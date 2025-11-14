@@ -1,0 +1,12 @@
+Flask==3.0.2
+requests==2.31.0
+openai==1.6.1
+python-dotenv==1.0.0
+gunicorn==21.2.0
+pandas==2.3.3
+openpyxl==3.1.5
+openai==1.6.1
+python-dotenv==1.0.0
+tqdm==4.66.1
+beutifulsoup4==4.12.3
+flask-cors==4.0.0
