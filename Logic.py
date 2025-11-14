@@ -7,7 +7,7 @@ Logic.py
 - يرسل الوصف للإيجنت
 - يطبع النتيجة للموظف (للتجارب حالياً)
 """
-
+#this comment by Shams
 from datetime import date
 
 # حالياً نستخدم إيجنت العمرة فقط
