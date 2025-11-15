@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>Smart Call Helper</title>
+
+    <style>
+        /* 
+           تنسيق الصفحة بالكامل:
+           - خلفية
+           - نوع الخط
+           - ترتيب النص
+        */
+        body {
+            font-family: "Cairo", sans-serif;
+            background-color: #f3f6f4;
+            text-align: center;
+        }
+
+        /* عنوان الصفحة فوق */
+        h1 {
+            margin-top: 30px;
+            color: #1f7bbf;
+            font-size: 32px;
+        }
+
+        /* 
+           الصندوق لفورم كامل (النموذج):
+           - العرض
+           - المسافات
+           - البوكس شادو
+           - الحدود
+        */
+        .form-container {
+            background-color: #ffffff;
+            width: 60%;
+            margin: 30px auto;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.08);
+            text-align: right;
+        }
+
+        /* تنسيق أسماء الحقول (Label) */
+        label {
+            display: block;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            padding-right: 4px;
+        }
+
+        /* 
+           تنسيق التكست انبوت والدروب داون:
+           - عرض كامل
+           - حدود
+           - حواف دائرية
+           - تكبير الخط
+        */
+        input, select {
+            width: 100%;
+            padding: 14px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            margin-bottom: 25px;
+            font-size: 18px;
+            font-weight: 600;
+            text-align: center;
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        /* 
+           زر توليد الصيغة:
+           - لون
+           - حجم
+           - تنسيق
+        */
+        button {
+            display: block;
+            margin: 20px auto 0 auto;
+            padding: 12px 30px;
+            border-radius: 10px;
+            border: none;
+            background-color: #2174ab;
+            color: white;
+            cursor: pointer;
+            font-size: 19px;
+            font-weight: 700;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- عنوان الصفحة -->
+    <h1>Smart Call Helper</h1>
+
+    <!-- 
+         نموذج سحب البيانات من المستخدم
+         ويحطها في POST request → للسيرفر على /search
+    -->
+    <form class="form-container" action="/search" method="POST">
+
+        <!-- حقل اسم العميل -->
+        <label for="caller_name">اسم العميل:</label>
+        <input name="caller_name" id="caller_name" type="text" required>
+
+        <!-- حقل نوع الجهة (دروب داون) -->
+        <label for="caller_type">نوع الجهة:</label>
+        <select name="caller_type" id="caller_type" required>
+            <option value="">اختر نوع الجهة</option>
+            <option value="شركة عمرة">شركة عمرة</option>
+            <option value="وكيل خارجي">وكيل خارجي</option>
+        </select>
+
+        <!-- حقل وصف المشكلة -->
+        <label for="issue_description">وصف المشكلة:</label>
+        <input name="issue_description" id="issue_description" type="text" required>
+
+        <!-- زر إرسال البيانات للسيرفر -->
+        <button type="submit">توليد الصيغة</button>
+
+    </form>
+
+</body>
+</html>
