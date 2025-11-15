@@ -1,43 +1,32 @@
 # -*- coding: utf-8 -*-
+
 """
 Logic.py
 ملف اللوجيك الرئيسي للكول هيلبر
 - يجمع المدخلات من الموظف
-- يختار الإيجنت المناسب داخليًا
+- يختار الإيجنت المناسب داخلياً
 - يرسل الوصف للإيجنت
-- يطبع النتيجة للموظف (للتجارب حالياً)
+- يطبع النتيجة للموظف
 """
-#this comment by Shams
-from datetime import date
 
-# حالياً نستخدم إيجنت العمرة فقط
+from datetime import date
 from agent.UmrahAgent import UmrahAgent
-# مستقبلاً:
-# from agent.HajjExAgent import HajjExAgent
-# from agent.HajjLoAgent import HajjLoAgent
 
 
 # =========================
 # دالة اختيار الإيجنت المناسب
 # =========================
 def get_agent_for_user(user_type: str):
-    
-   # تختار الإيجنت المناسب حسب نوع المستخدم.
-    #هذه العملية داخلية، ما تظهر للمستخدم.
-    
+    """
+    تختار الإيجنت المناسب حسب نوع المستخدم.
+    هذه العملية داخلية، ما تظهر للمستخدم.
+    """
 
-    normalized = (user_type or "").strip().lower()
+    normalized = (user_type or "").strip()
 
-    # كل ما له علاقة بالعمرة يروح لإيجنت العمرة
-    if "عمره" in normalized or "عمرة" in normalized:
+    # كل ما له علاقة بالعمرة → يروح لإيجنت العمرة
+    if "عمرة" in normalized or "شركة عمرة" in normalized or "وكيل خارجي" in normalized:
         return UmrahAgent()
-
-    # مثال مستقبلي:
-    # if "حج" in normalized and "خارج" in normalized:
-    #     return HajjExAgent()
-    #
-    # if "حج" in normalized and " in normalized:
-    #     return HajjLoAgent()
 
     # لو ما لقينا إيجنت مناسب نرجّع None
     return None
@@ -47,9 +36,9 @@ def get_agent_for_user(user_type: str):
 # الدالة الرئيسية
 # ==============
 def main():
-    # تاريخ اليوم (للسجلات أو اللوقز)
+    # تاريخ اليوم (للسجلّات أو اللوجز)
     today = date.today()
-    print("تاريخ اليوم :", today)
+    print("تاريخ اليوم:", today)
 
     # -------- المدخلات من الموظف --------
     client_name = input("اسم العميل : ")
@@ -62,8 +51,8 @@ def main():
     if agent is None:
         # رد عام محترم
         response_text = (
-            "حاليًا النظام مدرَّب على فئة محددة من المستخدمين فقط، "
-            "يرجى التأكد من كتابة نوع المستخدم بشكل صح."
+            "حالياً النظام مدرَّب على فئة محددة من المستخدمين فقط.\n"
+            "يرجى التأكد من كتابة نوع المستخدم بشكل صحيح."
         )
 
         print("\n--- النتيجة ---")
@@ -73,8 +62,7 @@ def main():
         return
 
     # -------- البحث في قاعدة المعرفة عبر الإيجنت --------
-    # ملاحظة: نفترض أن UmrahAgent عنده دالة:
-    #   find_best_row(issue_description) -> (best_row, status_msg)
+   
     best_row, status_msg = agent.find_best_row(issue_description)
 
     print("\n--- النتيجة ---")
@@ -86,12 +74,13 @@ def main():
         print("الحالة :", status_msg)
         print("الرد :", "نحتاج تفاصيل أكثر عن المشكلة أو تسجيلها كحالة جديدة في النظام.")
     else:
-        # نفترض أن best_row هي Series من pandas وفيها هذي الأعمدة
+        # نفترض أن best_row هي Series من pandas فيها الأعمدة
         print("الحالة :", status_msg)
         print("التصنيف :", best_row.get("Category", ""))
-        print("درجة المطابقة :", best_row.get("MatchScore", ""))
+        print("التصنيف الفرعي :", best_row.get("SubCategory", ""))
+        print("درجة المطابقة :", best_row.get("MatchScore", ""))  
         print("الرد المقترح :")
-        print(best_row.get("Response", ""))
+        print(best_row.get("ResponseText", ""))
 
 
 # تشغيل الملف مباشرة
