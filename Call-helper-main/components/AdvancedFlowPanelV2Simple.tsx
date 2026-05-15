@@ -37,10 +37,6 @@ interface AdvancedFlowPanelV2Props {
   problemDescription: string;
   isGrayAreaMode: boolean;
   initialFilteredRouteIds?: string[] | undefined;
-  /** عند تفعيل فلترة الفئة من وصف المشكلة / المعرفة */
-  categoryScopeBanner?: { title: string; subtitle?: string } | null;
-  /** رسالة عند عدم وجود مسارات بعد فلترة الفئة */
-  scopedEmptyMessage?: string | null;
   onFlowComplete: (result: {
     completedSteps: Array<{
       stepId: string;
@@ -69,8 +65,6 @@ export function AdvancedFlowPanelV2({
   steps, 
   isGrayAreaMode,
   initialFilteredRouteIds,
-  categoryScopeBanner,
-  scopedEmptyMessage,
   onFlowComplete,
   onDebugUpdate,
 }: AdvancedFlowPanelV2Props) {
@@ -353,49 +347,25 @@ export function AdvancedFlowPanelV2({
 
   // No routes available
   if (currentWizardStep.type === 'route_select' && currentWizardStep.availableRouteIds.length === 0) {
-    const customEmpty = scopedEmptyMessage?.trim();
     return (
       <div className="glass-panel border-2 border-border rounded-xl p-6 text-center space-y-3">
         <AlertCircle className="size-12 text-muted-foreground mx-auto mb-1" />
-        {categoryScopeBanner && (
-          <div className="text-right glass-card rounded-lg p-3 border border-primary/20 mb-2">
-            <p className="text-sm font-semibold text-foreground">{categoryScopeBanner.title}</p>
-            {categoryScopeBanner.subtitle && (
-              <p className="text-xs text-muted-foreground mt-1">{categoryScopeBanner.subtitle}</p>
-            )}
-          </div>
-        )}
         <p className="text-muted-foreground text-sm font-semibold">
-          {customEmpty
-            ? customEmpty
-            : isGrayAreaMode
-              ? 'لا توجد مسارات مربوطة بهذا السؤال'
-              : 'لا توجد مسارات متاحة'}
+          {isGrayAreaMode
+            ? 'لا توجد مسارات مربوطة بهذا السؤال'
+            : 'لا توجد مسارات متاحة'}
         </p>
-        {!customEmpty && (
-          <p className="text-xs text-muted-foreground mt-2">
-            {isGrayAreaMode
-              ? 'يرجى ربط المسارات المناسبة بهذا السؤال من صفحة الإعدادات المتقدمة'
-              : 'يرجى تفعيل بعض المسارات من لوحة الإعدادات'}
-          </p>
-        )}
+        <p className="text-xs text-muted-foreground mt-2">
+          {isGrayAreaMode
+            ? 'يرجى ربط المسارات المناسبة بهذا السؤال من صفحة الإعدادات المتقدمة'
+            : 'يرجى تفعيل بعض المسارات من لوحة الإعدادات'}
+        </p>
       </div>
     );
   }
 
   return (
     <div className="space-y-4" dir="rtl">
-      {categoryScopeBanner && !flowFinished && (
-        <div className="flex items-start gap-3 glass-panel rounded-lg p-3 border border-cyan-500/25 bg-cyan-500/5">
-          <FolderTree className="size-5 text-cyan-600 dark:text-cyan-400 shrink-0 mt-0.5" />
-          <div className="text-right flex-1 min-w-0">
-            <p className="text-sm font-semibold text-foreground">{categoryScopeBanner.title}</p>
-            {categoryScopeBanner.subtitle && (
-              <p className="text-xs text-muted-foreground mt-1">{categoryScopeBanner.subtitle}</p>
-            )}
-          </div>
-        </div>
-      )}
       {/* Breadcrumb - المسار الحالي */}
       {flowPath.length > 0 && !flowFinished && (
         <div className="glass-panel rounded-lg p-3 border">

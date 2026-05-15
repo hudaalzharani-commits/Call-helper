@@ -6,7 +6,8 @@ import {
   getHourlyActivity,
   getDistributionStats,
   getUserStats,
-  getKnowledgeBaseStats
+  getKnowledgeBaseStats,
+  getConfirmedBriefingsList,
 } from '../services/analyticsService.js';
 
 const router = express.Router();
@@ -33,8 +34,8 @@ router.get('/summary', authenticate, async (req, res) => {
 // @access  Private
 router.get('/time-series', authenticate, async (req, res) => {
   try {
-    const { period = '7d' } = req.query;
-    const result = await getTimeSeriesData(period);
+    const { period = '7d', from, to } = req.query;
+    const result = await getTimeSeriesData(period, { from, to });
     res.json(result);
   } catch (error) {
     console.error('❌ Analytics time-series error:', error);
@@ -76,6 +77,24 @@ router.get('/distribution', authenticate, async (req, res) => {
       success: false,
       message: 'Failed to get distribution statistics',
       error: error.message
+    });
+  }
+});
+
+// @route   GET /api/analytics/confirmed-briefings
+// @desc    List call logs with generated response + final display score 100% (problem + solution)
+// @access  Private
+router.get('/confirmed-briefings', authenticate, async (req, res) => {
+  try {
+    const { from, to, limit } = req.query;
+    const result = await getConfirmedBriefingsList({ from, to, limit });
+    res.json(result);
+  } catch (error) {
+    console.error('❌ Analytics confirmed-briefings error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get confirmed briefings',
+      error: error.message,
     });
   }
 });

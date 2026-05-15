@@ -144,23 +144,40 @@ export async function getSummaryStats() {
 
 /**
  * Get time series data
- * @param {string} period - Time period ('7d', '30d', '90d')
+ * @param {string} period - Time period ('7d', '30d', '90d') when from/to not used
+ * @param {{ from?: string, to?: string }} [range] - optional inclusive range from client ISO strings
  * @returns {Promise<Object>} Time series data
  */
-export async function getTimeSeriesData(period = '7d') {
+export async function getTimeSeriesData(period = '7d', range = {}) {
   try {
-    // Parse period
-    const days = parseInt(period) || 7;
-    
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-    
+    const { from, to } = range;
+    let startDate;
+    let endDate;
+
+    if (from && to) {
+      startDate = new Date(from);
+      endDate = new Date(to);
+      if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+        throw new Error('Invalid from or to date');
+      }
+      if (startDate > endDate) {
+        const swap = startDate;
+        startDate = endDate;
+        endDate = swap;
+      }
+    } else {
+      const days = parseInt(String(period).replace(/[^\d]/g, ''), 10) || 7;
+      endDate = new Date();
+      startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+    }
+
     // Aggregate calls by day
     const timeSeriesData = await CallLog.aggregate([
       {
         $match: {
-          createdAt: { $gte: startDate }
-        }
+          createdAt: { $gte: startDate, $lte: endDate },
+        },
       },
       {
         $group: {
@@ -211,9 +228,13 @@ export async function getTimeSeriesData(period = '7d') {
     // Fill in missing dates with zero values
     const filledData = [];
     const currentDate = new Date(startDate);
-    const endDate = new Date();
-    
-    while (currentDate <= endDate) {
+    const fillEnd = new Date(endDate);
+    if (from && to) {
+      currentDate.setHours(0, 0, 0, 0);
+      fillEnd.setHours(23, 59, 59, 999);
+    }
+
+    while (currentDate <= fillEnd) {
       const dateStr = currentDate.toISOString().split('T')[0];
       const existingData = timeSeriesData.find(d => d.date === dateStr);
       
@@ -567,6 +588,53 @@ export async function getUserStats() {
 }
 
 /**
+ * قائمة بلاغات «إفادات مؤكدة»: صيغة مولّدة + سكور العرض النهائي 100٪
+ * @param {{ from?: string, to?: string, limit?: number }} query
+ */
+export async function getConfirmedBriefingsList(query = {}) {
+  try {
+    const { from, to, limit: limitRaw } = query;
+    const limit = Math.min(200, Math.max(1, parseInt(String(limitRaw), 10) || 100));
+
+    const match = {
+      generatedResponse: { $type: 'string', $regex: /\S/ },
+      finalDisplayScore: { $gte: 100 },
+    };
+
+    if (from || to) {
+      match.createdAt = {};
+      if (from) match.createdAt.$gte = new Date(from);
+      if (to) match.createdAt.$lte = new Date(to);
+    }
+
+    const rows = await CallLog.find(match)
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .select('customerName entityType problemSummary category generatedResponse createdAt')
+      .lean();
+
+    const items = rows.map((r) => ({
+      id: String(r._id),
+      customerName: r.customerName ?? '',
+      entityType: r.entityType ?? '',
+      problemSummary: r.problemSummary ?? '',
+      category: r.category ?? null,
+      solution: r.generatedResponse ?? '',
+      createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : null,
+    }));
+
+    return {
+      success: true,
+      data: { items },
+      timestamp: new Date().toISOString(),
+    };
+  } catch (error) {
+    console.error('❌ Error getting confirmed briefings list:', error);
+    throw error;
+  }
+}
+
+/**
  * Get knowledge base statistics
  * @returns {Promise<Object>} KB stats
  */
@@ -616,5 +684,6 @@ export default {
   getHourlyActivity,
   getDistributionStats,
   getUserStats,
-  getKnowledgeBaseStats
+  getKnowledgeBaseStats,
+  getConfirmedBriefingsList,
 };

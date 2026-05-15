@@ -14,6 +14,8 @@ import {
   getHourlyActivity,
   getSummaryStats,
   getTimeSeriesData,
+  getConfirmedBriefings,
+  type ConfirmedBriefingRow,
   type DistributionStats,
   type HourlyDataPoint,
   type SummaryStats,
@@ -49,7 +51,62 @@ import {
 } from "./ui/popover";
 import { Button } from "./ui/button";
 import { Calendar as CalendarComponent } from "./ui/calendar";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
 import { formatAppDate, formatAppMonthDay, formatAppWeekdayFullDate, formatAppTime } from "../utils/dateDisplay";
+
+/** نطاق التقويم المعروض في المؤشرات (يُستخدم للسلاسل الزمنية وقائمة الإفادات المؤكدة) */
+function computeIndicatorDateRange(
+  selectedPeriod: string,
+  appliedDateRange: { start: Date; end: Date } | null,
+): { start: Date; end: Date } {
+  const now = new Date();
+  const start = new Date(now);
+  const end = new Date(now);
+
+  switch (selectedPeriod) {
+    case "today":
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      return { start, end };
+    case "week": {
+      const dayOfWeek = now.getDay();
+      const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      start.setDate(now.getDate() - diff);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      return { start, end };
+    }
+    case "month":
+      start.setDate(1);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      return { start, end };
+    case "year":
+      start.setMonth(0, 1);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      return { start, end };
+    case "custom":
+      if (appliedDateRange) {
+        return {
+          start: new Date(appliedDateRange.start),
+          end: new Date(appliedDateRange.end),
+        };
+      }
+      break;
+    default:
+      break;
+  }
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+}
 
 export function LiveIndicators() {
   const [selectedPeriod, setSelectedPeriod] = useState("today");
@@ -64,6 +121,15 @@ export function LiveIndicators() {
   const [distributionStats, setDistributionStats] = useState<DistributionStats | null>(null);
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
+  const [confirmedBriefingsOpen, setConfirmedBriefingsOpen] = useState(false);
+  const [confirmedBriefingsItems, setConfirmedBriefingsItems] = useState<
+    ConfirmedBriefingRow[]
+  >([]);
+  const [confirmedBriefingsLoading, setConfirmedBriefingsLoading] =
+    useState(false);
+  const [confirmedBriefingsError, setConfirmedBriefingsError] = useState<
+    string | null
+  >(null);
   const [date, setDate] = useState<Date | undefined>(
     new Date(),
   );
@@ -85,65 +151,10 @@ export function LiveIndicators() {
     end: Date;
   } | null>(null);
 
-  // Get date range based on selected period
-  const getDateRange = () => {
-    const now = new Date();
-    const start = new Date();
-    const end = new Date();
+  const getDateRange = () =>
+    computeIndicatorDateRange(selectedPeriod, appliedDateRange);
 
-    switch (selectedPeriod) {
-      case "today":
-        start.setHours(0, 0, 0, 0);
-        end.setHours(23, 59, 59, 999);
-        break;
-      case "week": {
-        const dayOfWeek = now.getDay();
-        const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Monday as first day
-        start.setDate(now.getDate() - diff);
-        start.setHours(0, 0, 0, 0);
-        end.setHours(23, 59, 59, 999);
-        break;
-      }
-      case "month":
-        start.setDate(1);
-        start.setHours(0, 0, 0, 0);
-        end.setHours(23, 59, 59, 999);
-        break;
-      case "year":
-        start.setMonth(0, 1);
-        start.setHours(0, 0, 0, 0);
-        end.setHours(23, 59, 59, 999);
-        break;
-      case "custom":
-        if (appliedDateRange) {
-          return {
-            start: appliedDateRange.start,
-            end: appliedDateRange.end,
-          };
-        }
-        break;
-    }
-
-    return { start, end };
-  };
-
-  /**
-   * Map UI selected period to backend analytics "period" param.
-   * Backend expects a string like '7d' but only uses the numeric part.
-   */
-  const analyticsPeriodParam = useMemo(() => {
-    if (selectedPeriod === "month") return "30d";
-    if (selectedPeriod === "year") return "90d";
-    if (selectedPeriod === "custom" && appliedDateRange) {
-      const ms = appliedDateRange.end.getTime() - appliedDateRange.start.getTime();
-      const days = Math.max(1, Math.ceil(ms / (1000 * 60 * 60 * 24)));
-      return `${days}d`;
-    }
-    // today/week default
-    return "7d";
-  }, [selectedPeriod, appliedDateRange]);
-
-  // Fetch analytics when period changes
+  // Fetch analytics when period / custom range changes
   useEffect(() => {
     let cancelled = false;
 
@@ -151,9 +162,16 @@ export function LiveIndicators() {
       setIsLoadingAnalytics(true);
       setAnalyticsError(null);
       try {
+        const { start, end } = computeIndicatorDateRange(
+          selectedPeriod,
+          appliedDateRange,
+        );
         const [summary, series, hourly, distribution] = await Promise.all([
           getSummaryStats(),
-          getTimeSeriesData(analyticsPeriodParam),
+          getTimeSeriesData({
+            from: start.toISOString(),
+            to: end.toISOString(),
+          }),
           getHourlyActivity(),
           getDistributionStats(),
         ]);
@@ -175,7 +193,7 @@ export function LiveIndicators() {
     return () => {
       cancelled = true;
     };
-  }, [analyticsPeriodParam]);
+  }, [selectedPeriod, appliedDateRange]);
 
   // Format date for display (ميلادي فقط)
   const formatDateForDisplay = () => {
@@ -223,10 +241,8 @@ export function LiveIndicators() {
   // Handle preset period selection
   const handlePeriodChange = (period: string) => {
     setSelectedPeriod(period);
-
     if (period !== "custom") {
-      const { start, end } = getDateRange();
-
+      setAppliedDateRange(null);
     }
   };
 
@@ -336,6 +352,100 @@ export function LiveIndicators() {
 
   return (
     <div className="space-y-6">
+      <Dialog
+        open={confirmedBriefingsOpen}
+        onOpenChange={(open) => {
+          setConfirmedBriefingsOpen(open);
+          if (!open) setConfirmedBriefingsError(null);
+        }}
+      >
+        <DialogContent
+          dir="rtl"
+          className="max-w-2xl w-[min(100vw-2rem,42rem)] max-h-[85vh] flex flex-col gap-0 overflow-hidden border-2 border-border bg-white p-0 text-foreground shadow-2xl sm:max-w-2xl dark:bg-zinc-950"
+        >
+          <DialogHeader className="shrink-0 border-b border-border bg-zinc-100 px-6 pb-3 pt-6 text-right dark:bg-zinc-900">
+            <DialogTitle className="text-right">
+              الإفادات المؤكدة — المشكلة والحل
+            </DialogTitle>
+            <DialogDescription className="text-right">
+              سجلات بصيغة مولّدة وسكور العرض النهائي 100٪، ضمن الفترة المعروضة
+              أعلاه في الصفحة.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-white px-6 py-4 dark:bg-zinc-950">
+            {confirmedBriefingsLoading && (
+              <p className="text-sm text-muted-foreground text-center py-10">
+                جاري التحميل…
+              </p>
+            )}
+            {confirmedBriefingsError && (
+              <p className="text-sm text-destructive text-right">
+                {confirmedBriefingsError}
+              </p>
+            )}
+            {!confirmedBriefingsLoading &&
+              !confirmedBriefingsError &&
+              confirmedBriefingsItems.length === 0 && (
+                <p className="text-sm text-muted-foreground text-right py-4">
+                  لا توجد إفادات مؤكدة ضمن الفترة المحددة.
+                </p>
+              )}
+            {!confirmedBriefingsLoading &&
+              confirmedBriefingsItems.map((row) => (
+                <div
+                  key={row.id}
+                  className="space-y-3 rounded-xl border border-border bg-zinc-50 p-4 text-right dark:bg-zinc-900"
+                >
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground justify-end">
+                    {row.createdAt && (
+                      <span>{formatAppDate(new Date(row.createdAt))}</span>
+                    )}
+                    {row.customerName ? (
+                      <span>
+                        العميل:{" "}
+                        <span className="text-foreground font-medium">
+                          {row.customerName}
+                        </span>
+                      </span>
+                    ) : null}
+                    {row.entityType ? (
+                      <span>
+                        الجهة:{" "}
+                        <span className="text-foreground font-medium">
+                          {row.entityType}
+                        </span>
+                      </span>
+                    ) : null}
+                    {row.category ? (
+                      <span>
+                        التصنيف:{" "}
+                        <span className="text-foreground font-medium">
+                          {row.category}
+                        </span>
+                      </span>
+                    ) : null}
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-muted-foreground mb-1">
+                      المشكلة
+                    </p>
+                    <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+                      {row.problemSummary?.trim() ? row.problemSummary : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-muted-foreground mb-1">
+                      الحل / الصيغة المولّدة
+                    </p>
+                    <pre className="m-0 max-h-[220px] overflow-y-auto rounded-lg border border-border bg-zinc-100 p-3 font-sans text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words dark:bg-zinc-950">
+                      {row.solution?.trim() ? row.solution : "—"}
+                    </pre>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </DialogContent>
+      </Dialog>
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
@@ -747,6 +857,33 @@ export function LiveIndicators() {
                       paddingAngle={4}
                       dataKey="value"
                       label={false}
+                      style={{ cursor: "pointer" }}
+                      onClick={(entry) => {
+                        if (!entry || entry.name !== "مؤكدة") return;
+                        setConfirmedBriefingsOpen(true);
+                        setConfirmedBriefingsItems([]);
+                        setConfirmedBriefingsError(null);
+                        setConfirmedBriefingsLoading(true);
+                        const { start, end } = getDateRange();
+                        getConfirmedBriefings({
+                          from: start.toISOString(),
+                          to: end.toISOString(),
+                          limit: 100,
+                        })
+                          .then((res) =>
+                            setConfirmedBriefingsItems(res.items ?? []),
+                          )
+                          .catch((err) =>
+                            setConfirmedBriefingsError(
+                              err instanceof Error
+                                ? err.message
+                                : "تعذّر تحميل القائمة",
+                            ),
+                          )
+                          .finally(() =>
+                            setConfirmedBriefingsLoading(false),
+                          );
+                      }}
                     >
                       {confirmedReportsData.map((entry, index) => (
                         <Cell

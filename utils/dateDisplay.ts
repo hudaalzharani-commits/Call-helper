@@ -3,6 +3,11 @@ const LOCALE = 'ar-SA';
 
 const GREGORY: Pick<Intl.DateTimeFormatOptions, 'calendar'> = { calendar: 'gregory' };
 
+/** أرقام إنجليزية (لاتينية) 0–9 بدل الأرقام العربية الهندية */
+const LATN_DIGITS: Pick<Intl.DateTimeFormatOptions, 'numberingSystem'> = {
+  numberingSystem: 'latn',
+};
+
 function toDate(d: Date | string | number): Date {
   return d instanceof Date ? d : new Date(d);
 }
@@ -12,6 +17,7 @@ export function formatAppDate(d: Date | string | number): string {
   if (Number.isNaN(x.getTime())) return '—';
   return x.toLocaleDateString(LOCALE, {
     ...GREGORY,
+    ...LATN_DIGITS,
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -23,6 +29,7 @@ export function formatAppDateTime(d: Date | string | number): string {
   if (Number.isNaN(x.getTime())) return '—';
   return x.toLocaleString(LOCALE, {
     ...GREGORY,
+    ...LATN_DIGITS,
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -40,6 +47,7 @@ export function formatAppDateShort(iso: string | undefined | null): string {
   if (Number.isNaN(d.getTime())) return '—';
   return d.toLocaleString(LOCALE, {
     ...GREGORY,
+    ...LATN_DIGITS,
     weekday: 'short',
     day: 'numeric',
     month: 'short',
@@ -51,13 +59,13 @@ export function formatAppDateShort(iso: string | undefined | null): string {
 export function formatAppWeekdayShort(d: Date | string | number): string {
   const x = toDate(d);
   if (Number.isNaN(x.getTime())) return '—';
-  return x.toLocaleDateString(LOCALE, { ...GREGORY, weekday: 'short' });
+  return x.toLocaleDateString(LOCALE, { ...GREGORY, ...LATN_DIGITS, weekday: 'short' });
 }
 
 export function formatAppMonthDay(d: Date | string | number): string {
   const x = toDate(d);
   if (Number.isNaN(x.getTime())) return '—';
-  return x.toLocaleDateString(LOCALE, { ...GREGORY, month: 'short', day: 'numeric' });
+  return x.toLocaleDateString(LOCALE, { ...GREGORY, ...LATN_DIGITS, month: 'short', day: 'numeric' });
 }
 
 export function formatAppWeekdayFullDate(d: Date | string | number): string {
@@ -65,6 +73,7 @@ export function formatAppWeekdayFullDate(d: Date | string | number): string {
   if (Number.isNaN(x.getTime())) return '—';
   return x.toLocaleDateString(LOCALE, {
     ...GREGORY,
+    ...LATN_DIGITS,
     weekday: 'long',
     year: 'numeric',
     month: 'long',
@@ -75,5 +84,5 @@ export function formatAppWeekdayFullDate(d: Date | string | number): string {
 export function formatAppTime(d: Date | string | number): string {
   const x = toDate(d);
   if (Number.isNaN(x.getTime())) return '—';
-  return x.toLocaleTimeString(LOCALE, { ...GREGORY, hour: '2-digit', minute: '2-digit' });
+  return x.toLocaleTimeString(LOCALE, { ...GREGORY, ...LATN_DIGITS, hour: '2-digit', minute: '2-digit' });
 }

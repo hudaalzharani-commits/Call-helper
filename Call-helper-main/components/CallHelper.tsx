@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -47,6 +47,11 @@ import {
   PROBLEM_TYPES 
 } from "../utils/mockConfidenceData";
 import { descriptionImpliesCategory } from "../utils/categoryContextMatch";
+import {
+  CallHelperThinkingVisualization,
+  estimateThinkingStepTypingMs,
+  type CallHelperThinkingStep,
+} from "./CallHelperThinkingVisualization";
 
 // ============ NEW: Import Real Confidence API ============
 import { analyzeConfidenceDebounced, cancelDebouncedAnalysis } from "../services/confidenceService";
@@ -284,6 +289,9 @@ export function CallHelper({
     timestamp: Date;
   }>>([]);
   const [debugScoringBreakdown, setDebugScoringBreakdown] = useState<KnowledgeSearchResult['debugBreakdown'] | null>(null);
+  /** رسالة «تفكير» واحدة ظاهرة في كل لحظة (يُستبدل النص عند كل مرحلة حقيقية) */
+  const [thinkingSteps, setThinkingSteps] = useState<CallHelperThinkingStep[]>([]);
+
   const getScoringWeightValue = (weightName: string, fallback: number): number => {
     const normalizedTarget = weightName.trim().toLowerCase();
     const reversedWeights = [...scoringSettings.weights].reverse();
@@ -316,6 +324,95 @@ export function CallHelper({
       ...extraOptions,
     };
   };
+
+  /** رسالة واحدة؛ ننتظر حتى تنتهي كتابة السطر الإنجليزي للمرحلة ثم pauseMs كحد أدنى */
+  const appendThinkingStep = useCallback(
+    async (text: string, pauseMs: number, enLine: string) => {
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      setThinkingSteps([{ id, text, enLine }]);
+      const typingMs = estimateThinkingStepTypingMs(enLine);
+      await new Promise<void>((r) => setTimeout(r, Math.max(pauseMs, typingMs)));
+    },
+    [],
+  );
+
+  const appendPostSearchThinking = useCallback(
+    async (searchResult: KnowledgeSearchResult, opts?: { includeGrayAreaHint?: boolean }) => {
+      const breakdown = searchResult.debugBreakdown;
+      if (breakdown?.preFilter?.skippedByUserTypeOrServiceType?.length) {
+        await appendThinkingStep(
+          "تضييق الاحتمالات بعد فلترة نوع الجهة أو نوع الخدمة وفق المعطيات.",
+          520,
+          "NARROWING BY USER TYPE AND SERVICE FILTERS",
+        );
+      }
+      const kw = breakdown?.keyword?.findings;
+      if (
+        kw &&
+        (kw.matchedMainKeywords.length > 0 ||
+          kw.matchedExtraKeywords.length > 0 ||
+          kw.matchedSynonyms.length > 0 ||
+          kw.matchedUserWordsInCaseText.length > 0)
+      ) {
+        await appendThinkingStep(
+          "مطابقة الكلمات المفتاحية مع نصوص الحالات المسجّلة.",
+          480,
+          "MATCHING KEYWORD SIGNALS ON REGISTERED CASES",
+        );
+      }
+      if (!searchResult.isMatched && searchResult.matchPercentage > 0) {
+        await appendThinkingStep(
+          "مراجعة الحالات القريبة — السكور لم يصل بعد لعتبة اعتماد التطابق في النظام.",
+          520,
+          "REVIEWING BORDERLINE SCORES BELOW CONFIRM THRESHOLD",
+        );
+      }
+      if (searchResult.isMatched && searchResult.matchPercentage >= 85) {
+        await appendThinkingStep(
+          "تم رصد تشابه مرتفع مع حالة مسجّلة في قاعدة البيانات.",
+          460,
+          "HIGH SIMILARITY LOCK ON DATABASE CASE",
+        );
+      } else if (searchResult.isMatched) {
+        await appendThinkingStep(
+          "تم التعرف على تشابه مع حالة قريبة.",
+          440,
+          "PARTIAL MATCH ANCHORED TO CLOSEST CASE",
+        );
+      }
+      const meta = breakdown?.metadata?.findings;
+      if (
+        meta &&
+        ((meta.categoryMatchedTokens?.length ?? 0) > 0 ||
+          (meta.subCategoryMatchedTokens?.length ?? 0) > 0 ||
+          meta.userTypeMatched === true)
+      ) {
+        await appendThinkingStep(
+          "ربط السياق (فئة / تصنيف فرعي / نوع حساب) ضمن مطابقة البيانات الوصفية.",
+          480,
+          "BINDING CATEGORY SUBTYPE AND ACCOUNT CONTEXT",
+        );
+      }
+      if (opts?.includeGrayAreaHint) {
+        const previewText =
+          searchResult.isMatched && searchResult.problem
+            ? getFormattedResponse(searchResult.problem, customerName, entityType)
+            : `السلام عليكم ورحمة الله وبركاته،\n\nتم استقبال بلاغ من العميل: ${customerName}\nنوع الجهة: ${entityType}\n\nوصف المشكلة:\n${problemSummary}\n\nتم تسجيل البلاغ في النظام وسيتم المتابعة مع الفريق المختص.\n\nشكراً لتواصلكم معنا.`;
+        const simDesc = searchResult.matchPercentage;
+        const simConf = searchResult.matchPercentage;
+        const simDisplayed = simDesc > 40 ? simDesc : simConf;
+        if (simDisplayed < grayAreaThreshold && previewText.trim()) {
+          await appendThinkingStep(
+            "الحالة تحتاج تفاصيل إضافية — قد تُفعَّل منطقة الغموض قبل اعتماد الرد النهائي.",
+            540,
+            "AMBIGUOUS MAY REQUIRE MORE DETAIL",
+          );
+        }
+      }
+    },
+    [appendThinkingStep, customerName, entityType, grayAreaThreshold, problemSummary],
+  );
+
   const rerunMatchWithFlowContext = async (context: {
     routeNames?: string[];
     stepNames?: string[];
@@ -400,6 +497,7 @@ export function CallHelper({
     }
 
     setIsGenerating(true);
+    setThinkingSteps([]);
     setIsAlternativeFormat(false);
 
     // ✅ Reset Gray Area states when generating new response
@@ -410,10 +508,26 @@ export function CallHelper({
     setDebugScoringBreakdown(null);
 
     try {
+      if (customerName.trim() || entityType.trim()) {
+        await appendThinkingStep(
+          "رفيق يربط المعطيات (اسم العميل ونوع الجهة) مع إعدادات المطابقة.",
+          520,
+          "LINKING INPUT FIELDS TO MATCHER CONTEXT",
+        );
+      }
+      await appendThinkingStep(
+        "رفيق يحلل الكلمات المفتاحية ويبحث في الحالات المسجّلة.",
+        540,
+        "THINKING IN NEXT MOVE",
+      );
+
       // ============ NEW: Search real database only (no mock fallback) ============
       console.log('🔍 Searching knowledge base for:', problemSummary);
       const matcherOptions = buildMatcherOptions();
       const searchResult = await searchWithFallback(problemSummary, false, matcherOptions);
+
+      await appendPostSearchThinking(searchResult, { includeGrayAreaHint: true });
+
       setDebugScoringBreakdown(searchResult.debugBreakdown || null);
       if (matcherOptions.includeDebugBreakdown && searchResult.debugBreakdown) {
         console.log('🧪 Matcher debug breakdown:', searchResult.debugBreakdown);
@@ -478,6 +592,11 @@ export function CallHelper({
       }
     } catch (error) {
       console.error('❌ Error during knowledge base search:', error);
+      await appendThinkingStep(
+        "تعذّر إكمال المطابقة من الخادم — جاري تجهيز رد احتياطي.",
+        540,
+        "MATCH FAILED USING SAFE FALLBACK RESPONSE",
+      );
       
       // Fallback to generic response on error
       const entityTypeArabic = entityType;
@@ -496,20 +615,30 @@ export function CallHelper({
       setIsMatchedResponse(false);
       setDebugScoringBreakdown(null);
     } finally {
+      await new Promise<void>((r) => setTimeout(r, 480));
+      setThinkingSteps([]);
       setIsGenerating(false);
     }
   };
 
   const handleGenerateAlternative = () => {
-    setIsGenerating(true);
     setIsAlternativeFormat(true);
+    setThinkingSteps([]);
+    void (async () => {
+      setIsGenerating(true);
+      await appendThinkingStep(
+        "مراجعة السكور الحالي وتجهيز صيغة بديلة وفق نفس السياق.",
+        480,
+        "REBUILDING ALTERNATE REPLY FROM CURRENT SCORE",
+      );
 
-    const scoreSnapshot =
-      descriptionMatchPercentage > 40
-        ? descriptionMatchPercentage
-        : confidenceScore;
+      const scoreSnapshot =
+        descriptionMatchPercentage > 40
+          ? descriptionMatchPercentage
+          : confidenceScore;
 
-    setTimeout(() => {
+      await new Promise<void>((r) => setTimeout(r, 400));
+
       const entityTypeArabic = entityType;
 
       const alternativeGenerated = `مرحباً،\n\nنفيدكم باستلام بلاغكم بخصوص:\nاسم المبلغ: ${customerName}\nطبيعة الجهة: ${entityTypeArabic}\n\nتفاصيل البلاغ:\n${problemSummary}\n\nسيتم دراسة الموضوع والرد عليكم في أقرب وقت.\n\nمع التقدير،`;
@@ -523,8 +652,10 @@ export function CallHelper({
           Math.max(0, Math.round(Number(scoreSnapshot) || 0)),
         ),
       });
+      await new Promise<void>((r) => setTimeout(r, 280));
+      setThinkingSteps([]);
       setIsGenerating(false);
-    }, 500);
+    })();
   };
 
   const handleCopy = () => {
@@ -715,48 +846,6 @@ export function CallHelper({
     getRoutesForContext,
   ]);
 
-  /** فئة السياق المعروضة في الوضع المتقدم (معرفة أو مستنتجة من الوصف) */
-  const advancedCategoryScope = useMemo(() => {
-    const cat =
-      (matchedProblem?.category || '').trim() || inferredCategoryFromDescription || '';
-    if (!cat) return null;
-    const fromKb = Boolean((matchedProblem?.category || '').trim());
-    return { category: cat, fromKb };
-  }, [matchedProblem, inferredCategoryFromDescription]);
-
-  const advancedCategoryScopeBanner = useMemo(() => {
-    if (targetedRouteIds === undefined || !advancedCategoryScope) return null;
-    return {
-      title: `وضع متقدم مخصّص للفئة: ${advancedCategoryScope.category}`,
-      subtitle: advancedCategoryScope.fromKb
-        ? 'المصدر: فئة من قاعدة المعرفة بعد المطابقة مع وصف المشكلة'
-        : 'المصدر: استنتاج من كلمات وصف المشكلة (يطابق أسماء فئات المسارات في الإعدادات المتقدمة)',
-    };
-  }, [targetedRouteIds, advancedCategoryScope]);
-
-  const advancedScopedEmptyMessage = useMemo(() => {
-    if (
-      targetedRouteIds === undefined ||
-      !advancedCategoryScope ||
-      targetedRouteIds.length > 0
-    ) {
-      return null;
-    }
-    return advancedCategoryScope.fromKb
-      ? `لا يوجد مسار مفعّل مطابق لفئة «${advancedCategoryScope.category}» من المعرفة. في الإعدادات المتقدمة: فعّل المسار، وإمّا أضف نفس الفئة في «فئات المسار» أو سمّ المسار بما يطابقها (بما فيه المفرد/الجمع)، وتأكد أن «أنواع الجهات» على المسار إما فارغة أو تطابق «مقدم الخدمة».`
-      : `لا يوجد مسار مفعّل مرتبط بالفئة «${advancedCategoryScope.category}» المستنتجة من الوصف. عيّن «فئات المسار» أو اسماً للمسار يطابقها، وراعِ تطابق «أنواع الجهات» مع مقدم الخدمة إن وُجدت.`;
-  }, [targetedRouteIds, advancedCategoryScope]);
-
-  const liveRoutingMode = !generatedText
-    ? null
-    : isLowConfidence
-      ? 'gray_area'
-      : isDirectAnswerRoute
-        ? 'direct_answer'
-        : showAllButtons
-          ? 'advanced_mode'
-          : 'unknown';
-
   /**
    * Handle Advanced Mode toggle
    * TODO: Connect to decision tree backend when enabled
@@ -855,9 +944,13 @@ export function CallHelper({
               )}
               <div className="relative flex items-center justify-center gap-2.5 text-white font-bold text-sm">
                 <Wand2 className={`size-4 ${isGenerating ? "animate-spin" : ""}`} />
-                <span>{isGenerating ? "جاري التوليد..." : "توليد الصيغة"}</span>
+                <span>{isGenerating ? "جاري التحليل..." : "تحليل الحالة"}</span>
               </div>
             </button>
+
+            {thinkingSteps.length > 0 && (
+              <CallHelperThinkingVisualization steps={thinkingSteps} />
+            )}
           </CardContent>
         </Card>
 
@@ -1075,38 +1168,67 @@ export function CallHelper({
                 )}
               </div>
             )}
-            {isAdmin && generatedText && (
-              <div className="glass-panel rounded-xl p-3 border border-primary/30 bg-primary/5">
-                <div className="flex items-center justify-between gap-2 text-right">
-                  <span className="text-xs font-semibold text-foreground">Live Threshold Indicator</span>
-                  <Badge className="bg-primary/15 text-primary border-0 text-[10px]">
-                    {liveRoutingMode === 'gray_area'
-                      ? 'Gray Area'
-                      : liveRoutingMode === 'advanced_mode'
-                        ? 'Advanced'
-                        : liveRoutingMode === 'direct_answer'
-                          ? 'Direct'
-                          : 'Unknown'}
-                  </Badge>
-                </div>
-                <p className="text-[11px] text-muted-foreground text-right mt-1">
-                  Score: {displayedScore}% | Direct: ≥{directAnswerThreshold}% | Advanced: {showAdvancedThreshold}%–{directAnswerThreshold - 1}% | Gray: &lt;{grayAreaThreshold}%
-                </p>
-              </div>
-            )}
 
-            {/* Generated Text — blur عند Gray Area فقط */}
+            {/* Generated response — عرض تشغيلي فقط؛ النص المخزّن في generatedText دون تغيير */}
             <div
               className={`relative ${isLowConfidence ? "pointer-events-none" : ""}`}
             >
-              <Textarea
-                value={generatedText}
-                readOnly
-                placeholder="سيتم عرض الصيغة المولدة هنا..."
-                className={`text-right glass-panel border rounded-xl px-4 py-3 min-h-[240px] resize-none text-foreground placeholder:text-muted-foreground transition-all ${
-                  isLowConfidence ? "blur-sm select-none" : ""
-                }`}
-              />
+              {generatedText.trim() ? (
+                <div
+                  className={`text-right rounded-xl border border-border/80 bg-card/40 shadow-sm overflow-hidden ${
+                    isLowConfidence ? "blur-sm select-none" : ""
+                  }`}
+                  dir="rtl"
+                >
+                  <div className="border-b border-border/60 bg-muted/25 px-4 sm:px-5 py-4 space-y-3.5">
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-bold text-muted-foreground tracking-wide">
+                        اسم العميل
+                      </p>
+                      <p className="text-sm sm:text-[15px] font-semibold text-foreground leading-snug">
+                        {customerName.trim() || "—"}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-bold text-muted-foreground tracking-wide">
+                        نوع الجهة
+                      </p>
+                      <p className="text-sm sm:text-[15px] font-semibold text-foreground leading-snug">
+                        {entityType.trim() || "—"}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-bold text-muted-foreground tracking-wide">
+                        يستفسر عن
+                      </p>
+                      <p className="text-sm sm:text-[15px] font-semibold text-foreground leading-snug whitespace-pre-wrap break-words">
+                        {problemSummary.trim() || "—"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="px-4 sm:px-5 py-4 space-y-3 bg-background/60">
+                    <p className="text-[11px] font-bold text-primary/90 border-r-2 border-primary pr-2 -mr-0.5">
+                      تم إفادة العميل بالتالي:
+                    </p>
+                    <div className="rounded-lg border border-border/70 bg-muted/20 px-3 sm:px-4 py-3 min-h-[180px]">
+                      <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-foreground m-0 text-right">
+                        {isMatchedResponse && matchedProblem?.response?.trim()
+                          ? matchedProblem.response.trim()
+                          : generatedText}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <Textarea
+                  value={generatedText}
+                  readOnly
+                  placeholder="سيتم عرض الصيغة المولدة هنا..."
+                  className={`text-right glass-panel border rounded-xl px-4 py-3 min-h-[240px] resize-none text-foreground placeholder:text-muted-foreground transition-all ${
+                    isLowConfidence ? "blur-sm select-none" : ""
+                  }`}
+                />
+              )}
               {isLowConfidence && (
                 <div className="absolute inset-0 flex items-center justify-center bg-background/5 rounded-xl">
                   <div className="text-center space-y-2">
@@ -1262,8 +1384,6 @@ export function CallHelper({
                       problemDescription={problemSummary}
                       isGrayAreaMode={wasGrayAreaResolved} // true = Gray Area (< 50%), false = Advanced Mode (50-79%)
                       initialFilteredRouteIds={targetedRouteIds}
-                      categoryScopeBanner={advancedCategoryScopeBanner}
-                      scopedEmptyMessage={advancedScopedEmptyMessage}
                       onFlowComplete={async (result) => {
                         console.log('🏁 Advanced Flow Complete:', result);
                         
@@ -1462,7 +1582,14 @@ export function CallHelper({
           
           // Show loading state
           setIsGenerating(true);
-          
+          setThinkingSteps([]);
+          try {
+          await appendThinkingStep(
+            "رفيق يربط نوع المشكلة مع المسارات والخطوات التي اخترتها.",
+            520,
+            "MERGING PROBLEM TYPE WITH SELECTED ROUTE PATH",
+          );
+
           // Optional AI simulation (can be disabled)
           if (ENABLE_AI) {
             await simulateAIProcessing();
@@ -1475,6 +1602,11 @@ export function CallHelper({
           const stepNames = flowPath.selectedSteps.map((item) => item.step.name).filter(Boolean);
           const subConditionNames = flowPath.selectedSteps.map((item) => item.subCondition.name).filter(Boolean);
           if (flowPath.finalAction === 'direct_answer') {
+            await appendThinkingStep(
+              "بناء الرد من خطوة الإجابة المباشرة في المسار المختار.",
+              460,
+              "COMPOSING DIRECT ANSWER FROM FLOW NODE",
+            );
             const directAnswerText = flowPath.finalStepDescription || 'تم تقديم الإجابة المباشرة';
             const generatedResponse = `السلام عليكم ورحمة الله وبركاته،\n\nعزيزي/عزيزتي ${customerName}،\n\nتم استلام بلاغكم بخصوص: ${problemTypeName}\nنوع الجهة: ${entityTypeArabic}\n\n💡 توجيهات الحل:\n${directAnswerText}\n\nتفاصيل المشكلة:\n${problemSummary}\n\nتمت المعالجة بنجاح.\n\nمع تحياتنا،`;
             setGeneratedText(generatedResponse);
@@ -1501,15 +1633,22 @@ export function CallHelper({
             });
             return;
           }
+          await appendThinkingStep(
+            "رفيق يعيد المطابقة من قاعدة الحالات مع موسّع السياق بعد المسار.",
+            540,
+            "RESCORING WITH EXPANDED FLOW CONTEXT",
+          );
           const enhancedSearchResult = await rerunMatchWithFlowContext({
             routeNames,
             stepNames,
             subConditionNames,
             problemTypeName,
           });
+          if (enhancedSearchResult) {
+            await appendPostSearchThinking(enhancedSearchResult, { includeGrayAreaHint: false });
+          }
           if (
             flowPath.finalAction !== 'escalation'
-            && flowPath.finalAction !== 'direct_answer'
             && enhancedSearchResult?.isMatched
             && enhancedSearchResult.problem
           ) {
@@ -1558,6 +1697,26 @@ export function CallHelper({
           setIsMatchedResponse(false);
           setMatchedProblem(null);
           setDescriptionMatchPercentage(0);
+
+          if (flowPath.finalAction === "force_solution") {
+            await appendThinkingStep(
+              "اعتماد نص الرد وفق إجراء «فرض الحل» المختار في المسار.",
+              460,
+              "APPLYING FORCED SOLUTION MESSAGE FROM ROUTE",
+            );
+          } else if (flowPath.finalAction === "escalation") {
+            await appendThinkingStep(
+              "اعتماد نص الرد وفق إجراء «تصعيد» المختار في المسار.",
+              460,
+              "APPLYING ESCALATION MESSAGE FROM ROUTE",
+            );
+          } else {
+            await appendThinkingStep(
+              "اعتماد نص الرد وفق إجراء المتابعة في المسار.",
+              440,
+              "APPLYING CONTINUE MESSAGE FROM ROUTE",
+            );
+          }
           
           // Build flow path description
           const flowPathText = flowPath.selectedSteps
@@ -1621,6 +1780,10 @@ export function CallHelper({
               },
             ]);
           });
+          } finally {
+            await new Promise<void>((r) => setTimeout(r, 480));
+            setThinkingSteps([]);
+          }
         }}
       />
 

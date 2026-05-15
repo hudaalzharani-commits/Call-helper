@@ -107,6 +107,17 @@ export interface UserStats {
   };
 }
 
+/** سجل واحد من «إفادات مؤكدة» (سكور العرض 100٪ + صيغة مولّدة) */
+export interface ConfirmedBriefingRow {
+  id: string;
+  customerName: string;
+  entityType: string;
+  problemSummary: string;
+  category: string | null;
+  solution: string;
+  createdAt: string | null;
+}
+
 // Configuration
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 const API_TIMEOUT = 10000; // 10 seconds
@@ -165,6 +176,7 @@ function emptyPayloadForAnalyticsEndpoint<T>(endpoint: string): T {
   if (endpoint.startsWith('/hourly')) return emptyHourly() as T;
   if (endpoint.startsWith('/distribution')) return EMPTY_DISTRIBUTION as T;
   if (endpoint.startsWith('/users')) return EMPTY_USER_STATS as T;
+  if (endpoint.startsWith('/confirmed-briefings')) return { items: [] } as T;
   return EMPTY_SUMMARY as T;
 }
 
@@ -247,11 +259,24 @@ export async function getSummaryStats(): Promise<SummaryStats> {
 
 /**
  * Get time series data
- * @param period - Time period ('7d', '30d', '90d')
+ * @param periodOrRange - Rolling window e.g. `'7d'`, or explicit `{ from, to }` ISO range (matches UI presets)
  */
-export async function getTimeSeriesData(period: string = '7d'): Promise<TimeSeriesDataPoint[]> {
+export async function getTimeSeriesData(
+  periodOrRange: string | { period?: string; from?: string; to?: string } = '7d',
+): Promise<TimeSeriesDataPoint[]> {
   try {
-    return await fetchAPI<TimeSeriesDataPoint[]>(`/time-series?period=${period}`);
+    let query: string;
+    if (typeof periodOrRange === 'string') {
+      query = `period=${encodeURIComponent(periodOrRange)}`;
+    } else {
+      const { period = '7d', from, to } = periodOrRange;
+      if (from && to) {
+        query = `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+      } else {
+        query = `period=${encodeURIComponent(period)}`;
+      }
+    }
+    return await fetchAPI<TimeSeriesDataPoint[]>(`/time-series?${query}`);
   } catch (error) {
     console.error('❌ Error fetching time series data:', error);
     throw error;
@@ -290,6 +315,27 @@ export async function getUserStats(): Promise<UserStats> {
     return await fetchAPI<UserStats>('/users');
   } catch (error) {
     console.error('❌ Error fetching user stats:', error);
+    throw error;
+  }
+}
+
+/** قائمة الإفادات المؤكدة (المشكلة + الصيغة المولّدة) ضمن فترة اختيارية */
+export async function getConfirmedBriefings(params?: {
+  from?: string;
+  to?: string;
+  limit?: number;
+}): Promise<{ items: ConfirmedBriefingRow[] }> {
+  try {
+    const sp = new URLSearchParams();
+    if (params?.from) sp.set('from', params.from);
+    if (params?.to) sp.set('to', params.to);
+    if (params?.limit != null) sp.set('limit', String(params.limit));
+    const q = sp.toString();
+    return await fetchAPI<{ items: ConfirmedBriefingRow[] }>(
+      `/confirmed-briefings${q ? `?${q}` : ''}`,
+    );
+  } catch (error) {
+    console.error('❌ Error fetching confirmed briefings:', error);
     throw error;
   }
 }
@@ -362,5 +408,6 @@ export default {
   getHourlyActivity,
   getDistributionStats,
   getUserStats,
+  getConfirmedBriefings,
   getAllAnalytics
 };
