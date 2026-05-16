@@ -496,7 +496,7 @@ export function UsersRolesPage() {
               setShowAddDialog(true);
             }}
             size="sm"
-            className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white text-xs sm:text-sm"
+            className="bg-primary text-primary-foreground hover:bg-primary-hover text-primary-foreground text-xs sm:text-sm"
           >
             <UserPlus className="size-3.5 ml-1.5 sm:size-4 sm:ml-2 shrink-0" />
             إضافة مستخدم
@@ -508,7 +508,7 @@ export function UsersRolesPage() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
         <Card className="glass-panel border border-border p-2.5">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-md shrink-0">
+            <div className="p-1.5 bg-primary rounded-md shrink-0">
               <Users className="size-4 text-white" />
             </div>
             <div className="min-w-0">
@@ -651,7 +651,7 @@ export function UsersRolesPage() {
                           {user.avatar ? (
                             <AvatarImage src={user.avatar} alt={user.name} />
                           ) : (
-                            <AvatarFallback className="bg-gradient-to-br from-cyan-500 to-blue-500 text-white text-[10px] p-0">
+                            <AvatarFallback className="bg-primary text-white text-[10px] p-0">
                               <Users className="size-3.5" />
                             </AvatarFallback>
                           )}
@@ -824,7 +824,7 @@ export function UsersRolesPage() {
             </Button>
             <Button
               size="sm"
-              className="h-8 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white"
+              className="h-8 bg-primary text-primary-foreground hover:bg-primary-hover text-primary-foreground"
               onClick={handleAddUser}
             >
               <Check className="size-3.5 ml-1.5" />
@@ -946,7 +946,7 @@ export function UsersRolesPage() {
                 </Button>
                 <Button
                   size="sm"
-                  className="h-8 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white"
+                  className="h-8 bg-primary text-primary-foreground hover:bg-primary-hover text-primary-foreground"
                   onClick={handleSavePermissionsDialog}
                   disabled={permSavingId === permissionsDialogUser.id}
                 >
@@ -1088,7 +1088,7 @@ export function UsersRolesPage() {
             </Button>
             <Button
               size="sm"
-              className="h-8 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white"
+              className="h-8 bg-primary text-primary-foreground hover:bg-primary-hover text-primary-foreground"
               onClick={handleEditUser}
             >
               <Check className="size-3.5 ml-1.5" />
@@ -1121,7 +1121,7 @@ export function UsersRolesPage() {
                     {selectedUser.avatar ? (
                       <AvatarImage src={selectedUser.avatar} alt={selectedUser.name} />
                     ) : (
-                      <AvatarFallback className="bg-gradient-to-br from-cyan-500 to-blue-500 text-white">
+                      <AvatarFallback className="bg-primary text-white">
                         <Users className="size-5" />
                       </AvatarFallback>
                     )}
@@ -1234,7 +1234,7 @@ export function UsersRolesPage() {
                     {selectedUser.avatar ? (
                       <AvatarImage src={selectedUser.avatar} alt={selectedUser.name} />
                     ) : (
-                      <AvatarFallback className="bg-gradient-to-br from-cyan-500 to-blue-500 text-white">
+                      <AvatarFallback className="bg-primary text-white">
                         <Users className="size-5" />
                       </AvatarFallback>
                     )}

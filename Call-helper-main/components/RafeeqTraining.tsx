@@ -64,7 +64,7 @@ function TrainingAttachmentLink({ entry }: { entry: TrainingEntry }) {
 
 /** خلفية غير شفافة داخل الـ Dialog حتى لا تذوب مع الثيم أو الطبقات الخلفية */
 const TRAINING_DIALOG_PANEL =
-  'max-h-[min(90vh,40rem)] overflow-y-auto shadow-2xl outline-none !border-2 !border-zinc-300 !bg-white !text-zinc-950 dark:!border-zinc-600 dark:!bg-zinc-950 dark:!text-zinc-50';
+  'max-h-[min(90vh,40rem)] overflow-y-auto shadow-2xl outline-none !border-border !bg-popover !text-popover-foreground';
 
 export function RafeeqTraining() {
   const { user } = useAuth();

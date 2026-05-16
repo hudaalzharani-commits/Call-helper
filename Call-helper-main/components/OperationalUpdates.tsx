@@ -24,7 +24,7 @@ import { formatAppDate, formatAppDateTime } from '../utils/dateDisplay';
 
 /** تباين أوضح داخل الـ Dialog (مثل نافذة «لماذا تظهر هنا؟») حتى لا يذوب النص في خلفية الثيم */
 const OPERATIONAL_DIALOG_PANEL =
-  'max-h-[min(90vh,40rem)] overflow-y-auto shadow-2xl outline-none !border-2 !border-zinc-300 !bg-white !text-zinc-950 dark:!border-zinc-600 dark:!bg-zinc-950 dark:!text-zinc-50';
+  'max-h-[min(90vh,40rem)] overflow-y-auto shadow-2xl outline-none !border-border !bg-popover !text-popover-foreground';
 
 const OP_UPDATE_TYPE_AR: Record<OperationalUpdate['type'], string> = {
   maintenance: 'صيانة',
@@ -445,14 +445,14 @@ export function OperationalUpdates() {
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent className={cn('max-w-2xl', OPERATIONAL_DIALOG_PANEL)} dir="rtl">
           <DialogHeader>
-            <DialogTitle className="text-right text-xl text-zinc-950 dark:text-zinc-50">
+            <DialogTitle className="text-right text-xl text-foreground">
               تحديث تشغيلي جديد
             </DialogTitle>
-            <DialogDescription className="text-right text-base leading-relaxed text-zinc-600 dark:text-zinc-300">
+            <DialogDescription className="text-right text-base leading-relaxed text-muted-foreground">
               أضف تحديثاً تشغيلياً جديداً
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4 text-base leading-relaxed [&_label]:font-medium [&_label]:text-zinc-800 dark:[&_label]:text-zinc-200">
+          <div className="space-y-4 py-4 text-base leading-relaxed [&_label]:font-medium [&_label]:text-foreground">
             <div className="space-y-2">
               <Label htmlFor="title" className="text-right block">العنوان</Label>
               <Input
@@ -574,12 +574,12 @@ export function OperationalUpdates() {
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className={cn('max-w-2xl', OPERATIONAL_DIALOG_PANEL)} dir="rtl">
           <DialogHeader>
-            <DialogTitle className="text-right text-xl text-zinc-950 dark:text-zinc-50">تعديل التحديث</DialogTitle>
-            <DialogDescription className="text-right text-base leading-relaxed text-zinc-600 dark:text-zinc-300">
+            <DialogTitle className="text-right text-xl text-foreground">تعديل التحديث</DialogTitle>
+            <DialogDescription className="text-right text-base leading-relaxed text-muted-foreground">
               تعديل بيانات التحديث التشغيلي
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4 text-base leading-relaxed [&_label]:font-medium [&_label]:text-zinc-800 dark:[&_label]:text-zinc-200">
+          <div className="space-y-4 py-4 text-base leading-relaxed [&_label]:font-medium [&_label]:text-foreground">
             <div className="space-y-2">
               <Label htmlFor="edit-title" className="text-right block">العنوان</Label>
               <Input

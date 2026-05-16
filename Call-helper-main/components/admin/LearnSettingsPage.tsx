@@ -33,7 +33,7 @@ export function LearnSettingsPage() {
             <RefreshCw className="size-4 ml-2" />
             إعادة تدريب النموذج
           </Button>
-          <Button className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white">
+          <Button className="bg-primary text-primary-foreground hover:bg-primary-hover text-primary-foreground">
             <Save className="size-4 ml-2" />
             حفظ الإعدادات
           </Button>
@@ -44,7 +44,7 @@ export function LearnSettingsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="glass-panel border-2 border-border p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-lg">
+            <div className="p-2 bg-primary rounded-lg">
               <Brain className="size-5 text-white" />
             </div>
             <div>
@@ -246,7 +246,7 @@ export function LearnSettingsPage() {
               {showLogSources && (
                 <div className="mt-3 pr-4 space-y-1 border-r-2 border-primary/30">
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <div className="size-1.5 rounded-full bg-cyan-500" />
+                    <div className="size-1.5 rounded-full bg-primary" />
                     <span>Issue Pattern Logs</span>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">

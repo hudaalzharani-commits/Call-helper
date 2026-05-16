@@ -563,7 +563,7 @@ export function AdvancedSettingsPage() {
       },
       direct_answer: {
         label: 'إجابة مباشرة',
-        color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-400',
+        color: 'bg-primary-soft text-primary',
         icon: Check,
       },
       escalation: {
@@ -647,7 +647,7 @@ export function AdvancedSettingsPage() {
               <ArrowRight className="size-4 text-primary flex-shrink-0" />
               {/* Icons for linked routes or child conditions */}
               {subCond.action === 'continue' && totalLinkedRoutesCount > 0 && (
-                <GitBranch className="size-4 text-cyan-600 dark:text-cyan-400" />
+                <GitBranch className="size-4 text-primary" />
               )}
               {hasChildConditions && (
                 <FolderTree className="size-4 text-blue-600 dark:text-blue-400" />
@@ -664,7 +664,7 @@ export function AdvancedSettingsPage() {
               {/* 🔗 Linked SubCondition Badge - يظهر فقط للخطوات المضافة في مسارات متعددة */}
               {isLinkedSubCondition && level === 0 && (
                 <Badge 
-                  className="bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-400 border-0 flex items-center gap-1 text-xs"
+                  className="bg-primary-soft text-primary border-0 flex items-center gap-1 text-xs"
                   title={`مرتبطة مع ${linkedStepsCount} ${linkedStepsCount === 1 ? 'مسار آخر' : 'مسارات أخرى'}`}
                 >
                   <Link2 className="size-3" />
@@ -696,7 +696,7 @@ export function AdvancedSettingsPage() {
               size="sm"
               onClick={() => openEditSubCondition(stepId, subCond)}
             >
-              <Edit2 className="size-3 text-cyan-500" />
+              <Edit2 className="size-3 text-primary" />
             </Button>
             <Button
               variant="ghost"
@@ -746,7 +746,7 @@ export function AdvancedSettingsPage() {
             إعادة تعيين
           </Button>
           <Button 
-            className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white"
+            className="bg-primary text-primary-foreground hover:bg-primary-hover text-primary-foreground"
             onClick={handleSaveAllSettings}
           >
             <Save className="size-4 ml-2" />
@@ -778,7 +778,7 @@ export function AdvancedSettingsPage() {
           </div>
           <Button
             onClick={() => setShowAddRouteDialog(true)}
-            className="bg-gradient-to-r from-cyan-500 to-blue-500 text-white"
+            className="bg-primary text-primary-foreground text-white"
             size="sm"
           >
             <Plus className="size-4 ml-2" />
@@ -840,7 +840,7 @@ export function AdvancedSettingsPage() {
 
                       {/* Badge for linked parent route */}
                       {route.parentSteps.length > 0 && (
-                        <Badge className="bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-400 border-0 flex items-center gap-1">
+                        <Badge className="bg-primary-soft text-primary border-0 flex items-center gap-1">
                           <GitBranch className="size-3" />
                           مسار مربوط
                         </Badge>
@@ -849,7 +849,7 @@ export function AdvancedSettingsPage() {
                       {/* 🎯 Targeting badges (categories + entityTypes) */}
                       {Array.isArray(route.categories) && route.categories.length > 0 && (
                         <Badge
-                          className="bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-400 border-0 flex items-center gap-1"
+                          className="bg-primary-soft text-primary border-0 flex items-center gap-1"
                           title={`فئات مرتبطة: ${route.categories.join('، ')}`}
                         >
                           <Target className="size-3" />
@@ -886,7 +886,7 @@ export function AdvancedSettingsPage() {
                         onClick={() => handleEditRoute(route)}
                         title="تعديل المسار"
                       >
-                        <Edit2 className="size-4 text-cyan-500" />
+                        <Edit2 className="size-4 text-primary" />
                       </Button>
                       <Button
                         variant="ghost"
@@ -1173,11 +1173,11 @@ export function AdvancedSettingsPage() {
               </div>
 
               {/* Show Advanced Threshold */}
-              <div className="glass-card p-4 rounded-xl border-2 border-cyan-500/30 bg-cyan-500/5">
+              <div className="glass-card p-4 rounded-xl border border-primary/25 bg-primary-soft">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <div className="w-2 h-2 rounded-full bg-cyan-500"></div>
+                      <div className="w-2 h-2 rounded-full bg-primary"></div>
                       <Label className="text-sm font-semibold text-foreground">وضع متقدم اختياري</Label>
                     </div>
                     <p className="text-[10px] text-muted-foreground">
@@ -1201,7 +1201,7 @@ export function AdvancedSettingsPage() {
                       }
                       className="glass-card border-2 border-border w-16 h-9 text-center font-bold"
                     />
-                    <span className="text-sm font-bold text-cyan-600 dark:text-cyan-400 min-w-[35px]">
+                    <span className="text-sm font-bold text-primary min-w-[35px]">
                       {scoringSettings.scoreThresholds.showAdvanced}%
                     </span>
                   </div>
@@ -1254,7 +1254,7 @@ export function AdvancedSettingsPage() {
                   <span>≥ {scoringSettings.scoreThresholds.directAnswer}% = رد تلقائي مباشر</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-cyan-600 dark:text-cyan-400">●</span>
+                  <span className="text-primary">●</span>
                   <span>{scoringSettings.scoreThresholds.showAdvanced}% - {scoringSettings.scoreThresholds.directAnswer - 1}% = وضع متقدم اختياري</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1401,18 +1401,21 @@ export function AdvancedSettingsPage() {
           setPendingCategoryInput('');
         }
       }}>
-        <DialogContent className="glass-card border-2 max-h-[80vh] overflow-y-auto" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="text-right">
+        <DialogContent
+          className="glass-card flex max-h-[min(88vh,44rem)] w-full max-w-[min(100vw-2rem,32rem)] flex-col gap-0 overflow-hidden border-2 p-0 sm:max-w-xl"
+          dir="rtl"
+        >
+          <DialogHeader className="shrink-0 space-y-1.5 border-b border-border px-6 pb-4 pt-6 text-right pe-12 sm:text-right">
+            <DialogTitle className="text-right text-lg">
               {editingRoute ? 'تعديل المسار' : 'إضافة مسار جديد'}
             </DialogTitle>
-            <DialogDescription className="text-right">
+            <DialogDescription className="text-right text-sm leading-relaxed">
               {editingRoute 
                 ? 'قم بتعديل بيانات المسار'
                 : 'أدخل اسم المسار واختر الخطوات التي سيرتبط بها (اختياري)'}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-6 py-4">
             <div className="space-y-2">
               <Label htmlFor="route-name">اسم المسار</Label>
               <Input
@@ -1425,9 +1428,9 @@ export function AdvancedSettingsPage() {
             </div>
 
             {/* 🎯 Route Targeting - Categories & Entity Types */}
-            <div className="space-y-3 glass-card border-2 border-cyan-500/30 rounded-lg p-4 bg-cyan-50/30 dark:bg-cyan-950/10">
+            <div className="space-y-3 glass-card bento p-4 border border-primary/20">
               <div className="flex items-start gap-2">
-                <Target className="size-4 text-cyan-500 mt-0.5 flex-shrink-0" />
+                <Target className="size-4 text-primary mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
                   <Label className="text-sm font-semibold text-foreground">
                     ربط المسار بسياق المكالمة (اختياري)
@@ -1436,7 +1439,7 @@ export function AdvancedSettingsPage() {
                     عند ترك الحقول فارغة → ينطبق المسار على جميع الفئات وأنواع الجهات.
                     إذا حدّدت قيماً → يظهر المسار في الوضع المتقدم فقط عند تطابق فئة الحالة / نوع الجهة.
                   </p>
-                  <p className="text-xs text-cyan-600 dark:text-cyan-400 mt-1">
+                  <p className="text-xs text-primary mt-1">
                     💡 مثال: لربط مسار "التأشيرة" بفئة "التأشيرة" فقط، أضف "التأشيرة" في "فئات الحالة".
                   </p>
                 </div>
@@ -1478,7 +1481,7 @@ export function AdvancedSettingsPage() {
                     {newRouteCategories.map((cat) => (
                       <Badge
                         key={cat}
-                        className="bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-400 border-0 gap-1"
+                        className="bg-primary-soft text-primary border-0 gap-1"
                       >
                         {cat}
                         <button
@@ -1508,8 +1511,8 @@ export function AdvancedSettingsPage() {
                         onClick={() => toggleEntityTypeForNewRoute(entityType)}
                         className={`text-xs px-3 py-1.5 rounded-full border-2 transition-colors ${
                           isSelected
-                            ? 'bg-cyan-500 text-white border-cyan-500'
-                            : 'bg-transparent text-foreground border-border hover:border-cyan-500'
+                            ? 'bg-primary text-white border-primary'
+                            : 'bg-transparent text-foreground border-border hover:border-primary'
                         }`}
                       >
                         {isSelected && <Check className="size-3 inline ml-1" />}
@@ -1623,7 +1626,7 @@ export function AdvancedSettingsPage() {
               )}
             </div>
           </div>
-          <DialogFooter className="flex gap-2">
+          <DialogFooter className="shrink-0 flex flex-row gap-2 border-t border-border bg-background px-6 py-4 sm:justify-end">
             <Button variant="outline" onClick={() => {
               setShowAddRouteDialog(false);
               setEditingRoute(null);
@@ -1635,7 +1638,7 @@ export function AdvancedSettingsPage() {
             }}>
               إلغاء
             </Button>
-            <Button onClick={editingRoute ? handleUpdateRoute : handleAddRoute} className="bg-gradient-to-r from-cyan-500 to-blue-500 text-white">
+            <Button onClick={editingRoute ? handleUpdateRoute : handleAddRoute} className="bg-primary text-primary-foreground text-white">
               <Plus className="size-4 ml-2" />
               {editingRoute ? 'حفظ' : 'إضافة'}
             </Button>
@@ -1825,7 +1828,7 @@ export function AdvancedSettingsPage() {
               إلغاء
             </Button>
             <Button
-              className="bg-gradient-to-r from-cyan-500 to-blue-500 text-white"
+              className="bg-primary text-primary-foreground text-white"
               onClick={() => {
                 setShowRouteLinkDialog(false);
                 toast.success('تم حفظ ربط المسارات بنجاح');

@@ -6,7 +6,6 @@ import {
   CheckCircle,
   Clock,
   BarChart3,
-  Users,
   Database,
   Plus,
   FileText,
@@ -17,7 +16,6 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { Card } from '../ui/card';
-import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import {
   getDistributionStats,
@@ -39,15 +37,33 @@ import {
   Area,
   BarChart,
   Bar,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer,
 } from 'recharts';
+import { DashboardChartDefs, dashAreaAccentFillId } from '../dashboard/DashboardChartDefs';
+import { DashboardChartFrame } from '../dashboard/DashboardChartFrame';
+import { DashboardKpiCard } from '../dashboard/DashboardKpiCard';
+import { useDashboardChartColors } from '../../hooks/useDashboardChartColors';
+import {
+  DASH_CARTESIAN_MARGIN,
+  DASH_CHART,
+  DASH_Y_AXIS_RTL,
+  DASH_Y_AXIS_SPACER,
+  DASH_Y_AXIS_WIDTH,
+  dashAxisTick,
+  dashAxisLine,
+  dashBarFill,
+  dashTooltipStyle,
+} from '../../utils/dashboardChartTheme';
+
+const ADMIN_ACTIVITY_CHART_ID = 'admin-activity';
 
 export function DashboardPage() {
+  const chartColors = useDashboardChartColors();
   const [summary, setSummary] = useState<SummaryStats | null>(null);
   const [users, setUsers] = useState<UserStats | null>(null);
   const [timeSeries, setTimeSeries] = useState<TimeSeriesDataPoint[]>([]);
@@ -109,9 +125,9 @@ export function DashboardPage() {
   }, [distribution]);
 
   return (
-    <div className="space-y-6">
+    <div className="dashboard-cosmos dashboard-cosmos--admin space-y-5">
       <div>
-        <h2 className="text-2xl font-bold text-foreground mb-2">Dashboard (Home)</h2>
+        <h2 className="dash-page-title mb-2">لوحة التحكم</h2>
         <p className="text-muted-foreground">نظرة شاملة على أداء النظام</p>
       </div>
 
@@ -126,213 +142,171 @@ export function DashboardPage() {
 
       {/* Summary Cards */}
       <div>
-        <h3 className="text-lg font-semibold text-foreground mb-4">Summary Cards</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-4">ملخص سريع</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="glass-panel border-2 border-border p-6 hover:scale-[1.02] transition-all duration-300">
-            <div className="flex items-start justify-between mb-4">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500">
-                <Users className="size-5 text-white" />
-              </div>
-              <Badge className="bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-900 border">
-                {users ? `${users.activeUsers} نشط` : '—'}
-              </Badge>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-foreground mb-1">{users?.totalUsers ?? 0}</p>
-              <p className="text-sm text-muted-foreground">إجمالي المستخدمين</p>
-            </div>
-          </Card>
+          <DashboardKpiCard
+            label="إجمالي المستخدمين"
+            value={String(users?.totalUsers ?? 0)}
+            change={users ? `${users.activeUsers} نشط` : undefined}
+            trend="neutral"
+          />
 
-          <Card className="glass-panel border-2 border-border p-6 hover:scale-[1.02] transition-all duration-300">
-            <div className="flex items-start justify-between mb-4">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500">
-                <Activity className="size-5 text-white" />
-              </div>
-              <Badge className="bg-green-100 dark:bg-green-950 text-green-600 dark:text-green-400 border-green-200 dark:border-green-900 border">
-                {typeof summary?.trends?.calls === 'number' ? `${summary.trends.calls >= 0 ? '+' : ''}${summary.trends.calls}%` : '—'}
-              </Badge>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-foreground mb-1">{summary?.callsToday ?? 0}</p>
-              <p className="text-sm text-muted-foreground">المكالمات اليوم</p>
-            </div>
-          </Card>
+          <DashboardKpiCard
+            label="المكالمات اليوم"
+            value={String(summary?.callsToday ?? 0)}
+            change={
+              typeof summary?.trends?.calls === 'number'
+                ? `${summary.trends.calls >= 0 ? '+' : ''}${summary.trends.calls}%`
+                : undefined
+            }
+            trend={
+              typeof summary?.trends?.calls === 'number'
+                ? summary.trends.calls >= 0
+                  ? 'up'
+                  : 'down'
+                : 'neutral'
+            }
+          />
 
-          <Card className="glass-panel border-2 border-border p-6 hover:scale-[1.02] transition-all duration-300">
-            <div className="flex items-start justify-between mb-4">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-orange-500 to-red-500">
-                <AlertCircle className="size-5 text-white" />
-              </div>
-              <Badge className="bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-900 border">
-                {summary ? `${summary.activeCalls} نشط` : '—'}
-              </Badge>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-foreground mb-1">{summary?.pendingCalls ?? 0}</p>
-              <p className="text-sm text-muted-foreground">المشاكل المفتوحة</p>
-            </div>
-          </Card>
+          <DashboardKpiCard
+            label="المشاكل المفتوحة"
+            value={String(summary?.pendingCalls ?? 0)}
+            change={summary ? `${summary.activeCalls} نشط` : undefined}
+            trend="neutral"
+          />
 
-          <Card className="glass-panel border-2 border-border p-6 hover:scale-[1.02] transition-all duration-300">
-            <div className="flex items-start justify-between mb-4">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500">
-                <TrendingUp className="size-5 text-white" />
-              </div>
-              <Badge className="bg-green-100 dark:bg-green-950 text-green-600 dark:text-green-400 border-green-200 dark:border-green-900 border">
-                {summary ? `${summary.resolvedCalls} محلولة` : '—'}
-              </Badge>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-foreground mb-1">{summary?.resolutionRate ?? 0}%</p>
-              <p className="text-sm text-muted-foreground">معدل الحل</p>
-            </div>
-          </Card>
+          <DashboardKpiCard
+            label="معدل الحل"
+            value={`${summary?.resolutionRate ?? 0}%`}
+            change={summary ? `${summary.resolvedCalls} محلولة` : undefined}
+            trend="up"
+          />
         </div>
       </div>
 
       {/* Graphs */}
       <div>
-        <h3 className="text-lg font-semibold text-foreground mb-4">Graphs</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-4">المخططات</h3>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Performance Over Time */}
-          <Card className="glass-panel border-2 border-border p-6">
-            <h4 className="text-foreground font-bold mb-4 flex items-center gap-2">
+          <Card className="dash-chart-card p-0 overflow-hidden border-0">
+            <div className="dash-chart-card__header">
+            <h4 className="dash-chart-card__title mb-0">
               <BarChart3 className="size-5 text-primary" />
               الأداء خلال الأسبوع
             </h4>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={performanceData}>
+            </div>
+            <div className="dash-chart-canvas">
+            <DashboardChartFrame height={300}>
+              <LineChart data={performanceData} margin={DASH_CARTESIAN_MARGIN}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" />
                 <XAxis 
                   dataKey="name" 
                   stroke="rgba(148, 163, 184, 0.5)"
                   style={{ fontSize: '12px' }}
                 />
-                <YAxis 
-                  stroke="rgba(148, 163, 184, 0.5)"
-                  style={{ fontSize: '12px' }}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    border: '1px solid rgba(148, 163, 184, 0.2)',
-                    borderRadius: '8px',
-                    fontSize: '12px'
-                  }}
-                />
+                <YAxis width={DASH_Y_AXIS_WIDTH} {...DASH_Y_AXIS_SPACER} />
+                <YAxis tick={dashAxisTick} tickLine={dashAxisLine} {...DASH_Y_AXIS_RTL} />
+                <Tooltip contentStyle={dashTooltipStyle} />
                 <Legend />
-                <Line 
-                  type="monotone" 
-                  dataKey="users" 
-                  stroke="#06b6d4" 
+                <Line
+                  type="monotone"
+                  dataKey="users"
+                  stroke={DASH_CHART.primary}
                   strokeWidth={2}
                   name="المستخدمين"
-                  dot={{ fill: '#06b6d4', r: 4 }}
+                  dot={{ fill: DASH_CHART.primary, r: 4 }}
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="calls" 
-                  stroke="#10b981" 
+                <Line
+                  type="monotone"
+                  dataKey="calls"
+                  stroke={DASH_CHART.accent}
                   strokeWidth={2}
                   name="المكالمات"
-                  dot={{ fill: '#10b981', r: 4 }}
+                  dot={{ fill: DASH_CHART.accent, r: 4 }}
                 />
               </LineChart>
-            </ResponsiveContainer>
+            </DashboardChartFrame>
+            </div>
           </Card>
 
           {/* Activity Throughout Day */}
-          <Card className="glass-panel border-2 border-border p-6">
-            <h4 className="text-foreground font-bold mb-4 flex items-center gap-2">
+          <Card className="dash-chart-card p-0 overflow-hidden border-0">
+            <div className="dash-chart-card__header">
+            <h4 className="dash-chart-card__title mb-0">
               <Activity className="size-5 text-primary" />
               النشاط على مدار اليوم
             </h4>
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={activityData}>
+            </div>
+            <div className="dash-chart-canvas">
+            <DashboardChartFrame height={300}>
+              <AreaChart data={activityData} margin={DASH_CARTESIAN_MARGIN}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" />
                 <XAxis 
                   dataKey="name" 
                   stroke="rgba(148, 163, 184, 0.5)"
                   style={{ fontSize: '12px' }}
                 />
-                <YAxis 
-                  stroke="rgba(148, 163, 184, 0.5)"
-                  style={{ fontSize: '12px' }}
+                <YAxis width={DASH_Y_AXIS_WIDTH} {...DASH_Y_AXIS_SPACER} />
+                <YAxis tick={dashAxisTick} tickLine={dashAxisLine} {...DASH_Y_AXIS_RTL} />
+                <Tooltip contentStyle={dashTooltipStyle} />
+                <DashboardChartDefs
+                  idPrefix={ADMIN_ACTIVITY_CHART_ID}
+                  primary={chartColors.primary}
+                  accent={chartColors.accent}
                 />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    border: '1px solid rgba(148, 163, 184, 0.2)',
-                    borderRadius: '8px',
-                    fontSize: '12px'
-                  }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="value" 
-                  stroke="#8b5cf6" 
-                  fill="url(#colorActivity)"
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke={chartColors.accent}
+                  fill={`url(#${dashAreaAccentFillId(ADMIN_ACTIVITY_CHART_ID)})`}
                   strokeWidth={2}
                   name="النشاط"
                 />
-                <defs>
-                  <linearGradient id="colorActivity" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
               </AreaChart>
-            </ResponsiveContainer>
+            </DashboardChartFrame>
+            </div>
           </Card>
 
           {/* Issue Distribution */}
-          <Card className="glass-panel border-2 border-border p-6">
-            <h4 className="text-foreground font-bold mb-4 flex items-center gap-2">
+          <Card className="dash-chart-card p-0 overflow-hidden border-0">
+            <div className="dash-chart-card__header">
+            <h4 className="dash-chart-card__title mb-0">
               <AlertCircle className="size-5 text-primary" />
               توزيع المشاكل
             </h4>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={issueDistributionData}>
+            </div>
+            <div className="dash-chart-canvas">
+            <DashboardChartFrame height={300}>
+              <BarChart data={issueDistributionData} margin={DASH_CARTESIAN_MARGIN}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" />
-                <XAxis 
-                  dataKey="name" 
+                <XAxis
+                  dataKey="name"
                   stroke="rgba(148, 163, 184, 0.5)"
                   style={{ fontSize: '12px' }}
                 />
-                <YAxis 
-                  stroke="rgba(148, 163, 184, 0.5)"
-                  style={{ fontSize: '12px' }}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    border: '1px solid rgba(148, 163, 184, 0.2)',
-                    borderRadius: '8px',
-                    fontSize: '12px'
-                  }}
-                />
-                <Bar 
-                  dataKey="value" 
-                  fill="url(#colorBar)"
-                  radius={[8, 8, 0, 0]}
-                  name="عدد المشاكل"
-                />
-                <defs>
-                  <linearGradient id="colorBar" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#f59e0b" stopOpacity={1}/>
-                    <stop offset="100%" stopColor="#ef4444" stopOpacity={1}/>
-                  </linearGradient>
-                </defs>
+                <YAxis width={DASH_Y_AXIS_WIDTH} {...DASH_Y_AXIS_SPACER} />
+                <YAxis tick={dashAxisTick} tickLine={dashAxisLine} {...DASH_Y_AXIS_RTL} />
+                <Tooltip contentStyle={dashTooltipStyle} />
+                <Bar dataKey="value" radius={DASH_CHART.barRadius} name="عدد المشاكل">
+                  {issueDistributionData.map((_, index) => (
+                    <Cell key={`issue-bar-${index}`} fill={dashBarFill(index, chartColors)} />
+                  ))}
+                </Bar>
               </BarChart>
-            </ResponsiveContainer>
+            </DashboardChartFrame>
+            </div>
           </Card>
 
           {/* System Status */}
-          <Card className="glass-panel border-2 border-border p-6">
-            <h4 className="text-foreground font-bold mb-4 flex items-center gap-2">
-              <Database className="size-5 text-primary" />
-              حالة النظام
-            </h4>
+          <Card className="dash-chart-card p-0 overflow-hidden border-0">
+            <div className="dash-chart-card__header">
+              <h4 className="dash-chart-card__title mb-0">
+                <Database className="size-5 text-primary" />
+                حالة النظام
+              </h4>
+            </div>
+            <div className="dash-chart-canvas">
             <div className="space-y-4">
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
@@ -350,13 +324,13 @@ export function DashboardPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
-                    <CheckCircle className="size-4 text-cyan-500" />
+                    <CheckCircle className="size-4 text-primary" />
                     <span className="text-muted-foreground">استخدام الذاكرة</span>
                   </div>
                   <span className="text-foreground font-semibold">68%</span>
                 </div>
                 <div className="h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
-                  <div className="h-full w-[68%] bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full" />
+                  <div className="h-full w-[68%] bg-primary text-primary-foreground rounded-full" />
                 </div>
               </div>
 
@@ -386,6 +360,7 @@ export function DashboardPage() {
                 </div>
               </div>
             </div>
+            </div>
           </Card>
         </div>
       </div>
@@ -398,7 +373,7 @@ export function DashboardPage() {
             className="glass-panel border-2 border-border h-auto py-6 flex-col gap-3 hover:scale-[1.02] transition-all hover:bg-accent/50 text-foreground"
             variant="ghost"
           >
-            <div className="p-3 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-xl">
+            <div className="p-3 bg-primary rounded-xl">
               <Plus className="size-6 text-white" />
             </div>
             <div className="text-center">

@@ -81,6 +81,14 @@ export function formatAppWeekdayFullDate(d: Date | string | number): string {
   });
 }
 
+/** مفتاح يوم تقويمي محلي YYYY-MM-DD (للتحليلات) */
+export function toLocalCalendarDateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export function formatAppTime(d: Date | string | number): string {
   const x = toDate(d);
   if (Number.isNaN(x.getTime())) return '—';

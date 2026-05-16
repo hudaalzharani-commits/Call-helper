@@ -185,7 +185,7 @@ export function LogsPage() {
           </Button>
           <Button
             type="button"
-            className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white"
+            className="bg-primary text-primary-foreground hover:bg-primary-hover text-primary-foreground"
             onClick={exportJson}
             disabled={loading || filtered.length === 0}
           >

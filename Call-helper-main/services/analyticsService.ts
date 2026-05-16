@@ -290,9 +290,16 @@ export async function getTimeSeriesData(
 /**
  * Get hourly activity distribution
  */
-export async function getHourlyActivity(): Promise<HourlyDataPoint[]> {
+export async function getHourlyActivity(params?: {
+  from?: string;
+  to?: string;
+}): Promise<HourlyDataPoint[]> {
   try {
-    return await fetchAPI<HourlyDataPoint[]>('/hourly');
+    const sp = new URLSearchParams();
+    if (params?.from) sp.set('from', params.from);
+    if (params?.to) sp.set('to', params.to);
+    const q = sp.toString();
+    return await fetchAPI<HourlyDataPoint[]>(`/hourly${q ? `?${q}` : ''}`);
   } catch (error) {
     console.error('❌ Error fetching hourly activity:', error);
     throw error;

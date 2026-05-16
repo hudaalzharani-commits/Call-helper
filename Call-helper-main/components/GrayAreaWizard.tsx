@@ -20,7 +20,24 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useAdvancedSettings } from '../contexts/AdvancedSettingsContext';
-import type { Route, Step, SubCondition } from '../contexts/AdvancedSettingsContext';
+import type { Route, Step, SubCondition, GrayAreaQuestion } from '../contexts/AdvancedSettingsContext';
+
+/** مسارات افتراضية عند عدم ضبط الربط من الأدمن (أو بيانات قديمة في التخزين المحلي) */
+const DEFAULT_QUESTION_ROUTE_LINKS: Record<string, string[]> = {
+  technical: ['route-1'],
+  operational: ['route-3'],
+  financial: ['route-2'],
+  complaint: ['route-2', 'route-3'],
+  general_inquiry: ['route-1', 'route-2', 'route-3'],
+};
+
+function getEffectiveLinkedRouteIds(question: GrayAreaQuestion, activeRoutes: Route[]): string[] {
+  const activeIds = new Set(activeRoutes.filter((r) => r.isActive).map((r) => r.id));
+  const configured = question.linkedRouteIds.filter((id) => activeIds.has(id));
+  if (configured.length > 0) return configured;
+  const fallback = DEFAULT_QUESTION_ROUTE_LINKS[question.id] ?? [];
+  return fallback.filter((id) => activeIds.has(id));
+}
 
 interface GrayAreaWizardProps {
   isOpen: boolean;
@@ -48,7 +65,7 @@ type WizardStep =
   | { type: 'subcondition'; route: Route; step: Step; previousSteps: Array<{ route: Route; step: Step; subCondition: SubCondition }> }
   | { type: 'child_subcondition'; route: Route; step: Step; parentCondition: SubCondition; previousSteps: Array<{ route: Route; step: Step; subCondition: SubCondition }> };
 
-export function GrayAreaWizard({ isOpen, onClose, onComplete, isDarkMode }: GrayAreaWizardProps) {
+export function GrayAreaWizard({ isOpen, onClose, onComplete, isDarkMode: _isDarkMode }: GrayAreaWizardProps) {
   const { routes, steps, grayAreaSettings } = useAdvancedSettings();
   
   // Wizard navigation state
@@ -78,17 +95,18 @@ export function GrayAreaWizard({ isOpen, onClose, onComplete, isDarkMode }: Gray
 
   // Handle question selection
   const handleQuestionSelect = (questionId: string, questionTitle: string) => {
-    const question = grayAreaSettings.questions.find(q => q.id === questionId);
-    if (!question || question.linkedRouteIds.length === 0) {
-      return;
-    }
+    const question = grayAreaSettings.questions.find((q) => q.id === questionId);
+    if (!question) return;
+
+    const routeIds = getEffectiveLinkedRouteIds(question, routes);
+    if (routeIds.length === 0) return;
 
     setSelectedQuestion({ id: questionId, title: questionTitle });
-    
+
     const nextStep: WizardStep = {
       type: 'route',
       questionId,
-      availableRouteIds: question.linkedRouteIds,
+      availableRouteIds: routeIds,
     };
     
     setCurrentStep(nextStep);
@@ -260,30 +278,42 @@ export function GrayAreaWizard({ isOpen, onClose, onComplete, isDarkMode }: Gray
         return (
           <div className="space-y-3 pt-4">
             {enabledQuestions.map((question) => {
-              const hasLinkedRoutes = question.linkedRouteIds.length > 0;
-              
+              const linkedRouteIds = getEffectiveLinkedRouteIds(question, routes);
+              const hasLinkedRoutes = linkedRouteIds.length > 0;
+              const linkedRouteNames = routes
+                .filter((r) => linkedRouteIds.includes(r.id))
+                .map((r) => r.name);
+
               return (
                 <button
                   key={question.id}
+                  type="button"
                   onClick={() => handleQuestionSelect(question.id, question.title)}
                   disabled={!hasLinkedRoutes}
-                  className={`w-full p-4 rounded-xl transition-all duration-200 text-right border-2 glass-panel group ${
-                    hasLinkedRoutes 
-                      ? 'border-border hover:border-primary/50 hover:bg-accent/30 cursor-pointer'
-                      : 'border-border/50 opacity-50 cursor-not-allowed'
+                  className={`w-full p-4 rounded-xl transition-all duration-200 text-right border group ${
+                    hasLinkedRoutes
+                      ? 'border-border bg-surface hover:border-primary/40 hover:bg-surface-2 cursor-pointer'
+                      : 'border-border/50 bg-surface/50 opacity-60 cursor-not-allowed'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-3">
                     {hasLinkedRoutes ? (
-                      <ArrowRight className="size-4 text-primary group-hover:translate-x-[-4px] transition-transform" />
+                      <ArrowLeft className="size-4 shrink-0 text-primary group-hover:-translate-x-0.5 transition-transform" />
                     ) : (
-                      <AlertCircle className="size-4 text-muted-foreground" />
+                      <AlertCircle className="size-4 shrink-0 text-muted-foreground" />
                     )}
                     <span className="font-semibold text-foreground">{question.title}</span>
                   </div>
+                  {hasLinkedRoutes && linkedRouteNames.length > 0 && (
+                    <p className="text-[11px] text-muted-foreground text-right mt-2 leading-relaxed">
+                      {linkedRouteNames.length === 1
+                        ? `المسار: ${linkedRouteNames[0]}`
+                        : `المسارات: ${linkedRouteNames.join(' · ')}`}
+                    </p>
+                  )}
                   {!hasLinkedRoutes && (
-                    <p className="text-[10px] text-muted-foreground text-right mt-1">
-                      لا توجد مسارات مربوطة
+                    <p className="text-[11px] text-muted-foreground text-right mt-2">
+                      لا توجد مسارات مفعّلة — راجع الإعدادات المتقدمة في الأدمن
                     </p>
                   )}
                 </button>
@@ -336,7 +366,7 @@ export function GrayAreaWizard({ isOpen, onClose, onComplete, isDarkMode }: Gray
                       </Badge>
                     )}
                     {route.parentSteps.length > 0 && (
-                      <Badge className="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-0 text-[10px]">
+                      <Badge className="bg-primary-soft text-primary border-0 text-[10px]">
                         مسار مربوط
                       </Badge>
                     )}
@@ -373,12 +403,12 @@ export function GrayAreaWizard({ isOpen, onClose, onComplete, isDarkMode }: Gray
             </div>
             
             {stepLinkedRoutes.length > 0 && (
-              <div className="glass-panel rounded-lg p-3 border border-cyan-500/30 bg-cyan-500/5 mb-3">
+              <div className="glass-panel rounded-lg p-3 border border-primary/20 bg-primary-soft mb-3">
                 <div className="flex items-center gap-2 justify-end">
-                  <p className="text-[11px] text-cyan-700 dark:text-cyan-300">
+                  <p className="text-[11px] text-primary">
                     💡 هذه الخطوة مربوطة بـ {stepLinkedRoutes.length} مسار إضافي
                   </p>
-                  <GitBranch className="size-3 text-cyan-600 dark:text-cyan-400" />
+                  <GitBranch className="size-3 text-primary" />
                 </div>
               </div>
             )}
@@ -406,7 +436,7 @@ export function GrayAreaWizard({ isOpen, onClose, onComplete, isDarkMode }: Gray
                         <div className="flex items-center gap-2">
                           <ArrowRight className="size-4 text-primary group-hover:translate-x-[-4px] transition-transform" />
                           {subCondition.action === 'continue' && totalLinkedCount > 0 && (
-                            <GitBranch className="size-4 text-cyan-600 dark:text-cyan-400" />
+                            <GitBranch className="size-4 text-primary" />
                           )}
                           {hasChildConditions && (
                             <FolderTree className="size-4 text-blue-600 dark:text-blue-400" />
@@ -429,7 +459,7 @@ export function GrayAreaWizard({ isOpen, onClose, onComplete, isDarkMode }: Gray
                             </Badge>
                           )}
                           {subCondition.action === 'direct_answer' && (
-                            <Badge className="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-0 text-[10px]">
+                            <Badge className="bg-primary-soft text-primary border-0 text-[10px]">
                               إجابة مباشرة
                             </Badge>
                           )}
@@ -440,7 +470,7 @@ export function GrayAreaWizard({ isOpen, onClose, onComplete, isDarkMode }: Gray
                           )}
                           {subCondition.action === 'continue' && (
                             <>
-                              <Badge className="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-0 text-[10px]">
+                              <Badge className="bg-primary-soft text-primary border-0 text-[10px]">
                                 متابعة
                               </Badge>
                               {totalLinkedCount > 0 && (
@@ -491,12 +521,12 @@ export function GrayAreaWizard({ isOpen, onClose, onComplete, isDarkMode }: Gray
             </div>
             
             {childLinkedRoutes.length > 0 && (
-              <div className="glass-panel rounded-lg p-3 border border-cyan-500/30 bg-cyan-500/5 mb-3">
+              <div className="glass-panel rounded-lg p-3 border border-primary/20 bg-primary-soft mb-3">
                 <div className="flex items-center gap-2 justify-end">
-                  <p className="text-[11px] text-cyan-700 dark:text-cyan-300">
+                  <p className="text-[11px] text-primary">
                     💡 هذه الخطوة مربوطة بـ {childLinkedRoutes.length} مسار إضافي
                   </p>
-                  <GitBranch className="size-3 text-cyan-600 dark:text-cyan-400" />
+                  <GitBranch className="size-3 text-primary" />
                 </div>
               </div>
             )}
@@ -521,7 +551,7 @@ export function GrayAreaWizard({ isOpen, onClose, onComplete, isDarkMode }: Gray
                         <div className="flex items-center gap-2">
                           <ArrowRight className="size-4 text-primary group-hover:translate-x-[-4px] transition-transform" />
                           {childSubCondition.action === 'continue' && totalLinkedCount > 0 && (
-                            <GitBranch className="size-4 text-cyan-600 dark:text-cyan-400" />
+                            <GitBranch className="size-4 text-primary" />
                           )}
                         </div>
                         <span className="font-semibold text-foreground">{childSubCondition.name}</span>
@@ -541,7 +571,7 @@ export function GrayAreaWizard({ isOpen, onClose, onComplete, isDarkMode }: Gray
                             </Badge>
                           )}
                           {childSubCondition.action === 'direct_answer' && (
-                            <Badge className="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-0 text-[10px]">
+                            <Badge className="bg-primary-soft text-primary border-0 text-[10px]">
                               إجابة مباشرة
                             </Badge>
                           )}
@@ -552,7 +582,7 @@ export function GrayAreaWizard({ isOpen, onClose, onComplete, isDarkMode }: Gray
                           )}
                           {childSubCondition.action === 'continue' && (
                             <>
-                              <Badge className="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-0 text-[10px]">
+                              <Badge className="bg-primary-soft text-primary border-0 text-[10px]">
                                 متابعة
                               </Badge>
                               {totalLinkedCount > 0 && (
@@ -583,9 +613,11 @@ export function GrayAreaWizard({ isOpen, onClose, onComplete, isDarkMode }: Gray
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <div className={isDarkMode ? 'dark' : ''}>
-        <DialogContent className="glass-card max-w-lg shadow-2xl border-2 max-h-[80vh] flex flex-col" dir="rtl">
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent
+        className="max-w-lg w-[calc(100%-2rem)] max-h-[min(85vh,640px)] flex flex-col gap-4 overflow-hidden bg-popover text-popover-foreground border border-border shadow-xl sm:max-w-lg sm:rounded-3xl"
+        dir="rtl"
+      >
           <DialogHeader>
             <DialogTitle className="text-right text-foreground flex items-center gap-2 justify-end text-lg">
               <span>
@@ -606,7 +638,7 @@ export function GrayAreaWizard({ isOpen, onClose, onComplete, isDarkMode }: Gray
 
           {/* Breadcrumb */}
           {selectedQuestion && (
-            <div className="glass-panel rounded-lg p-3 border">
+            <div className="rounded-xl p-3 border border-border bg-surface-2">
               <div className="flex items-center gap-2 justify-end flex-wrap">
                 <span className="text-[10px] text-muted-foreground">المسار الحالي:</span>
                 <Badge className="bg-primary/10 text-primary border-0 text-[10px]">
@@ -645,11 +677,10 @@ export function GrayAreaWizard({ isOpen, onClose, onComplete, isDarkMode }: Gray
             </div>
           )}
 
-          <p className="text-[10px] text-center text-muted-foreground pt-2">
+          <p className="text-[10px] text-center text-muted-foreground pt-2 shrink-0">
             سيتم توليد الصيغة تلقائياً بعد إتمام الخطوات
           </p>
-        </DialogContent>
-      </div>
+      </DialogContent>
     </Dialog>
   );
 }

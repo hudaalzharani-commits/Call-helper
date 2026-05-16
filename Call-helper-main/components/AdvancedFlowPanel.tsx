@@ -3,9 +3,9 @@
  * Advanced Flow Panel - Nested Decision Tree
  * ====================================================================
  * 
- * يعرض Routes بناءً على Keywords
- * يدعم الشروط المتداخلة (Nested Conditions)
- * - Continue → يفتح شروط فرعية
+ * يShow Routes Based on Keywords
+ * يدعم الشروط الNested (Nested Conditions)
+ * - Continue → يOpen شروط فرعية
  * - Force Solution / Escalation → نهائي
  * 
  * ====================================================================
@@ -256,7 +256,7 @@ export function AdvancedFlowPanel({
    */
   const handleProceed = () => {
     if (!selectedConditionId) {
-      alert('يرجى اختيار خيار قبل المتابعة');
+      alert('Please pick an option to continue.');
       return;
     }
 
@@ -413,17 +413,17 @@ export function AdvancedFlowPanel({
   const getActionBadge = (action: SubCondition['action']) => {
     const config = {
       continue: {
-        label: 'متابعة',
-        color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400',
+        label: 'Continue',
+        color: 'bg-success/10 text-emerald-700 dark:bg-emerald-950 dark:text-success',
         icon: PlayCircle,
       },
       force_solution: {
-        label: 'إيقاف وحل',
+        label: 'Stop & resolve',
         color: 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400',
         icon: StopCircle,
       },
       escalation: {
-        label: 'تصعيد',
+        label: 'Escalate',
         color: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400',
         icon: AlertCircle,
       },
@@ -448,10 +448,10 @@ export function AdvancedFlowPanel({
       <div className="glass-panel border-2 border-border rounded-xl p-6 text-center">
         <Search className="size-12 text-muted-foreground mx-auto mb-3" />
         <p className="text-muted-foreground text-sm font-semibold">
-          لم نتمكن من تحديد مسار مناسب
+          Could not identify a suitable route.
         </p>
         <p className="text-xs text-muted-foreground mt-2">
-          جرب إضافة تفاصيل أكثر لوصف المشكلة (مثل: تسجيل، دفع، تأشيرة، عقد)
+          Try adding more details to the problem description (e.g. registration, payment, visa, contract).
         </p>
       </div>
     );
@@ -462,14 +462,14 @@ export function AdvancedFlowPanel({
       <div className="glass-panel border-2 border-border rounded-xl p-6 text-center">
         <Sparkles className="size-12 text-muted-foreground mx-auto mb-3" />
         <p className="text-muted-foreground text-sm">
-          لا توجد خطوات معرّفة للمسارات المطابقة
+          No steps defined for matching routes.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4" dir="rtl">
+    <div className="space-y-4">
       {/* Header */}
       <div 
         className="flex items-center justify-between cursor-pointer"
@@ -479,7 +479,7 @@ export function AdvancedFlowPanel({
           <Sparkles className="size-5 text-primary" />
           <h3 className="font-bold text-foreground">Advanced View</h3>
           <Badge variant="outline" className="text-xs">
-            {matchedRoutes.length} مسار مطابق
+            {matchedRoutes.length} matched route
           </Badge>
         </div>
         {isExpanded ? (
@@ -493,11 +493,11 @@ export function AdvancedFlowPanel({
         <>
           {/* Matched Routes Info */}
           <div className="glass-panel rounded-lg p-3 border border-border">
-            <div className="flex items-start gap-2 text-right">
+            <div className="flex items-start gap-2 text-left">
               <Search className="size-4 text-primary flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-xs font-semibold text-foreground mb-1">
-                  تم العثور على مطابقات:
+                  Matches found:
                 </p>
                 <div className="flex flex-wrap gap-1">
                   {matchedRoutes.map((match) => (
@@ -505,7 +505,7 @@ export function AdvancedFlowPanel({
                       key={match.routeName} 
                       className="bg-primary/10 text-primary border-0 text-[10px]"
                     >
-                      {match.routeName} ({match.matchScore} نقطة)
+                      {match.routeName} ({match.matchScore} pts)
                     </Badge>
                   ))}
                 </div>
@@ -521,9 +521,9 @@ export function AdvancedFlowPanel({
                   <div className="flex flex-col items-center w-full">
                     <div className={`w-full h-2 rounded-full transition-all ${
                       index < currentStepIndex 
-                        ? 'bg-emerald-500'
+                        ? 'bg-success'
                         : index === currentStepIndex
-                        ? 'bg-cyan-500'
+                        ? 'bg-primary'
                         : 'bg-gray-200 dark:bg-gray-700'
                     }`} />
                     <span className={`text-[10px] mt-1 ${
@@ -545,11 +545,11 @@ export function AdvancedFlowPanel({
               <div className="glass-panel border-2 border-primary/30 rounded-xl p-5 space-y-4">
               {/* Step Header */}
               <div className="flex items-start gap-3 pb-3 border-b border-border">
-                <div className="text-right flex-1">
+                <div className="text-left flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <ArrowRight className="size-4 text-primary" />
                     <h4 className="font-bold text-foreground">
-                      {currentRoute.name} (المرحلة {currentRoute.order})
+                      {currentRoute.name} (Stage {currentRoute.order})
                     </h4>
                   </div>
                   
@@ -570,7 +570,7 @@ export function AdvancedFlowPanel({
                     </div>
                   )}
                 </div>
-                <Badge className="bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-400 border-0 text-xs">
+                <Badge className="bg-primary/10 text-primary dark:bg-primary-soft dark:text-primary border-0 text-xs">
                   {currentStepIndex + 1}/{relevantSteps.length}
                 </Badge>
               </div>
@@ -579,14 +579,14 @@ export function AdvancedFlowPanel({
               {currentConditions.length === 0 ? (
                 <div className="text-center py-6">
                   <p className="text-sm text-muted-foreground mb-3">
-                    لا توجد خيارات لهذه المرحلة
+                    No options for this stage.
                   </p>
                   <Button
                     onClick={() => moveToNextStep(conditionPath)}
-                    className="bg-gradient-to-r from-cyan-500 to-blue-500 text-white"
+                    className="bg-primary text-white"
                     size="sm"
                   >
-                    متابعة للمرحلة التالية
+                    Continue to next stage
                   </Button>
                 </div>
               ) : (
@@ -607,7 +607,7 @@ export function AdvancedFlowPanel({
                         onClick={() => handleCheckboxChange(subCond.id, !isSelected)}
                       >
                         <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-start gap-3 flex-1 text-right">
+                          <div className="flex items-start gap-3 flex-1 text-left">
                             <Checkbox
                               checked={isSelected}
                               onCheckedChange={(checked) => 
@@ -620,8 +620,8 @@ export function AdvancedFlowPanel({
                                 {subCond.name}
                               </p>
                               {hasChildren && (
-                                <p className="text-[10px] text-cyan-600 dark:text-cyan-400 mt-0.5">
-                                  {subCond.childConditions!.length} خيار فرعي متاح
+                                <p className="text-[10px] text-primary dark:text-primary mt-0.5">
+                                  {subCond.childConditions!.length} available sub-option
                                 </p>
                               )}
                             </div>
@@ -637,15 +637,15 @@ export function AdvancedFlowPanel({
                         {isSelected && subCond.actionDetails && grayAreaSettings.showActionDetails && (
                           <div className={`mt-3 pt-3 border-t ${
                             isActionStop 
-                              ? 'border-orange-500/30' 
+                              ? 'border-primary/30' 
                               : 'border-border'
                           }`}>
                             <p className="text-xs font-semibold text-foreground mb-1">
                               {subCond.action === 'escalation' 
-                                ? '⚠️ ملاحظات قبل التصعيد:' 
+                                ? '⚠️ Notes before escalation:' 
                                 : subCond.action === 'force_solution'
-                                ? '💡 توجيهات الحل:'
-                                : 'تفاصيل:'}
+                                ? '💡 Resolution guidance:'
+                                : 'Details:'}
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {subCond.actionDetails}
@@ -672,7 +672,7 @@ export function AdvancedFlowPanel({
                     return (
                       <div className="text-center">
                         <p className="text-xs text-muted-foreground">
-                          ⏳ يتم فتح الخيارات الفرعية تلقائياً...
+                          ⏳ Sub-options are opening automatically…
                         </p>
                       </div>
                     );
@@ -682,11 +682,11 @@ export function AdvancedFlowPanel({
                   return (
                     <Button
                       onClick={handleProceed}
-                      className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600"
+                      className="w-full bg-primary text-white hover:from-primary hover:to-primary"
                     >
                       {currentStepIndex < relevantSteps.length - 1 
-                        ? '← المرحلة التالية'
-                        : 'إنهاء وتطبيق'
+                        ? '← Next stage'
+                        : 'Finish & apply'
                       }
                     </Button>
                   );
@@ -695,9 +695,9 @@ export function AdvancedFlowPanel({
                   return (
                     <Button
                       onClick={() => handleFinishFlow(selected)}
-                      className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white hover:from-orange-600 hover:to-red-600 font-bold"
+                      className="w-full bg-gradient-to-r bg-primary text-white hover:from-orange-600 hover:to-red-600 font-bold"
                     >
-                      {selected.action === 'force_solution' ? '✓ تطبيق الحل' : '✓ تطبيق التصعيد'}
+                      {selected.action === 'force_solution' ? '✓ Apply resolution' : '✓ Apply escalation'}
                     </Button>
                   );
                 }
@@ -705,13 +705,13 @@ export function AdvancedFlowPanel({
             </div>
             ) : (
               // No current route or step available
-              <div className="glass-panel border-2 border-orange-500/30 rounded-xl p-6 text-center">
-                <AlertCircle className="size-12 text-orange-500 mx-auto mb-3" />
+              <div className="glass-panel border-2 border-primary/30 rounded-xl p-6 text-center">
+                <AlertCircle className="size-12 text-primary mx-auto mb-3" />
                 <p className="text-orange-700 dark:text-orange-400 text-sm font-semibold mb-2">
-                  لا توجد مراحل متاحة حالياً
+                  No stages available right now.
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  جرب إضافة المزيد من التفاصيل أو حدد نوع المشكلة أولاً
+                  Try adding more details, or pick a problem type first.
                 </p>
               </div>
             )
@@ -719,49 +719,49 @@ export function AdvancedFlowPanel({
             // Flow Finished
             <div className={`glass-panel rounded-xl p-5 border-2 ${
               finalAction === 'continue'
-                ? 'border-emerald-500/50 bg-emerald-50/30 dark:bg-emerald-950/20'
+                ? 'border-success/50 bg-success/10/30 dark:bg-emerald-950/20'
                 : finalAction === 'force_solution'
-                ? 'border-orange-500/50 bg-orange-50/30 dark:bg-orange-950/20'
-                : 'border-red-500/50 bg-red-50/30 dark:bg-red-950/20'
+                ? 'border-primary/50 bg-orange-50/30 dark:bg-orange-950/20'
+                : 'border-danger/50 bg-danger/10/30 dark:bg-red-950/20'
             }`}>
               <div className="flex items-center gap-3 mb-4">
                 {finalAction === 'continue' ? (
-                  <CheckCircle2 className="size-8 text-emerald-600 dark:text-emerald-400" />
+                  <CheckCircle2 className="size-8 text-success dark:text-success" />
                 ) : finalAction === 'force_solution' ? (
-                  <StopCircle className="size-8 text-orange-600 dark:text-orange-400" />
+                  <StopCircle className="size-8 text-primary dark:text-orange-400" />
                 ) : (
-                  <AlertCircle className="size-8 text-red-600 dark:text-red-400" />
+                  <AlertCircle className="size-8 text-danger dark:text-red-400" />
                 )}
-                <div className="text-right flex-1">
+                <div className="text-left flex-1">
                   <h4 className="font-bold text-foreground">
                     {finalAction === 'continue' 
-                      ? 'تمت جميع الخطوات بنجاح'
+                      ? 'All steps completed.'
                       : finalAction === 'force_solution'
-                      ? 'تم إيقاف العملية - يوجد حل'
-                      : 'تم التصعيد للجهة المختصة'
+                      ? 'Stopped — resolution available.'
+                      : 'Escalated to the relevant team.'
                     }
                   </h4>
                   <p className="text-xs text-muted-foreground">
-                    {completedSteps.length} خطوة مكتملة
+                    {completedSteps.length} completed step
                   </p>
                 </div>
               </div>
 
               {(completedSteps[completedSteps.length - 1]?.selectedSubCondition.actionDetails) && (
                 <div className="glass-panel rounded-lg p-4 border border-border mb-4">
-                  <p className="text-xs font-semibold text-muted-foreground mb-2 text-right">
-                    {finalAction === 'escalation' ? 'تفاصيل التصعيد:' : 'الحل المقترح:'}
+                  <p className="text-xs font-semibold text-muted-foreground mb-2 text-left">
+                    {finalAction === 'escalation' ? 'Escalation details:' : 'Suggested resolution:'}
                   </p>
-                  <p className="text-sm text-foreground text-right">
+                  <p className="text-sm text-foreground text-left">
                     {completedSteps[completedSteps.length - 1].selectedSubCondition.actionDetails}
                   </p>
                 </div>
               )}
 
               <div className="space-y-2 mb-4">
-                <p className="text-xs font-semibold text-muted-foreground text-right">الخطوات المكتملة:</p>
+                <p className="text-xs font-semibold text-muted-foreground text-left">Completed steps:</p>
                 {completedSteps.map((step, index) => (
-                  <div key={step.stepId} className="flex items-center gap-2 text-sm text-right">
+                  <div key={step.stepId} className="flex items-center gap-2 text-sm text-left">
                     <span className="text-primary font-medium">
                       {step.selectedSubCondition.name}
                     </span>
@@ -769,7 +769,7 @@ export function AdvancedFlowPanel({
                     <span className="text-foreground">
                       {index + 1}. {step.stepName}
                     </span>
-                    <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400" />
+                    <CheckCircle2 className="size-4 text-success dark:text-success" />
                   </div>
                 ))}
               </div>
@@ -780,14 +780,14 @@ export function AdvancedFlowPanel({
                 className="w-full border-2"
                 size="sm"
               >
-                إعادة المحاولة
+                Retry
               </Button>
             </div>
           )}
 
           {completedSteps.length > 0 && !flowFinished && (
             <div className="text-xs text-muted-foreground text-center">
-              ✓ تم إكمال {completedSteps.length} من {relevantSteps.length} خطوات
+              ✓ Completed {completedSteps.length} of {relevantSteps.length} steps
             </div>
           )}
         </>

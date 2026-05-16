@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import {
   Calendar,
   TrendingUp,
@@ -34,7 +34,6 @@ import {
   PieChart,
   Pie,
   Cell,
-  ResponsiveContainer,
   XAxis,
   YAxis,
   Tooltip,
@@ -43,7 +42,28 @@ import {
   Line,
   Area,
   AreaChart,
+  CartesianGrid,
 } from "recharts";
+import { DashboardChartDefs, dashAreaFillId } from "./dashboard/DashboardChartDefs";
+import { DashboardChartFrame } from "./dashboard/DashboardChartFrame";
+import { DashboardKpiCard } from "./dashboard/DashboardKpiCard";
+import { useDashboardChartColors } from "../hooks/useDashboardChartColors";
+import {
+  DASH_CARTESIAN_MARGIN,
+  DASH_CARTESIAN_MARGIN_COMPACT,
+  DASH_CATEGORY_BAR_MARGIN,
+  DASH_HORIZONTAL_BAR_MARGIN,
+  DASH_CHART,
+  DASH_CHART_HEIGHT_TALL,
+  DASH_Y_AXIS_RTL,
+  DASH_Y_AXIS_SPACER,
+  DASH_Y_AXIS_WIDTH,
+  chartPalette,
+  dashAxisLineFrom,
+  dashAxisTickFrom,
+  dashBarFill,
+  dashTooltipStyle,
+} from "../utils/dashboardChartTheme";
 import {
   Popover,
   PopoverContent,
@@ -54,11 +74,18 @@ import { Calendar as CalendarComponent } from "./ui/calendar";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
-import { formatAppDate, formatAppMonthDay, formatAppWeekdayFullDate, formatAppTime } from "../utils/dateDisplay";
+import {
+  formatAppDate,
+  formatAppMonthDay,
+  formatAppWeekdayFullDate,
+  formatAppTime,
+  formatChartHourLabel,
+  toAnalyticsDateKey,
+  toLocalCalendarDateKey,
+} from "../utils/dateDisplay";
 
 /** نطاق التقويم المعروض في المؤشرات (يُستخدم للسلاسل الزمنية وقائمة الإفادات المؤكدة) */
 function computeIndicatorDateRange(
@@ -109,8 +136,14 @@ function computeIndicatorDateRange(
 }
 
 export function LiveIndicators() {
+  const chartColors = useDashboardChartColors();
+  const dailyAreaGradId = useId();
+  const axisTick = useMemo(() => dashAxisTickFrom(chartColors), [chartColors]);
+  const axisLine = useMemo(() => dashAxisLineFrom(chartColors), [chartColors]);
+  const palette = useMemo(() => chartPalette(chartColors), [chartColors]);
+
   const [selectedPeriod, setSelectedPeriod] = useState("today");
-  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("سجل الحالات اليومية");
 
   // =========================
   // Real analytics state (API-backed)
@@ -167,20 +200,21 @@ export function LiveIndicators() {
           selectedPeriod,
           appliedDateRange,
         );
+        const rangeKeys = {
+          from: toAnalyticsDateKey(start),
+          to: toAnalyticsDateKey(end),
+        };
         const [summary, series, hourly, distribution] = await Promise.all([
           getSummaryStats(),
-          getTimeSeriesData({
-            from: start.toISOString(),
-            to: end.toISOString(),
-          }),
-          getHourlyActivity(),
+          getTimeSeriesData(rangeKeys),
+          getHourlyActivity(rangeKeys),
           getDistributionStats(),
         ]);
 
         if (cancelled) return;
         setSummaryStats(summary);
-        setTimeSeries(series);
-        setHourlyActivity(hourly);
+        setTimeSeries(Array.isArray(series) ? series : []);
+        setHourlyActivity(Array.isArray(hourly) ? hourly : []);
         setDistributionStats(distribution);
       } catch (err) {
         if (cancelled) return;
@@ -261,8 +295,35 @@ export function LiveIndicators() {
     return [...byKey.values()].sort((a, b) => b.value - a.value);
   }, [distributionStats]);
 
+  const periodCasesTotal = useMemo(
+    () => timeSeries.reduce((sum, p) => sum + (Number(p.count) || 0), 0),
+    [timeSeries],
+  );
+
+  const isTodayPeriod = selectedPeriod === "today";
+
+  const dailyCasesChartTitle = useMemo(() => {
+    switch (selectedPeriod) {
+      case "today":
+        return "سجل الحالات اليومية - اليوم";
+      case "week":
+        return "سجل الحالات اليومية - هذا الأسبوع";
+      case "month":
+        return "سجل الحالات اليومية - هذا الشهر";
+      case "year":
+        return "سجل الحالات اليومية - هذه السنة";
+      case "custom":
+        return "سجل الحالات اليومية - الفترة المحددة";
+      default:
+        return "سجل الحالات اليومية";
+    }
+  }, [selectedPeriod]);
+
   const statsCards = useMemo(() => {
-    const callsToday = summaryStats?.callsToday ?? 0;
+    const callsInPeriod =
+      selectedPeriod === "today"
+        ? (summaryStats?.callsToday ?? periodCasesTotal)
+        : periodCasesTotal;
     const topIssueCount = distributionStats?.topCategories?.[0]?.count ?? 0;
     const uniqueGeneralTypes =
       distributionStats?.uniqueCategoryCount ?? uniqueCommonIssuesChartData.length;
@@ -274,11 +335,11 @@ export function LiveIndicators() {
     return [
       {
         title: "سجل الحالات اليومية",
-        value: String(callsToday),
+        value: String(callsInPeriod),
         change: callsChange,
         trend: typeof callsTrend === "number" ? (callsTrend >= 0 ? "up" : "down") : "neutral",
         color: "from-slate-300 to-slate-200",
-        activeColor: "from-cyan-500 to-blue-600",
+        activeColor: "from-primary to-primary",
       },
       {
         title: "الإفادات المؤكدة",
@@ -286,7 +347,7 @@ export function LiveIndicators() {
         change: "",
         trend: "neutral",
         color: "from-slate-300 to-slate-200",
-        activeColor: "from-cyan-500 to-blue-600",
+        activeColor: "from-primary to-primary",
       },
       {
         title: "أكثر المشاكل تكرارًا",
@@ -294,7 +355,7 @@ export function LiveIndicators() {
         change: "",
         trend: "neutral",
         color: "from-slate-300 to-slate-200",
-        activeColor: "from-cyan-500 to-blue-600",
+        activeColor: "from-primary to-primary",
       },
       {
         title: "المشاكل العامة",
@@ -302,17 +363,23 @@ export function LiveIndicators() {
         change: "",
         trend: "neutral",
         color: "from-slate-300 to-slate-200",
-        activeColor: "from-cyan-500 to-blue-600",
+        activeColor: "from-primary to-primary",
       },
     ];
-  }, [summaryStats, distributionStats]);
+  }, [summaryStats, distributionStats, selectedPeriod, periodCasesTotal]);
 
-  const dailyCasesData = useMemo(() => {
+  const dailyCasesChartData = useMemo(() => {
+    if (selectedPeriod === "today") {
+      return hourlyActivity.map((h) => ({
+        name: formatChartHourLabel(h.hour, h.name),
+        value: Number(h.value) || 0,
+      }));
+    }
     return timeSeries.map((p) => ({
-      name: formatAppMonthDay(new Date(p.date)),
-      value: p.count,
+      name: formatAppMonthDay(new Date(`${p.date}T12:00:00`)),
+      value: Number(p.count) || 0,
     }));
-  }, [timeSeries]);
+  }, [selectedPeriod, timeSeries, hourlyActivity]);
 
   const confirmedReportsData = useMemo(() => {
     const briefingRate =
@@ -331,38 +398,25 @@ export function LiveIndicators() {
     return top.slice(0, 5).map((c) => ({ name: c.category, value: Number(c.count) }));
   }, [distributionStats]);
 
-  const topIssuesColors = [
-    "#0891b2", // Cyan
-    "#06b6d4", // Bright Cyan
-    "#22d3ee", // Light Cyan
-    "#67e8f9", // Very Light Cyan
-    "#a5f3fc", // Pale Cyan
-  ];
-
-  const barColors = [
-    "#0891b2",
-    "#06b6d4",
-    "#22d3ee",
-    "#67e8f9",
-  ];
-
   const platformsData = useMemo(() => {
     const entities = distributionStats?.issuesByEntity ?? [];
-    const colors = ["#0891b2", "#06b6d4", "#22d3ee", "#67e8f9"];
     return entities.map((e, idx) => ({
       name: e.entityType,
       value: Number(e.count),
-      color: colors[idx % colors.length],
+      color: palette[idx % palette.length],
     }));
-  }, [distributionStats]);
+  }, [distributionStats, palette]);
 
   const hourlyActivityData = useMemo(() => {
-    // Backend already provides { hour, name, value }
-    return hourlyActivity;
+    return hourlyActivity.map((h) => ({
+      ...h,
+      name: formatChartHourLabel(h.hour, h.name),
+      value: Number(h.value) || 0,
+    }));
   }, [hourlyActivity]);
 
   return (
-    <div className="space-y-6">
+    <div className="dashboard-cosmos space-y-6">
       <Dialog
         open={confirmedBriefingsOpen}
         onOpenChange={(open) => {
@@ -378,10 +432,6 @@ export function LiveIndicators() {
             <DialogTitle className="text-right">
               الإفادات المؤكدة — المشكلة والحل
             </DialogTitle>
-            <DialogDescription className="text-right">
-              سجلات بصيغة مولّدة وسكور العرض النهائي 100٪، ضمن الفترة المعروضة
-              أعلاه في الصفحة.
-            </DialogDescription>
           </DialogHeader>
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-white px-6 py-4 dark:bg-zinc-950">
             {confirmedBriefingsLoading && (
@@ -460,10 +510,10 @@ export function LiveIndicators() {
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-[rgb(0,0,0)] dark:text-white mb-1 text-right font-bold">
+          <h1 className="dash-page-title mb-1 text-right">
             المؤشرات اللحظية
           </h1>
-          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Calendar className="size-4" />
             <span>{formatDateForDisplay()}</span>
           </div>
@@ -478,28 +528,28 @@ export function LiveIndicators() {
             dir="rtl"
             className="w-full sm:w-auto"
           >
-            <TabsList className="glass-card shadow-sm border-2 border-border w-full sm:w-auto grid grid-cols-4 sm:inline-flex">
+            <TabsList className="dash-period-rail w-full sm:w-auto grid grid-cols-4 sm:inline-flex h-auto p-1 bg-transparent border-0 shadow-none">
               <TabsTrigger
                 value="year"
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-cyan-300 dark:data-[state=active]:border-cyan-400 transition-all"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
               >
                 هذه السنة
               </TabsTrigger>
               <TabsTrigger
                 value="month"
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-cyan-300 dark:data-[state=active]:border-cyan-400 transition-all"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
               >
                 هذا الشهر
               </TabsTrigger>
               <TabsTrigger
                 value="week"
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-cyan-300 dark:data-[state=active]:border-cyan-400 transition-all"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
               >
                 هذا الأسبوع
               </TabsTrigger>
               <TabsTrigger
                 value="today"
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-cyan-300 dark:data-[state=active]:border-cyan-400 transition-all"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
               >
                 اليوم
               </TabsTrigger>
@@ -520,8 +570,8 @@ export function LiveIndicators() {
                 }
                 className={`shadow-sm transition-all ${
                   selectedPeriod === "custom"
-                    ? "bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white border-cyan-400 dark:border-cyan-300"
-                    : "glass-card border-2 border-border hover:border-cyan-300 dark:hover:border-cyan-500"
+                    ? "bg-primary text-primary-foreground hover:bg-primary-hover border-primary/30"
+                    : "glass-card border-2 border-border hover:border-primary/40"
                 }`}
               >
                 <CalendarIcon className="size-4 ml-2" />
@@ -586,11 +636,11 @@ export function LiveIndicators() {
 
                 {/* Selected Range Preview */}
                 {startDate && endDate && !dateRangeError && (
-                  <div className="bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-700 rounded-lg p-3 text-right space-y-1">
-                    <p className="text-xs text-cyan-600 dark:text-cyan-400 mb-1">
+                  <div className="bg-primary-soft border border-primary/20 rounded-lg p-3 text-right space-y-1">
+                    <p className="text-xs text-primary mb-1">
                       الفترة المحددة:
                     </p>
-                    <p className="text-sm font-medium text-cyan-900 dark:text-cyan-200">
+                    <p className="text-sm font-medium text-foreground">
                       {formatAppDate(startDate)}
                       <br />
                       إلى {formatAppDate(endDate)}
@@ -606,14 +656,14 @@ export function LiveIndicators() {
                       setDateRangeError("");
                     }}
                     variant="outline"
-                    className="flex-1 glass-card border-2 border-border hover:border-cyan-300 dark:hover:border-cyan-500 transition-all"
+                    className="flex-1 glass-card border-2 border-border hover:border-primary/40 transition-all"
                   >
                     إلغاء
                   </Button>
                   <Button
                     onClick={handleApplyCustomRange}
                     disabled={!startDate || !endDate}
-                    className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white border-0 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed shadow-lg disabled:shadow-none transition-all"
+                    className="flex-1 bg-primary text-primary-foreground hover:opacity-95 text-white border-0 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed shadow-lg disabled:shadow-none transition-all"
                   >
                     تطبيق الفلتر
                   </Button>
@@ -643,63 +693,15 @@ export function LiveIndicators() {
       {/* Stats Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {statsCards.map((stat, index) => (
-          <button
+          <DashboardKpiCard
             key={index}
+            label={stat.title}
+            value={stat.value}
+            change={stat.change}
+            trend={stat.trend}
+            active={selectedCategory === stat.title}
             onClick={() => setSelectedCategory(stat.title)}
-            className="text-right focus:outline-none group"
-          >
-            <Card
-              className={`transition-all duration-300 overflow-hidden ${
-                selectedCategory === stat.title
-                  ? "shadow-xl -translate-y-1 scale-[1.02] bg-gradient-to-br from-cyan-50/50 to-blue-50/50 dark:from-cyan-950/30 dark:to-blue-950/30"
-                  : "shadow-md hover:shadow-lg hover:-translate-y-0.5"
-              }`}
-            >
-              <div
-                className={`h-2 bg-gradient-to-r transition-all duration-300 ${
-                  selectedCategory === stat.title 
-                    ? stat.activeColor 
-                    : stat.color + ' group-hover:from-cyan-400 group-hover:to-blue-500'
-                }`}
-              />
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm text-muted-foreground font-bold">
-                    {stat.title}
-                  </p>
-                  <div className="flex items-center justify-center w-5 h-5">
-                    {stat.trend === "up" && (
-                      <TrendingUp className="size-5 text-emerald-500 dark:text-emerald-400" />
-                    )}
-                    {stat.trend === "down" && (
-                      <TrendingDown className="size-5 text-orange-500 dark:text-orange-400" />
-                    )}
-                    {stat.trend === "neutral" && (
-                      <Clock className="size-5 text-cyan-500 dark:text-cyan-400" />
-                    )}
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-3xl text-foreground">
-                    {stat.value}
-                  </h3>
-                  {stat.change && (
-                    <p
-                      className={`text-xs font-semibold ${
-                        stat.trend === "up"
-                          ? "text-emerald-600 dark:text-emerald-400"
-                          : stat.trend === "down"
-                            ? "text-orange-600 dark:text-orange-400"
-                            : "text-muted-foreground"
-                      }`}
-                    >
-                      {stat.change}
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </button>
+          />
         ))}
       </div>
 
@@ -707,109 +709,112 @@ export function LiveIndicators() {
       {selectedCategory === "سجل الحالات اليومية" && (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="border-2 border-border shadow-lg overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-cyan-500/15 to-blue-500/15 dark:from-cyan-500/10 dark:to-blue-500/10 rounded-t-2xl border-b border-border">
-                <CardTitle className="text-foreground text-right font-bold flex items-center gap-2">
-                  <div className="w-1 h-6 bg-gradient-to-b from-cyan-500 to-blue-600 rounded-full" />
-                  سجل الحالات اليومية - آخر 7 أيام
+            <Card className="dash-chart-card gap-0 p-0 min-w-0">
+              <CardHeader className="dash-chart-card__header border-0 rounded-none shadow-none">
+                <CardTitle className="dash-chart-card__title">
+                  {dailyCasesChartTitle}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-6">
-                <ResponsiveContainer width="100%" height={350}>
+              <CardContent className="dash-chart-canvas !p-0 !px-0">
+                {dailyCasesChartData.length === 0 ? (
+                  <div className="flex h-[340px] items-center justify-center text-sm text-muted-foreground">
+                    لا توجد بيانات للفترة المحددة بعد.
+                  </div>
+                ) : (
+                <DashboardChartFrame>
                   <AreaChart
-                    data={dailyCasesData}
-                    margin={{
-                      top: 30,
-                      right: 30,
-                      left: 20,
-                      bottom: 20,
-                    }}
+                    data={dailyCasesChartData}
+                    margin={DASH_CARTESIAN_MARGIN}
                   >
-                    <defs>
-                      <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#0891b2" stopOpacity={0.1}/>
-                      </linearGradient>
-                    </defs>
+                    <DashboardChartDefs
+                      idPrefix={dailyAreaGradId}
+                      primary={chartColors.primary}
+                      accent={chartColors.accent}
+                    />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke={chartColors.grid}
+                      vertical={false}
+                    />
                     <XAxis
                       dataKey="name"
-                      tick={{ fill: "var(--muted-foreground)", fontSize: 13 }}
-                      tickLine={{ stroke: "var(--border)" }}
+                      tick={axisTick}
+                      tickLine={axisLine}
+                      interval={isTodayPeriod ? 2 : "preserveStartEnd"}
+                      minTickGap={12}
                     />
-                    <YAxis 
-                      tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
-                      tickLine={{ stroke: "var(--border)" }}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "var(--card)",
-                        border: "2px solid var(--border)",
-                        borderRadius: "0.75rem",
-                        color: "var(--foreground)"
-                      }}
-                    />
+                    <YAxis width={DASH_Y_AXIS_WIDTH} {...DASH_Y_AXIS_SPACER} />
+                    <YAxis tick={axisTick} tickLine={axisLine} {...DASH_Y_AXIS_RTL} />
+                    <Tooltip contentStyle={dashTooltipStyle} />
                     <Area
                       type="monotone"
                       dataKey="value"
-                      stroke="#06b6d4"
-                      strokeWidth={3}
+                      stroke={chartColors.primary}
+                      strokeWidth={2.5}
+                      fill={`url(#${dashAreaFillId(dailyAreaGradId)})`}
                       fillOpacity={1}
-                      fill="url(#colorValue)"
+                      isAnimationActive={false}
+                      dot={{ r: 3, fill: chartColors.primary, strokeWidth: 0 }}
+                      activeDot={{ r: 5, fill: chartColors.primary }}
                     />
                   </AreaChart>
-                </ResponsiveContainer>
+                </DashboardChartFrame>
+                )}
               </CardContent>
             </Card>
 
-            <Card className="border-2 border-border shadow-lg overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-violet-500/15 to-purple-500/15 dark:from-violet-500/10 dark:to-purple-500/10 rounded-t-2xl border-b border-border">
-                <CardTitle className="text-foreground text-right font-bold flex items-center gap-2">
-                  <div className="w-1 h-6 bg-gradient-to-b from-violet-500 to-purple-600 rounded-full" />
+            <Card className="dash-chart-card gap-0 p-0 min-w-0">
+              <CardHeader className="dash-chart-card__header border-0 rounded-none shadow-none">
+                <CardTitle className="dash-chart-card__title">
                   النشاط على مدار اليوم
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-6">
+              <CardContent className="dash-chart-canvas !p-0 !px-0">
                 {hourlyActivityData.length === 0 ? (
-                  <div className="text-right text-sm text-muted-foreground">
+                  <div className="flex h-full items-center justify-center text-right text-sm text-muted-foreground">
                     لا توجد بيانات نشاط لهذه الفترة بعد.
                   </div>
                 ) : (
-                  <ResponsiveContainer width="100%" height={350}>
+                  <DashboardChartFrame>
                     <BarChart
                       data={hourlyActivityData}
-                      margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                      margin={DASH_CARTESIAN_MARGIN_COMPACT}
                     >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke={chartColors.grid}
+                        vertical={false}
+                      />
                       <XAxis
                         dataKey="name"
-                        tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
-                        tickLine={{ stroke: "var(--border)" }}
+                        tick={axisTick}
+                        tickLine={axisLine}
+                        interval={isTodayPeriod ? 2 : "preserveStartEnd"}
+                        minTickGap={12}
                       />
-                      <YAxis
-                        tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
-                        tickLine={{ stroke: "var(--border)" }}
-                      />
+                      <YAxis width={36} {...DASH_Y_AXIS_SPACER} />
+                      <YAxis tick={axisTick} tickLine={axisLine} {...DASH_Y_AXIS_RTL} width={36} />
                       <Tooltip
-                        contentStyle={{
-                          backgroundColor: "var(--card)",
-                          border: "2px solid var(--border)",
-                          borderRadius: "0.75rem",
-                          color: "var(--foreground)",
-                        }}
-                        formatter={(value: any) => [`${value}`, "عدد الحالات"]}
+                        contentStyle={dashTooltipStyle}
+                        formatter={(value: number) => [`${value}`, "عدد الحالات"]}
                       />
-                      <Bar dataKey="value" radius={[8, 8, 0, 0]} fill="#8b5cf6" />
+                      <Bar
+                        dataKey="value"
+                        radius={DASH_CHART.barRadius}
+                        fill={chartColors.accent}
+                        isAnimationActive={false}
+                      />
                     </BarChart>
-                  </ResponsiveContainer>
+                  </DashboardChartFrame>
                 )}
               </CardContent>
             </Card>
           </div>
 
           {/* Summary Stats */}
-          <Card className="border-2 border-border shadow-lg bg-gradient-to-br from-cyan-50/80 to-blue-50/80 dark:from-cyan-950/30 dark:to-blue-950/30 overflow-hidden">
-            <CardHeader className="rounded-t-2xl border-b border-border bg-gradient-to-r from-cyan-500/10 to-blue-500/10 dark:from-cyan-500/5 dark:to-blue-500/5">
-              <CardTitle className="text-foreground font-bold text-right flex items-center gap-2">
-                <div className="w-1 h-6 bg-gradient-to-b from-cyan-500 to-blue-600 rounded-full" />
+          <Card className="dash-chart-card gap-0 p-0 min-w-0">
+            <CardHeader className="dash-chart-card__header border-0 rounded-none">
+              <CardTitle className="dash-chart-card__title">
                 ملخص الحالات اليومية
               </CardTitle>
             </CardHeader>
@@ -827,15 +832,15 @@ export function LiveIndicators() {
                   <>
                     <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
                       <span className="text-sm text-foreground font-medium">إجمالي الحالات خلال الفترة</span>
-                      <span className="text-lg text-foreground font-bold">{total}</span>
+                      <span className="dash-inline-stat">{total}</span>
                     </div>
                     <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
                       <span className="text-sm text-foreground font-medium">متوسط الحالات اليومية</span>
-                      <span className="text-lg text-foreground font-bold">{avg}</span>
+                      <span className="dash-inline-stat">{avg}</span>
                     </div>
                     <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
                       <span className="text-sm text-foreground font-medium">أعلى يوم</span>
-                      <span className="text-lg text-foreground font-bold">{maxLabel} ({max?.count ?? 0})</span>
+                      <span className="dash-inline-stat">{maxLabel} ({max?.count ?? 0})</span>
                     </div>
                   </>
                 );
@@ -849,20 +854,19 @@ export function LiveIndicators() {
       {selectedCategory === "الإفادات المؤكدة" && (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="border-2 border-border shadow-lg overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-cyan-500/15 to-teal-500/15 dark:from-cyan-500/10 dark:to-teal-500/10 rounded-t-2xl border-b border-border">
-                <CardTitle className="text-foreground text-right font-bold flex items-center gap-2">
-                  <div className="w-1 h-6 bg-gradient-to-b from-cyan-500 to-teal-600 rounded-full" />
+            <Card className="dash-chart-card gap-0 p-0 min-w-0">
+              <CardHeader className="dash-chart-card__header border-0 rounded-none">
+                <CardTitle className="dash-chart-card__title">
                   نسب الإفادات المؤكدة
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-6">
-                <ResponsiveContainer width="100%" height={320}>
+              <CardContent className="dash-chart-canvas !p-0 !px-0">
+                <DashboardChartFrame>
                   <PieChart>
                     <Pie
                       data={confirmedReportsData}
                       cx="50%"
-                      cy="45%"
+                      cy="50%"
                       innerRadius={65}
                       outerRadius={100}
                       paddingAngle={4}
@@ -877,8 +881,8 @@ export function LiveIndicators() {
                         setConfirmedBriefingsLoading(true);
                         const { start, end } = getDateRange();
                         getConfirmedBriefings({
-                          from: start.toISOString(),
-                          to: end.toISOString(),
+                          from: toLocalCalendarDateKey(start),
+                          to: toLocalCalendarDateKey(end),
                           limit: 100,
                         })
                           .then((res) =>
@@ -922,14 +926,13 @@ export function LiveIndicators() {
                       )}
                     />
                   </PieChart>
-                </ResponsiveContainer>
+                </DashboardChartFrame>
               </CardContent>
             </Card>
 
-            <Card className="border-2 border-border shadow-lg bg-gradient-to-br from-cyan-50/80 to-teal-50/80 dark:from-cyan-950/30 dark:to-teal-950/30 overflow-hidden">
-              <CardHeader className="rounded-t-2xl border-b border-border bg-gradient-to-r from-cyan-500/10 to-teal-500/10 dark:from-cyan-500/5 dark:to-teal-500/5">
-                <CardTitle className="text-foreground font-bold text-right flex items-center gap-2">
-                  <div className="w-1 h-6 bg-gradient-to-b from-cyan-500 to-teal-600 rounded-full" />
+            <Card className="dash-chart-card gap-0 p-0 min-w-0">
+              <CardHeader className="dash-chart-card__header border-0 rounded-none">
+                <CardTitle className="dash-chart-card__title">
                   تفاصيل الإفادات
                 </CardTitle>
               </CardHeader>
@@ -944,7 +947,7 @@ export function LiveIndicators() {
                     <>
                       <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
                         <span className="text-sm text-foreground font-medium">إجمالي البلاغات</span>
-                        <span className="text-lg text-foreground font-bold">{total}</span>
+                        <span className="dash-inline-stat">{total}</span>
                       </div>
                       <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
                         <span className="text-sm text-foreground font-medium">محلولة</span>
@@ -956,7 +959,7 @@ export function LiveIndicators() {
                       </div>
                       <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
                         <span className="text-sm text-foreground font-medium">معدل الحل</span>
-                        <span className="text-lg text-foreground font-bold">{rate}%</span>
+                        <span className="dash-inline-stat">{rate}%</span>
                       </div>
                     </>
                   );
@@ -971,10 +974,9 @@ export function LiveIndicators() {
       {selectedCategory === "أكثر المشاكل تكرارًا" && (
         <>
           <div className="grid grid-cols-1 gap-6">
-            <Card className="border-2 border-border shadow-lg overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-cyan-500/15 to-blue-500/15 dark:from-cyan-500/10 dark:to-blue-500/10 rounded-t-2xl border-b border-border">
-                <CardTitle className="text-foreground text-right font-bold flex items-center gap-2">
-                  <div className="w-1 h-6 bg-gradient-to-b from-cyan-500 to-blue-600 rounded-full" />
+            <Card className="dash-chart-card gap-0 p-0 min-w-0">
+              <CardHeader className="dash-chart-card__header border-0 rounded-none">
+                <CardTitle className="dash-chart-card__title">
                   أكثر 5 مشاكل تكراراً
                 </CardTitle>
               </CardHeader>
@@ -990,7 +992,7 @@ export function LiveIndicators() {
                       >
                         <div
                           className="w-4 h-4 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: topIssuesColors[index] }}
+                          style={{ backgroundColor: palette[index % palette.length] }}
                         />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-bold text-foreground truncate">
@@ -1005,17 +1007,12 @@ export function LiveIndicators() {
                   </div>
 
                   {/* Chart on the Left */}
-                  <div className="order-1 lg:order-2">
-                    <ResponsiveContainer width="100%" height={420}>
+                  <div className="order-1 lg:order-2 w-full dash-chart-canvas !p-0 !px-0">
+                    <DashboardChartFrame height={DASH_CHART_HEIGHT_TALL}>
                       <BarChart
                         data={topIssuesData}
                         layout="vertical"
-                        margin={{
-                          top: 20,
-                          right: 30,
-                          left: 20,
-                          bottom: 20,
-                        }}
+                        margin={DASH_HORIZONTAL_BAR_MARGIN}
                       >
                         <XAxis 
                           type="number" 
@@ -1031,18 +1028,13 @@ export function LiveIndicators() {
                           axisLine={false}
                         />
                         <Tooltip
-                          contentStyle={{
-                            backgroundColor: "var(--card)",
-                            border: "2px solid var(--border)",
-                            borderRadius: "0.75rem",
-                            color: "var(--foreground)"
-                          }}
+                          contentStyle={dashTooltipStyle}
                           formatter={(value: any) => [`${value}`, 'عدد الحالات']}
                           cursor={false}
                         />
                         <Bar
                           dataKey="value"
-                          radius={[0, 8, 8, 0]}
+                          radius={[0, 14, 14, 0]}
                           label={{
                             position: "right",
                             fill: "var(--foreground)",
@@ -1055,12 +1047,12 @@ export function LiveIndicators() {
                           {topIssuesData.map((entry, index) => (
                             <Cell
                               key={`cell-${index}`}
-                              fill={topIssuesColors[index]}
+                              fill={dashBarFill(index, chartColors)}
                             />
                           ))}
                         </Bar>
                       </BarChart>
-                    </ResponsiveContainer>
+                    </DashboardChartFrame>
                   </div>
                 </div>
               </CardContent>
@@ -1068,10 +1060,9 @@ export function LiveIndicators() {
           </div>
 
           {/* Summary Stats */}
-          <Card className="border-2 border-border shadow-lg bg-gradient-to-br from-cyan-50/80 to-blue-50/80 dark:from-cyan-950/30 dark:to-blue-950/30 overflow-hidden">
-            <CardHeader className="rounded-t-2xl border-b border-border bg-gradient-to-r from-cyan-500/10 to-blue-500/10 dark:from-cyan-500/5 dark:to-blue-500/5">
-              <CardTitle className="text-foreground font-bold text-right flex items-center gap-2">
-                <div className="w-1 h-6 bg-gradient-to-b from-cyan-500 to-blue-600 rounded-full" />
+          <Card className="dash-chart-card gap-0 p-0 min-w-0">
+            <CardHeader className="dash-chart-card__header border-0 rounded-none">
+              <CardTitle className="dash-chart-card__title">
                 ملخص المشاكل المتكررة
               </CardTitle>
             </CardHeader>
@@ -1085,15 +1076,15 @@ export function LiveIndicators() {
                   <>
                     <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
                       <span className="text-sm text-foreground font-medium">عدد الأنواع (حسب التصنيفات)</span>
-                      <span className="text-lg text-foreground font-bold">{totalTypes}</span>
+                      <span className="dash-inline-stat">{totalTypes}</span>
                     </div>
                     <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
                       <span className="text-sm text-foreground font-medium">أكثر مشكلة تكراراً</span>
-                      <span className="text-lg text-foreground font-bold">{top ? `${top.category} (${top.count})` : '—'}</span>
+                      <span className="dash-inline-stat">{top ? `${top.category} (${top.count})` : '—'}</span>
                     </div>
                     <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
                       <span className="text-sm text-foreground font-medium">إجمالي التكرارات (Top Categories)</span>
-                      <span className="text-lg text-foreground font-bold">{totalRepeats}</span>
+                      <span className="dash-inline-stat">{totalRepeats}</span>
                     </div>
                   </>
                 );
@@ -1106,25 +1097,21 @@ export function LiveIndicators() {
       {/* Charts for "المشاكل العامة" */}
       {selectedCategory === "المشاكل العامة" && (
         <>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 dash-charts-grid--general">
             {/* Platforms Distribution */}
-            <Card className="border-2 border-border shadow-lg overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-cyan-500/15 to-blue-500/15 dark:from-cyan-500/10 dark:to-blue-500/10 rounded-t-2xl border-b border-border">
-                <CardTitle className="text-foreground text-right font-bold flex items-center gap-2">
-                  <div className="w-1 h-6 bg-gradient-to-b from-cyan-500 to-blue-600 rounded-full" />
+            <Card className="dash-chart-card gap-0 p-0 min-w-0">
+              <CardHeader className="dash-chart-card__header border-0 rounded-none">
+                <CardTitle className="dash-chart-card__title">
                   الجهات المتضررة
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-6">
-                <ResponsiveContainer
-                  width="100%"
-                  height={320}
-                >
+              <CardContent className="dash-chart-canvas !p-0 !px-0">
+                <DashboardChartFrame>
                   <PieChart>
                     <Pie
                       data={platformsData}
                       cx="50%"
-                      cy="45%"
+                      cy="50%"
                       innerRadius={65}
                       outerRadius={100}
                       paddingAngle={4}
@@ -1157,33 +1144,28 @@ export function LiveIndicators() {
                       )}
                     />
                   </PieChart>
-                </ResponsiveContainer>
+                </DashboardChartFrame>
               </CardContent>
             </Card>
 
             {/* Bar Chart */}
-            <Card className="border-2 border-border shadow-lg overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-cyan-500/15 to-indigo-500/15 dark:from-cyan-500/10 dark:to-indigo-500/10 rounded-t-2xl border-b border-border">
-                <CardTitle className="text-foreground text-right font-bold flex items-center gap-2">
-                  <div className="w-1 h-6 bg-gradient-to-b from-cyan-500 to-indigo-600 rounded-full" />
-                  المشاكل العامة حسب التصنيف (أنواع فريدة)
+            <Card className="dash-chart-card gap-0 p-0 min-w-0">
+              <CardHeader className="dash-chart-card__header border-0 rounded-none">
+                <CardTitle className="dash-chart-card__title">
+                  المشاكل العامة حسب التصنيف
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-6 m-[0px]">
+              <CardContent className="dash-chart-canvas dash-chart-canvas--tall !p-0 !px-0">
                 {uniqueCommonIssuesChartData.length === 0 ? (
-                  <div className="text-right text-sm text-muted-foreground py-12">
+                  <div className="flex h-full items-center justify-center text-right text-sm text-muted-foreground">
                     لا توجد تصنيفات مسجّلة للمشاكل العامة بعد.
                   </div>
                 ) : (
-                  <ResponsiveContainer width="100%" height={420}>
+                  <DashboardChartFrame height={DASH_CHART_HEIGHT_TALL}>
                     <BarChart
                       data={uniqueCommonIssuesChartData}
-                      margin={{
-                        top: 40,
-                        right: 30,
-                        left: 30,
-                        bottom: 120,
-                      }}
+                      margin={DASH_CATEGORY_BAR_MARGIN}
+                      barCategoryGap="18%"
                     >
                       <XAxis
                         dataKey="name"
@@ -1194,9 +1176,11 @@ export function LiveIndicators() {
                         tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
                         tickLine={{ stroke: "var(--border)" }}
                       />
-                      <YAxis 
+                      <YAxis width={DASH_Y_AXIS_WIDTH} {...DASH_Y_AXIS_SPACER} />
+                      <YAxis
                         tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
                         tickLine={{ stroke: "var(--border)" }}
+                        {...DASH_Y_AXIS_RTL}
                       />
                       <Tooltip
                         contentStyle={{
@@ -1209,7 +1193,7 @@ export function LiveIndicators() {
                       />
                       <Bar
                         dataKey="value"
-                        radius={[8, 8, 0, 0]}
+                        radius={DASH_CHART.barRadius}
                         label={{
                           position: "top",
                           fill: "var(--foreground)",
@@ -1221,12 +1205,12 @@ export function LiveIndicators() {
                         {uniqueCommonIssuesChartData.map((entry, index) => (
                           <Cell
                             key={`cell-${entry.name}-${index}`}
-                            fill={barColors[index % barColors.length]}
+                            fill={dashBarFill(index, chartColors)}
                           />
                         ))}
                       </Bar>
                     </BarChart>
-                  </ResponsiveContainer>
+                  </DashboardChartFrame>
                 )}
               </CardContent>
             </Card>
@@ -1235,10 +1219,9 @@ export function LiveIndicators() {
           {/* Active vs Resolved Issues */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Active Issues */}
-            <Card className="border-2 border-border shadow-lg overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-amber-500/15 to-orange-500/15 dark:from-amber-500/10 dark:to-orange-500/10 rounded-t-2xl border-b border-border">
-                <CardTitle className="text-foreground text-right font-bold flex items-center gap-2">
-                  <div className="w-1 h-6 bg-gradient-to-b from-amber-500 to-orange-600 rounded-full" />
+            <Card className="dash-chart-card gap-0 p-0 min-w-0">
+              <CardHeader className="dash-chart-card__header border-0 rounded-none">
+                <CardTitle className="dash-chart-card__title">
                   المشاكل النشطة حالياً
                 </CardTitle>
               </CardHeader>
@@ -1256,43 +1239,45 @@ export function LiveIndicators() {
 
                   return (
                     <>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <PieChart>
-                          <Pie
-                            data={data}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={60}
-                            outerRadius={90}
-                            paddingAngle={4}
-                            dataKey="value"
-                            label={false}
-                          >
-                            {data.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: 'var(--card)',
-                              border: '2px solid var(--border)',
-                              borderRadius: '0.75rem',
-                              color: 'var(--foreground)'
-                            }}
-                          />
-                          <Legend
-                            verticalAlign="bottom"
-                            height={50}
-                            wrapperStyle={{ paddingTop: "20px" }}
-                            formatter={(value, entry: any) => (
-                              <span className="text-foreground text-sm">
-                                {value} ({entry.payload.value})
-                              </span>
-                            )}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                      <div className="text-center mt-4">
+                      <div className="dash-chart-canvas !p-0 !px-0">
+                        <DashboardChartFrame height={300}>
+                          <PieChart>
+                            <Pie
+                              data={data}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={90}
+                              paddingAngle={4}
+                              dataKey="value"
+                              label={false}
+                            >
+                              {data.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: 'var(--card)',
+                                border: '2px solid var(--border)',
+                                borderRadius: '0.75rem',
+                                color: 'var(--foreground)'
+                              }}
+                            />
+                            <Legend
+                              verticalAlign="bottom"
+                              height={50}
+                              wrapperStyle={{ paddingTop: "20px" }}
+                              formatter={(value, entry: any) => (
+                                <span className="text-foreground text-sm">
+                                  {value} ({entry.payload.value})
+                                </span>
+                              )}
+                            />
+                          </PieChart>
+                        </DashboardChartFrame>
+                      </div>
+                      <div className="text-center mt-4 px-6 pb-6">
                         <p className="text-sm text-muted-foreground">نسبة المشاكل النشطة</p>
                         <p className="text-2xl text-amber-600 dark:text-amber-400 font-bold">
                           {percent}%
@@ -1305,10 +1290,9 @@ export function LiveIndicators() {
             </Card>
 
             {/* Resolved Issues */}
-            <Card className="border-2 border-border shadow-lg overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-emerald-500/15 to-green-500/15 dark:from-emerald-500/10 dark:to-green-500/10 rounded-t-2xl border-b border-border">
-                <CardTitle className="text-foreground text-right font-bold flex items-center gap-2">
-                  <div className="w-1 h-6 bg-gradient-to-b from-emerald-500 to-green-600 rounded-full" />
+            <Card className="dash-chart-card gap-0 p-0 min-w-0">
+              <CardHeader className="dash-chart-card__header border-0 rounded-none">
+                <CardTitle className="dash-chart-card__title">
                   المشاكل المؤكد حلها
                 </CardTitle>
               </CardHeader>
@@ -1326,43 +1310,45 @@ export function LiveIndicators() {
 
                   return (
                     <>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <PieChart>
-                          <Pie
-                            data={data}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={60}
-                            outerRadius={90}
-                            paddingAngle={4}
-                            dataKey="value"
-                            label={false}
-                          >
-                            {data.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: 'var(--card)',
-                              border: '2px solid var(--border)',
-                              borderRadius: '0.75rem',
-                              color: 'var(--foreground)'
-                            }}
-                          />
-                          <Legend
-                            verticalAlign="bottom"
-                            height={50}
-                            wrapperStyle={{ paddingTop: "20px" }}
-                            formatter={(value, entry: any) => (
-                              <span className="text-foreground text-sm">
-                                {value} ({entry.payload.value})
-                              </span>
-                            )}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                      <div className="text-center mt-4">
+                      <div className="dash-chart-canvas !p-0 !px-0">
+                        <DashboardChartFrame height={300}>
+                          <PieChart>
+                            <Pie
+                              data={data}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={90}
+                              paddingAngle={4}
+                              dataKey="value"
+                              label={false}
+                            >
+                              {data.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: 'var(--card)',
+                                border: '2px solid var(--border)',
+                                borderRadius: '0.75rem',
+                                color: 'var(--foreground)'
+                              }}
+                            />
+                            <Legend
+                              verticalAlign="bottom"
+                              height={50}
+                              wrapperStyle={{ paddingTop: "20px" }}
+                              formatter={(value, entry: any) => (
+                                <span className="text-foreground text-sm">
+                                  {value} ({entry.payload.value})
+                                </span>
+                              )}
+                            />
+                          </PieChart>
+                        </DashboardChartFrame>
+                      </div>
+                      <div className="text-center mt-4 px-6 pb-6">
                         <p className="text-sm text-muted-foreground">نسبة المشاكل المحلولة</p>
                         <p className="text-2xl text-emerald-600 dark:text-emerald-400 font-bold">{percent}%</p>
                       </div>
@@ -1374,35 +1360,34 @@ export function LiveIndicators() {
           </div>
 
           {/* Summary Stats Card */}
-          <Card className="border-2 border-border shadow-lg bg-gradient-to-br from-cyan-50/80 to-blue-50/80 dark:from-cyan-950/30 dark:to-blue-950/30 overflow-hidden">
-            <CardHeader className="rounded-t-2xl border-b border-border bg-gradient-to-r from-cyan-500/10 to-blue-500/10 dark:from-cyan-500/5 dark:to-blue-500/5">
-              <CardTitle className="text-foreground font-bold text-right flex items-center gap-2">
-                <div className="w-1 h-6 bg-gradient-to-b from-cyan-500 to-blue-600 rounded-full" />
+          <Card className="dash-chart-card gap-0 p-0 min-w-0">
+            <CardHeader className="dash-chart-card__header border-0 rounded-none">
+              <CardTitle className="dash-chart-card__title">
                 ملخص عام
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 pt-6">
               <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
                 <span className="text-sm text-foreground font-medium">أنواع المشاكل العامة (غير مكررة)</span>
-                <span className="text-lg text-foreground font-bold">
+                <span className="dash-inline-stat">
                   {distributionStats?.uniqueCategoryCount ?? uniqueCommonIssuesChartData.length}
                 </span>
               </div>
               <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
                 <span className="text-sm text-foreground font-medium">إجمالي البلاغات</span>
-                <span className="text-lg text-foreground font-bold">{summaryStats?.totalCalls ?? 0}</span>
+                <span className="dash-inline-stat">{summaryStats?.totalCalls ?? 0}</span>
               </div>
               <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
                 <span className="text-sm text-foreground font-medium">معدل الحل</span>
-                <span className="text-lg text-foreground font-bold">{summaryStats?.resolutionRate ?? 0}%</span>
+                <span className="dash-inline-stat">{summaryStats?.resolutionRate ?? 0}%</span>
               </div>
               <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
                 <span className="text-sm text-foreground font-medium">متوسط وقت الحل (ساعات)</span>
-                <span className="text-lg text-foreground font-bold">{summaryStats?.avgResolutionTime ?? 0}</span>
+                <span className="dash-inline-stat">{summaryStats?.avgResolutionTime ?? 0}</span>
               </div>
               <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
                 <span className="text-sm text-foreground font-medium">المستخدمون النشطون</span>
-                <span className="text-lg text-foreground font-bold">{summaryStats?.activeUsers ?? 0} / {summaryStats?.totalUsers ?? 0}</span>
+                <span className="dash-inline-stat">{summaryStats?.activeUsers ?? 0} / {summaryStats?.totalUsers ?? 0}</span>
               </div>
             </CardContent>
           </Card>
@@ -1411,7 +1396,7 @@ export function LiveIndicators() {
           <div className="glass-card rounded-2xl shadow-lg p-5 border-2 border-border">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3 text-foreground">
-                <div className="p-2 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl border-2 border-cyan-300 dark:border-cyan-400">
+                <div className="p-2 bg-primary rounded-xl border-2 border-primary/30">
                   <Clock className="size-5 text-white" />
                 </div>
                 <span className="font-bold">آخر تحديث</span>

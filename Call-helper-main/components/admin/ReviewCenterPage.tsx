@@ -752,14 +752,14 @@ export function ReviewCenterPage() {
                 {/* Section B: System Suggestion */}
                 <div className="space-y-2 pt-3 border-t border-border">
                   <div className="flex items-center gap-2 pb-2 border-b border-border">
-                    <Target className="size-4 text-cyan-500" />
+                    <Target className="size-4 text-primary" />
                     <h3 className="font-bold text-foreground text-sm">System Suggestion</h3>
                   </div>
 
                   <div className="space-y-3">
                     <div>
                       <Label className="text-xs text-muted-foreground">Suggested Action</Label>
-                      <p className="text-sm font-medium text-cyan-600 dark:text-cyan-400 mt-1">
+                      <p className="text-sm font-medium text-primary mt-1">
                         {selectedItem.suggestion.action}
                       </p>
                     </div>

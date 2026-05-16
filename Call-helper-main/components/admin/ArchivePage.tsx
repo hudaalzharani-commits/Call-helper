@@ -119,7 +119,7 @@ export function ArchivePage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-foreground mb-2 flex items-center gap-2">
-          <div className="p-2 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-xl">
+          <div className="p-2 bg-primary rounded-xl">
             <Archive className="size-6 text-white" />
           </div>
           Archive

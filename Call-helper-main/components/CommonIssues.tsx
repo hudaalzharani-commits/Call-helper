@@ -73,7 +73,7 @@ const KB_CATEGORY_KEYS = Object.keys(KB_CATEGORY_LABEL_AR) as Array<keyof typeof
 
 /** خلفية ونص واضحان لحوار «إضافة مشكلة عامة» (نفس أسلوب التحديثات التشغيلية) */
 const COMMON_ISSUES_DIALOG_PANEL =
-  'max-h-[min(90vh,40rem)] overflow-y-auto shadow-2xl outline-none !border-2 !border-zinc-300 !bg-white !text-zinc-950 dark:!border-zinc-600 dark:!bg-zinc-950 dark:!text-zinc-50';
+  'max-h-[min(90vh,40rem)] overflow-y-auto shadow-2xl outline-none !border-border !bg-popover !text-popover-foreground';
 
 const DESC_SOLUTION_MARKER = '\n\n---\n\nالحل:\n';
 
@@ -1121,12 +1121,12 @@ export function CommonIssues() {
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent className={cn('max-w-2xl', COMMON_ISSUES_DIALOG_PANEL)} dir="rtl">
           <DialogHeader>
-            <DialogTitle className="text-right text-xl text-zinc-950 dark:text-zinc-50">إضافة مشكلة عامة</DialogTitle>
-            <DialogDescription className="text-right text-base leading-relaxed text-zinc-600 dark:text-zinc-300">
+            <DialogTitle className="text-right text-xl text-foreground">إضافة مشكلة عامة</DialogTitle>
+            <DialogDescription className="text-right text-base leading-relaxed text-muted-foreground">
               يُحفظ السجل في <strong>سجل المعرفة</strong> ليُستَخدم في الإجابات والمسارات.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4 text-base leading-relaxed [&_label]:font-medium [&_label]:text-zinc-800 dark:[&_label]:text-zinc-200">
+          <div className="space-y-4 py-4 text-base leading-relaxed [&_label]:font-medium [&_label]:text-foreground">
             <div className="space-y-2">
               <Label htmlFor="ci-title" className="text-right block">
                 العنوان

@@ -142,7 +142,7 @@ function OperationalIssueRow({
           <Badge className={`${statusBadgeClasses(issue.status)} text-[10px]`}>
             {statusLabel(issue.status)}
           </Badge>
-          <Badge className="bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30 text-[10px]">
+          <Badge className="bg-primary/15 text-primary border border-primary/30 text-[10px]">
             {issue.occurrenceCount} حالة
           </Badge>
         </div>

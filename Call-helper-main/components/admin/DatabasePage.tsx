@@ -761,7 +761,7 @@ export function DatabasePage() {
             </Button>
             <Button
               onClick={editingCase ? handleUpdateCase : handleAddCase}
-              className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white"
+              className="bg-primary text-primary-foreground hover:bg-primary-hover text-primary-foreground"
             >
               <Save className="size-4 ml-2" />
               {editingCase ? 'Update Case' : 'Add Case'}
@@ -775,17 +775,17 @@ export function DatabasePage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <h2 className="text-3xl font-bold text-foreground">Cases Management</h2>
-        <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center lg:w-auto lg:min-w-[min(100%,24rem)]">
-          <div className="relative min-w-0 flex-1">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
+        <h2 className="shrink-0 text-3xl font-bold text-foreground">Cases Management</h2>
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center lg:flex-1 lg:max-w-4xl">
+          <div className="relative min-w-0 w-full flex-1 sm:min-w-[20rem] lg:min-w-[28rem]">
             <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="search"
               placeholder="بحث في قاعدة البيانات (CaseID، كلمات، تصنيف…)"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="pr-10 text-right"
+              className="h-10 w-full pr-10 text-right text-base"
               aria-label="بحث في الحالات"
             />
           </div>
@@ -796,7 +796,7 @@ export function DatabasePage() {
             </Button>
             <Button
               onClick={() => setShowAddForm(true)}
-              className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white"
+              className="bg-primary text-primary-foreground hover:bg-primary-hover text-primary-foreground"
             >
               <Plus className="size-4 ml-2" />
               Add New Case
@@ -831,7 +831,7 @@ export function DatabasePage() {
                       <p className="text-muted-foreground">No cases found. Add your first case!</p>
                       <Button
                         onClick={() => setShowAddForm(true)}
-                        className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white"
+                        className="bg-primary text-primary-foreground hover:bg-primary-hover text-primary-foreground"
                       >
                         <Plus className="size-4 ml-2" />
                         Add New Case
@@ -901,7 +901,7 @@ export function DatabasePage() {
                           size="sm"
                           disabled={archivingId === caseItem._id}
                           onClick={() => handleEditClick(caseItem)}
-                          className="bg-cyan-500 hover:bg-cyan-600 text-white text-xs px-3"
+                          className="bg-primary hover:bg-cyan-600 text-white text-xs px-3"
                         >
                           Edit
                         </Button>

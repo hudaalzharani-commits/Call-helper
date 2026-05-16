@@ -48,7 +48,7 @@ export function AdminPanel() {
   const [showDatabaseView, setShowDatabaseView] = useState(false);
 
   const adminMenuItems: AdminMenuItem[] = [
-    { id: 'dashboard', name: 'Dashboard (Home)', icon: Home, color: 'from-cyan-500 to-blue-500' },
+    { id: 'dashboard', name: 'Dashboard (Home)', icon: Home, color: 'from-primary to-primary' },
     { id: 'advanced-settings', name: 'Advanced Settings', icon: Sliders, color: 'from-purple-500 to-pink-500' },
     { 
       id: 'logs', 
@@ -112,12 +112,12 @@ export function AdminPanel() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center gap-3">
-            <div className="p-2 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-xl">
+            <div className="p-2 bg-primary rounded-xl">
               <Shield className="size-6 text-white" />
             </div>
             لوحة تحكم الأدمن
@@ -134,7 +134,7 @@ export function AdminPanel() {
               variant={!showDatabaseView ? "default" : "ghost"}
               size="sm"
               onClick={() => setShowDatabaseView(false)}
-              className={`${!showDatabaseView ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600' : 'hover:bg-accent'}`}
+              className={`${!showDatabaseView ? 'bg-primary text-primary-foreground text-white hover:from-primary hover:to-primary' : 'hover:bg-accent'}`}
             >
               <Shield className="size-4 ml-2" />
               لوحة الأدمن
@@ -143,14 +143,14 @@ export function AdminPanel() {
               variant={showDatabaseView ? "default" : "ghost"}
               size="sm"
               onClick={() => setShowDatabaseView(true)}
-              className={`${showDatabaseView ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600' : 'hover:bg-accent'}`}
+              className={`${showDatabaseView ? 'bg-primary text-primary-foreground text-white hover:from-primary hover:to-primary' : 'hover:bg-accent'}`}
             >
               <Database className="size-4 ml-2" />
               قاعدة البيانات
             </Button>
           </div>
           
-          <Button className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white shadow-lg border-2 border-cyan-400 dark:border-cyan-300">
+          <Button className="bg-primary text-primary-foreground hover:bg-primary-hover text-primary-foreground shadow-lg border-2 border-primary/30">
             <RefreshCw className="size-4 ml-2" />
             تحديث البيانات
           </Button>

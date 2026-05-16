@@ -172,9 +172,9 @@ export function AddStepDialog({
         <div className="space-y-4 py-4">
           {/* Linked Warning - في حالة التعديل فقط */}
           {editingSubCondition && isLinked && (
-            <div className="glass-card bg-cyan-50 dark:bg-cyan-950/30 border-2 border-cyan-500/50 p-4 rounded-xl">
+            <div className="glass-card bg-primary-soft dark:bg-primary-soft/30 border-2 border-primary/50 p-4 rounded-xl">
               <div className="flex items-start gap-3">
-                <Link2 className="size-5 text-cyan-600 dark:text-cyan-400 flex-shrink-0 mt-0.5" />
+                <Link2 className="size-5 text-primary flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <p className="font-semibold text-cyan-900 dark:text-cyan-100 text-sm mb-1">
                     ⚠️ خطوة مرتبطة بمسارات أخرى
@@ -201,9 +201,9 @@ export function AddStepDialog({
 
           {/* Multi-Route Selector - فقط عند الإضافة */}
           {!editingSubCondition && (
-            <div className="space-y-3 glass-card bg-gradient-to-br from-cyan-50 to-blue-50 dark:from-cyan-950/30 dark:to-blue-950/30 border-2 border-cyan-500/30 p-4 rounded-xl">
+            <div className="space-y-3 glass-card bg-gradient-to-br from-cyan-50 to-blue-50 dark:from-cyan-950/30 dark:to-blue-950/30 border-2 border-primary/30 p-4 rounded-xl">
               <div className="flex items-center gap-2 mb-2">
-                <Link2 className="size-5 text-cyan-600 dark:text-cyan-400" />
+                <Link2 className="size-5 text-primary" />
                 <Label className="font-semibold text-foreground">إضافة في مسارات متعددة (جديد!)</Label>
               </div>
               <p className="text-xs text-muted-foreground mb-3">
@@ -222,7 +222,7 @@ export function AddStepDialog({
                     <label
                       key={route.id}
                       className={`flex items-center gap-2 p-2 rounded hover:bg-muted/50 cursor-pointer ${
-                        isCurrentRoute ? 'bg-cyan-100 dark:bg-cyan-900/30' : ''
+                        isCurrentRoute ? 'bg-cyan-100 dark:bg-primary-soft/30' : ''
                       }`}
                     >
                       <input
@@ -241,7 +241,7 @@ export function AddStepDialog({
                       <span className="text-sm text-foreground flex items-center gap-2">
                         {route.name}
                         {isCurrentRoute && (
-                          <Badge className="bg-cyan-500 text-white text-xs">المسار الحالي</Badge>
+                          <Badge className="bg-primary text-white text-xs">المسار الحالي</Badge>
                         )}
                       </span>
                     </label>
@@ -367,7 +367,7 @@ export function AddStepDialog({
                 </SelectItem>
                 <SelectItem value="direct_answer" className="text-right">
                   <div className="flex items-center gap-2">
-                    <Check className="size-4 text-cyan-500" />
+                    <Check className="size-4 text-primary" />
                     إجابة مباشرة - استخدام توجيهات الحل مباشرة
                   </div>
                 </SelectItem>
@@ -410,7 +410,7 @@ export function AddStepDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            className="bg-gradient-to-r from-cyan-500 to-blue-500 text-white"
+            className="bg-primary text-primary-foreground text-white"
             disabled={!name.trim()}
           >
             {editingSubCondition ? (

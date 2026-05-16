@@ -1,17 +1,17 @@
 /**
  * ====================================================================
- * Debug Panel - للأدمن فقط
+ * Debug Panel - للأدof فقط
  * ====================================================================
  * 
- * يعرض معلومات تفصيلية عن Advanced Mode Flow للمساعدة في الاختبار
+ * يShow معلومات تفصيلية عن Advanced Mode Flow للمساعدة في اNoختبار
  * 
- * ⚠️ هذا Component للتطوير فقط - يمكن إخفاءه أو حذفه في الإنتاج
+ * ⚠️ هذا Component للتطوير فقط - يمكن إخفاءه أو Deleteه في الإنتاج
  * 
- * يعرض:
+ * يShow:
  * - Active Route
  * - Current Step
  * - Sub-condition المختار
- * - Action المنفذ
+ * - Action الofفذ
  * - Final Score
  * - Flow Log
  * 
@@ -29,7 +29,7 @@ interface DebugPanelProps {
     order: number;
   } | null;
   subCondition: string | null;
-  action: 'continue' | 'force_solution' | 'direct_answer' | 'escalation' | null;
+  action: 'continue' | 'force_solution' | 'escalation' | null;
   finalScore: number;
   flowLog: Array<{
     step: string;
@@ -40,27 +40,11 @@ interface DebugPanelProps {
   scoringBreakdown?: {
     caseDbId: string;
     caseId: string;
-    preFilter: {
-      skippedByUserTypeOrServiceType: Array<{
-        caseDbId: string;
-        caseId: string;
-        caseUserType: string | null;
-        caseServiceType: string | null;
-        selectedUserTypeHint: string | null;
-        reason: string;
-      }>;
-    };
     keyword: {
       rawScore: number;
       boundedScore: number;
       weight: number;
       contribution: number;
-      findings: {
-        matchedMainKeywords: string[];
-        matchedExtraKeywords: string[];
-        matchedSynonyms: string[];
-        matchedUserWordsInCaseText: string[];
-      };
     };
     usageFrequency: {
       score: number;
@@ -80,16 +64,6 @@ interface DebugPanelProps {
       userTypeScore: number | null;
       categoryScore: number | null;
       subCategoryScore: number | null;
-      findings: {
-        userTypeHint: string | null;
-        caseUserType: string | null;
-        caseAccountStatus: string | null;
-        userTypeMatched: boolean | null;
-        categoryMatchedTokens: string[];
-        categoryTotalTokens: string[];
-        subCategoryMatchedTokens: string[];
-        subCategoryTotalTokens: string[];
-      };
     };
     finalScore: number;
   } | null;
@@ -107,10 +81,10 @@ export function DebugPanel({
   const [isExpanded, setIsExpanded] = useState(true);
 
   return (
-    <div className="fixed bottom-4 left-4 z-50 w-96 glass-card border-2 border-amber-500/50 rounded-xl shadow-2xl overflow-hidden" dir="rtl">
+    <div className="fixed bottom-4 left-4 z-50 w-96 glass-card border-2 border-ai/50 rounded-xl shadow-2xl overflow-hidden">
       {/* Header */}
       <div 
-        className="bg-gradient-to-r from-amber-500 to-orange-500 p-3 flex items-center justify-between cursor-pointer"
+        className="bg-gradient-to-r bg-ai p-3 flex items-center justify-between cursor-pointer"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-2">
@@ -131,11 +105,11 @@ export function DebugPanel({
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground font-semibold">Active Route:</p>
             {activeRoute ? (
-              <Badge className="bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-400 border-0">
+              <Badge className="bg-primary/10 text-primary dark:bg-primary-soft dark:text-primary border-0">
                 {activeRoute}
               </Badge>
             ) : (
-              <span className="text-xs text-muted-foreground">لا يوجد</span>
+              <span className="text-xs text-muted-foreground">None</span>
             )}
           </div>
 
@@ -144,13 +118,13 @@ export function DebugPanel({
             <p className="text-xs text-muted-foreground font-semibold">Current Step:</p>
             {currentStep ? (
               <div className="flex items-center gap-2">
-                <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400 border-0">
+                <Badge className="bg-primary/10 text-primary dark:bg-blue-950 dark:text-primary border-0">
                   {currentStep.name}
                 </Badge>
                 <span className="text-xs text-muted-foreground">({currentStep.order}/n)</span>
               </div>
             ) : (
-              <span className="text-xs text-muted-foreground">لا يوجد</span>
+              <span className="text-xs text-muted-foreground">None</span>
             )}
           </div>
 
@@ -162,7 +136,7 @@ export function DebugPanel({
                 {subCondition}
               </Badge>
             ) : (
-              <span className="text-xs text-muted-foreground">لا يوجد</span>
+              <span className="text-xs text-muted-foreground">None</span>
             )}
           </div>
 
@@ -172,17 +146,15 @@ export function DebugPanel({
             {action ? (
               <Badge className={`border-0 ${
                 action === 'continue' 
-                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
+                  ? 'bg-success/10 text-emerald-700 dark:bg-emerald-950 dark:text-success'
                   : action === 'force_solution'
                   ? 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400'
-                  : action === 'direct_answer'
-                  ? 'bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-400'
                   : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400'
               }`}>
-                {action === 'continue' ? 'Continue' : action === 'force_solution' ? 'Force Solution' : action === 'direct_answer' ? 'Direct Answer' : 'Escalation'}
+                {action === 'continue' ? 'Continue' : action === 'force_solution' ? 'Force Solution' : 'Escalation'}
               </Badge>
             ) : (
-              <span className="text-xs text-muted-foreground">لا يوجد</span>
+              <span className="text-xs text-muted-foreground">None</span>
             )}
           </div>
 
@@ -191,12 +163,12 @@ export function DebugPanel({
             <p className="text-xs text-muted-foreground font-semibold">Final Score:</p>
             <span className={`text-lg font-bold ${
               finalScore >= 90 
-                ? 'text-emerald-600 dark:text-emerald-400'
+                ? 'text-success dark:text-success'
                 : finalScore >= 80
-                ? 'text-cyan-600 dark:text-cyan-400'
+                ? 'text-primary dark:text-primary'
                 : finalScore >= 41
-                ? 'text-yellow-600 dark:text-yellow-400'
-                : 'text-orange-600 dark:text-orange-400'
+                ? 'text-warning dark:text-yellow-400'
+                : 'text-primary dark:text-orange-400'
             }`}>
               {finalScore}%
             </span>
@@ -206,7 +178,7 @@ export function DebugPanel({
           <div className="space-y-2 pt-3 border-t border-border">
             <p className="text-xs text-muted-foreground font-semibold">Matcher Factors:</p>
             {!scoringBreakdown ? (
-              <p className="text-xs text-muted-foreground">لا توجد بيانات بعد</p>
+              <p className="text-xs text-muted-foreground">No data yet.</p>
             ) : (
               <div className="text-xs glass-panel p-2 rounded-lg space-y-1">
                 <p className="font-semibold text-foreground">
@@ -224,53 +196,6 @@ export function DebugPanel({
                 <p className="text-muted-foreground">
                   Metadata: {scoringBreakdown.metadata.contribution.toFixed(2)} (w:{scoringBreakdown.metadata.weight})
                 </p>
-                <div className="border border-border rounded-md p-2 bg-background/40 space-y-1">
-                  <p className="font-semibold text-foreground">Findings</p>
-                  <p className="text-muted-foreground">
-                    Main keywords matched: {scoringBreakdown.keyword.findings.matchedMainKeywords.length > 0 ? scoringBreakdown.keyword.findings.matchedMainKeywords.join('، ') : 'None'}
-                  </p>
-                  <p className="text-muted-foreground">
-                    Extra keywords matched: {scoringBreakdown.keyword.findings.matchedExtraKeywords.length > 0 ? scoringBreakdown.keyword.findings.matchedExtraKeywords.join('، ') : 'None'}
-                  </p>
-                  <p className="text-muted-foreground">
-                    Synonyms matched: {scoringBreakdown.keyword.findings.matchedSynonyms.length > 0 ? scoringBreakdown.keyword.findings.matchedSynonyms.join('، ') : 'None'}
-                  </p>
-                  <p className="text-muted-foreground">
-                    User words found in case terms: {scoringBreakdown.keyword.findings.matchedUserWordsInCaseText.length > 0 ? scoringBreakdown.keyword.findings.matchedUserWordsInCaseText.join('، ') : 'None'}
-                  </p>
-                  <p className="text-muted-foreground">
-                    Freshness source date: {scoringBreakdown.freshness?.createdAt || 'N/A'}
-                  </p>
-                  <p className="text-muted-foreground">
-                    Freshness normalized score: {Number(scoringBreakdown.freshness?.score || 0).toFixed(2)}
-                  </p>
-                  <p className="text-muted-foreground">
-                    UserType selected vs case: {(scoringBreakdown.metadata.findings.userTypeHint || 'N/A')} ↔ {(scoringBreakdown.metadata.findings.caseUserType || scoringBreakdown.metadata.findings.caseAccountStatus || 'N/A')}
-                  </p>
-                  <p className="text-muted-foreground">
-                    UserType matched: {scoringBreakdown.metadata.findings.userTypeMatched === null ? 'N/A' : scoringBreakdown.metadata.findings.userTypeMatched ? 'Yes' : 'No'}
-                  </p>
-                  <p className="text-muted-foreground">
-                    Category tokens matched: {scoringBreakdown.metadata.findings.categoryMatchedTokens.length}/{scoringBreakdown.metadata.findings.categoryTotalTokens.length}
-                    {scoringBreakdown.metadata.findings.categoryMatchedTokens.length > 0 ? ` (${scoringBreakdown.metadata.findings.categoryMatchedTokens.join('، ')})` : ''}
-                  </p>
-                  <p className="text-muted-foreground">
-                    SubCategory tokens matched: {scoringBreakdown.metadata.findings.subCategoryMatchedTokens.length}/{scoringBreakdown.metadata.findings.subCategoryTotalTokens.length}
-                    {scoringBreakdown.metadata.findings.subCategoryMatchedTokens.length > 0 ? ` (${scoringBreakdown.metadata.findings.subCategoryMatchedTokens.join('، ')})` : ''}
-                  </p>
-                  <p className="text-muted-foreground">
-                    Skipped by UserType/ServiceType pre-filter: {scoringBreakdown.preFilter.skippedByUserTypeOrServiceType.length > 0 ? 'Yes' : 'No'}
-                  </p>
-                  {scoringBreakdown.preFilter.skippedByUserTypeOrServiceType.length > 0 && (
-                    <div className="space-y-1 pl-2 border-l border-border/70">
-                      {scoringBreakdown.preFilter.skippedByUserTypeOrServiceType.slice(0, 8).map((skippedCase) => (
-                        <p key={skippedCase.caseDbId || skippedCase.caseId} className="text-muted-foreground">
-                          {skippedCase.caseId || skippedCase.caseDbId}: {skippedCase.reason}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                </div>
                 <p className="font-semibold text-primary mt-1">Final: {scoringBreakdown.finalScore}%</p>
               </div>
             )}
@@ -280,7 +205,7 @@ export function DebugPanel({
           <div className="space-y-2 pt-3 border-t border-border">
             <p className="text-xs text-muted-foreground font-semibold">Flow Log:</p>
             {flowLog.length === 0 ? (
-              <p className="text-xs text-muted-foreground">لا توجد سجلات بعد</p>
+              <p className="text-xs text-muted-foreground">No logs yet.</p>
             ) : (
               <div className="space-y-1 max-h-32 overflow-y-auto">
                 {flowLog.map((log, index) => (
@@ -291,7 +216,7 @@ export function DebugPanel({
                       <span className="text-primary">{log.subCondition}</span>
                     </div>
                     <div className="text-[10px] text-muted-foreground mt-0.5">
-                      {log.action === 'continue' ? '✓' : log.action === 'force_solution' ? '🛑' : log.action === 'direct_answer' ? '💡' : '⚠️'} {log.action}
+                      {log.action === 'continue' ? '✓' : log.action === 'force_solution' ? '🛑' : '⚠️'} {log.action}
                     </div>
                   </div>
                 ))}

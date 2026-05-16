@@ -52,7 +52,8 @@ router.get('/time-series', authenticate, async (req, res) => {
 // @access  Private
 router.get('/hourly', authenticate, async (req, res) => {
   try {
-    const result = await getHourlyActivity();
+    const { from, to } = req.query;
+    const result = await getHourlyActivity({ from, to });
     res.json(result);
   } catch (error) {
     console.error('❌ Analytics hourly error:', error);

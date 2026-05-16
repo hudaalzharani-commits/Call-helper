@@ -463,16 +463,16 @@ export function AdminOperationalMonitoringSection() {
                   )}
                 </div>
 
-                <div className="glass-panel rounded-xl p-4 border-2 border-cyan-300/50 dark:border-cyan-500/30 space-y-3">
+                <div className="glass-panel rounded-xl p-4 border-2 border-cyan-300/50 dark:border-primary/30 space-y-3">
                   <div className="flex items-center justify-between gap-2">
-                    <Badge className="bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30 text-[10px]">
+                    <Badge className="bg-primary/15 text-primary border border-primary/30 text-[10px]">
                       إجمالي
                     </Badge>
                     <div className="flex items-center gap-2">
                       <h4 className="text-sm font-bold text-foreground">
                         المشاكل العامة
                       </h4>
-                      <BarChart3 className="size-4 text-cyan-600 dark:text-cyan-400" />
+                      <BarChart3 className="size-4 text-primary" />
                     </div>
                   </div>
                   {topCategoriesAll.length === 0 ? (
@@ -484,9 +484,9 @@ export function AdminOperationalMonitoringSection() {
                       {topCategoriesAll.slice(0, 10).map((cat, idx) => (
                         <div
                           key={`${cat.category}__${idx}`}
-                          className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-cyan-500/5 border border-cyan-500/20 hover:shadow-sm transition-all"
+                          className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-primary/5 border border-primary/20 hover:shadow-sm transition-all"
                         >
-                          <Badge className="bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30 text-xs shrink-0 font-bold">
+                          <Badge className="bg-primary/15 text-primary border border-primary/30 text-xs shrink-0 font-bold">
                             {cat.count}
                           </Badge>
                           <div className="text-right flex-1 min-w-0">

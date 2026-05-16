@@ -4,325 +4,896 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ─────────────────────────────────────────────────────────────────────────
+   RAFIQ DESIGN SYSTEM — v0.3 stronger visual pass
+   Premium modern SaaS / operations-cockpit feel.
+   Real surface contrast, generous rounding, cinematic shadows,
+   accent-driven glows, refined active states.
+   Works for Dark Mode, Light Mode, and all accent palettes.
+   ───────────────────────────────────────────────────────────────────── */
+
+
+/* ─── LIGHT MODE — warm, off-white, premium not pale ─────────────────── */
 :root {
   --font-size: 16px;
-  
-  /* Modern Teal/Cyan Color System */
-  --background: #f0f9ff;
-  --foreground: #0c4a6e;
-  
-  --card: rgba(255, 255, 255, 0.95);
-  --card-foreground: #0c4a6e;
-  
-  --popover: rgba(255, 255, 255, 0.98);
-  --popover-foreground: #0c4a6e;
-  
-  --primary: #0891b2;
-  --primary-foreground: #ffffff;
-  
-  --secondary: #06b6d4;
-  --secondary-foreground: #ffffff;
-  
-  --muted: #e0f2fe;
-  --muted-foreground: #475569;
-  
-  --accent: #7dd3fc;
-  --accent-foreground: #0c4a6e;
-  
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
-  
-  --border: rgba(14, 116, 144, 0.2);
-  --input: transparent;
-  --input-background: rgba(255, 255, 255, 0.9);
-  --switch-background: #cbd5e1;
-  
-  --font-weight-medium: 600;
-  --font-weight-normal: 400;
-  
-  --ring: #0891b2;
-  
-  --chart-1: #0891b2;
-  --chart-2: #06b6d4;
-  --chart-3: #22d3ee;
-  --chart-4: #67e8f9;
-  --chart-5: #a5f3fc;
-  
-  --radius: 1.25rem;
-  
-  --sidebar: rgba(255, 255, 255, 0.9);
-  --sidebar-foreground: #0c4a6e;
-  --sidebar-primary: #0891b2;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgba(8, 145, 178, 0.1);
-  --sidebar-accent-foreground: #0c4a6e;
-  --sidebar-border: rgba(14, 116, 144, 0.2);
-  --sidebar-ring: #0891b2;
+
+  /* Background: warm cream that's slightly deeper so surfaces visibly lift */
+  --background:           #EFE9DF;
+  --background-alt:       #E9E2D6;
+  --background-radial:    radial-gradient(ellipse 1100px 720px at 12% -10%, color-mix(in srgb, var(--primary) 6%, transparent) 0%, transparent 55%),
+                          radial-gradient(ellipse 900px 600px at 100% 110%, color-mix(in srgb, var(--ai) 5%, transparent) 0%, transparent 60%);
+
+  --foreground:           #14110D;
+  --foreground-strong:    #0A0807;
+
+  /* Surface ladder — strong stepwise contrast so cards have weight */
+  --surface:              #FFFFFF;
+  --surface-2:            #FAF6EE;
+  --surface-3:            #F1ECE0;
+  --surface-4:            #E5DECE;
+
+  --card:                 #FFFFFF;
+  --card-foreground:      #14110D;
+
+  --popover:              #FFFFFF;
+  --popover-foreground:   #14110D;
+
+  --primary:              #D43E20;
+  --primary-hover:        #C13619;
+  --primary-foreground:   #FFFFFF;
+  --primary-soft:         color-mix(in srgb, var(--primary) 11%, transparent);
+  --primary-glow:         color-mix(in srgb, var(--primary) 32%, transparent);
+  --primary-glow-soft:    color-mix(in srgb, var(--primary) 14%, transparent);
+  --primary-tint:         color-mix(in srgb, var(--primary) 5%, transparent);
+
+  --secondary:            #F4EFE7;
+  --secondary-foreground: #14110D;
+
+  --muted:                #F4EFE7;
+  --muted-foreground:     #5A524A;
+  --muted-strong:         #847B72;
+
+  --accent:               #F4EFE7;
+  --accent-foreground:    #14110D;
+
+  --ai:                   #C97A1F;
+  --ai-foreground:        #FFFFFF;
+  --ai-soft:              color-mix(in srgb, var(--ai) 11%, transparent);
+  --ai-glow:              color-mix(in srgb, var(--ai) 28%, transparent);
+
+  --success:              #15803D;
+  --success-soft:         rgba(21, 128, 61, 0.13);
+  --warning:              #B45309;
+  --warning-soft:         rgba(180, 83, 9, 0.13);
+  --danger:               #B91C1C;
+  --danger-soft:          rgba(185, 28, 28, 0.13);
+  --info:                 #1D4ED8;
+  --info-soft:            rgba(29, 78, 216, 0.13);
+
+  --destructive:          #B91C1C;
+  --destructive-foreground: #FFFFFF;
+
+  /* Borders — visible but quiet */
+  --border:               rgba(20, 16, 12, 0.10);
+  --border-strong:        rgba(20, 16, 12, 0.18);
+  --border-soft:          rgba(20, 16, 12, 0.06);
+  --border-accent:        color-mix(in srgb, var(--primary) 28%, transparent);
+  --input:                transparent;
+  --input-background:     #FFFFFF;
+  --switch-background:    #D6CFC4;
+  --ring:                 var(--primary);
+
+  --chart-1:              var(--primary);
+  --chart-2:              var(--ai);
+  --chart-3:              #847B72;
+  --chart-4:              #B45309;
+  --chart-5:              #14110D;
+
+  --radius:               1.25rem;       /* 20px base */
+  --radius-card:          1.5rem;        /* 24px — premium card */
+  --radius-hero:          2rem;          /* 32px — hero panels */
+
+  --sidebar:                      #FFFFFF;
+  --sidebar-foreground:           #14110D;
+  --sidebar-primary:              var(--primary);
+  --sidebar-primary-foreground:   #FFFFFF;
+  --sidebar-accent:               #F4EFE7;
+  --sidebar-accent-foreground:    #14110D;
+  --sidebar-border:               rgba(20, 16, 12, 0.10);
+  --sidebar-ring:                 var(--primary);
+
+  /* Cinematic shadows — warm, multi-stop, grounded */
+  --shadow-xs:    0 1px 2px rgba(20, 16, 10, 0.07);
+  --shadow-sm:    0 1px 2px rgba(20, 16, 10, 0.06),
+                  0 2px 6px rgba(20, 16, 10, 0.05);
+  --shadow-md:    0 1px 2px rgba(20, 16, 10, 0.06),
+                  0 6px 18px rgba(20, 16, 10, 0.07),
+                  0 16px 36px rgba(20, 16, 10, 0.06);
+  --shadow-lg:    0 1px 2px rgba(20, 16, 10, 0.08),
+                  0 14px 32px rgba(20, 16, 10, 0.10),
+                  0 28px 56px rgba(20, 16, 10, 0.10);
+  --shadow-xl:    0 2px 4px rgba(20, 16, 10, 0.08),
+                  0 18px 40px rgba(20, 16, 10, 0.14),
+                  0 44px 88px rgba(20, 16, 10, 0.12);
+  --shadow-hero:  0 4px 8px rgba(20, 16, 10, 0.08),
+                  0 24px 56px rgba(20, 16, 10, 0.14),
+                  0 64px 128px -32px rgba(20, 16, 10, 0.18);
+
+  /* Inner highlight — subtle top sheen + bottom darkness for "frosted" depth */
+  --inner-highlight:  inset 0 1px 0 rgba(255, 255, 255, 0.95),
+                      inset 0 -1px 0 rgba(20, 16, 12, 0.03);
+  --inner-highlight-strong:
+                      inset 0 1px 0 rgba(255, 255, 255, 1),
+                      inset 0 -1px 0 rgba(20, 16, 12, 0.05);
+
+  /* Accent-tinted glows — used on active states/CTAs */
+  --shadow-glow:        0 0 0 1px var(--primary-glow-soft),
+                        0 8px 24px var(--primary-glow);
+  --shadow-glow-soft:   0 0 0 1px var(--primary-glow-soft),
+                        0 6px 18px var(--primary-glow-soft);
+  --shadow-ai-glow:     0 0 0 1px color-mix(in srgb, var(--ai) 18%, transparent),
+                        0 8px 24px var(--ai-glow);
+
+  /* Rail accent puck — solid filled active state with ambient glow */
+  --rail-active-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.10),
+        0 1px 2px rgba(0, 0, 0, 0.10),
+        0 8px 20px -6px var(--primary-glow);
 }
 
+
+/* ─── DARK MODE — cinematic, deep, grounded ──────────────────────────── */
 .dark {
-  --background: #0a1929;
-  --foreground: #e0f2fe;
-  
-  --card: rgba(15, 23, 42, 0.95);
-  --card-foreground: #e0f2fe;
-  
-  --popover: rgba(15, 23, 42, 0.98);
-  --popover-foreground: #e0f2fe;
-  
-  --primary: #22d3ee;
-  --primary-foreground: #0a1929;
-  
-  --secondary: #06b6d4;
-  --secondary-foreground: #ffffff;
-  
-  --muted: #1e293b;
-  --muted-foreground: #94a3b8;
-  
-  --accent: #0891b2;
-  --accent-foreground: #e0f2fe;
-  
-  --destructive: #f87171;
-  --destructive-foreground: #ffffff;
-  
-  --border: rgba(34, 211, 238, 0.3);
-  --input: transparent;
-  --input-background: rgba(15, 23, 42, 0.9);
-  --switch-background: #475569;
-  
-  --ring: #22d3ee;
-  
-  --chart-1: #22d3ee;
-  --chart-2: #06b6d4;
-  --chart-3: #0891b2;
-  --chart-4: #0e7490;
-  --chart-5: #155e75;
-  
-  --sidebar: rgba(15, 23, 42, 0.9);
-  --sidebar-foreground: #e0f2fe;
-  --sidebar-primary: #22d3ee;
-  --sidebar-primary-foreground: #0a1929;
-  --sidebar-accent: rgba(34, 211, 238, 0.15);
-  --sidebar-accent-foreground: #e0f2fe;
-  --sidebar-border: rgba(34, 211, 238, 0.3);
-  --sidebar-ring: #22d3ee;
+  /* Background: deeper near-black so cards have real lift */
+  --background:           #08080B;
+  --background-alt:       #0C0C10;
+  --background-radial:    radial-gradient(ellipse 1200px 800px at 8% -8%, color-mix(in srgb, var(--primary) 9%, transparent) 0%, transparent 55%),
+                          radial-gradient(ellipse 900px 600px at 100% 110%, color-mix(in srgb, var(--ai) 7%, transparent) 0%, transparent 60%);
+
+  --foreground:           #F4EFE8;
+  --foreground-strong:    #FFFCF6;
+
+  /* Surface ladder — strong stepwise contrast for layered cockpit feel */
+  --surface:              #141418;
+  --surface-2:            #1B1B20;
+  --surface-3:            #23232A;
+  --surface-4:            #2D2D34;
+
+  --card:                 #141418;
+  --card-foreground:      #F4EFE8;
+
+  --popover:              #1B1B20;
+  --popover-foreground:   #F4EFE8;
+
+  --primary:              #E45437;
+  --primary-hover:        #F0613F;
+  --primary-foreground:   #FFFFFF;
+  --primary-soft:         color-mix(in srgb, var(--primary) 16%, transparent);
+  --primary-glow:         color-mix(in srgb, var(--primary) 38%, transparent);
+  --primary-glow-soft:    color-mix(in srgb, var(--primary) 18%, transparent);
+  --primary-tint:         color-mix(in srgb, var(--primary) 7%, transparent);
+
+  --secondary:            #23232A;
+  --secondary-foreground: #F4EFE8;
+
+  --muted:                #1B1B20;
+  --muted-foreground:     #A8A29B;
+  --muted-strong:         #6E6961;
+
+  --accent:               #23232A;
+  --accent-foreground:    #F4EFE8;
+
+  --ai:                   #F0A954;
+  --ai-foreground:        #14110D;
+  --ai-soft:              color-mix(in srgb, var(--ai) 18%, transparent);
+  --ai-glow:              color-mix(in srgb, var(--ai) 32%, transparent);
+
+  --success:              #34D399;
+  --success-soft:         rgba(52, 211, 153, 0.18);
+  --warning:              #F59E0B;
+  --warning-soft:         rgba(245, 158, 11, 0.18);
+  --danger:               #F87171;
+  --danger-soft:          rgba(248, 113, 113, 0.18);
+  --info:                 #60A5FA;
+  --info-soft:            rgba(96, 165, 250, 0.18);
+
+  --destructive:          #F87171;
+  --destructive-foreground: #FFFFFF;
+
+  --border:               rgba(255, 255, 255, 0.09);
+  --border-strong:        rgba(255, 255, 255, 0.18);
+  --border-soft:          rgba(255, 255, 255, 0.05);
+  --border-accent:        color-mix(in srgb, var(--primary) 32%, transparent);
+  --input:                transparent;
+  --input-background:     #1B1B20;
+  --switch-background:    #3F3F46;
+  --ring:                 var(--primary);
+
+  --chart-1:              var(--primary);
+  --chart-2:              var(--ai);
+  --chart-3:              #6E6961;
+  --chart-4:              #F59E0B;
+  --chart-5:              #F4EFE8;
+
+  --sidebar:                      #141418;
+  --sidebar-foreground:           #F4EFE8;
+  --sidebar-primary:              var(--primary);
+  --sidebar-primary-foreground:   #FFFFFF;
+  --sidebar-accent:               #23232A;
+  --sidebar-accent-foreground:    #F4EFE8;
+  --sidebar-border:               rgba(255, 255, 255, 0.09);
+  --sidebar-ring:                 var(--primary);
+
+  /* Dark cinematic shadows — deeper, softer ambient */
+  --shadow-xs:    0 1px 2px rgba(0, 0, 0, 0.50);
+  --shadow-sm:    0 1px 2px rgba(0, 0, 0, 0.55),
+                  0 3px 8px rgba(0, 0, 0, 0.40);
+  --shadow-md:    0 1px 2px rgba(0, 0, 0, 0.55),
+                  0 6px 18px rgba(0, 0, 0, 0.55),
+                  0 16px 36px rgba(0, 0, 0, 0.40);
+  --shadow-lg:    0 2px 4px rgba(0, 0, 0, 0.60),
+                  0 14px 32px rgba(0, 0, 0, 0.65),
+                  0 28px 56px rgba(0, 0, 0, 0.50);
+  --shadow-xl:    0 4px 8px rgba(0, 0, 0, 0.65),
+                  0 18px 40px rgba(0, 0, 0, 0.70),
+                  0 44px 88px rgba(0, 0, 0, 0.55);
+  --shadow-hero:  0 4px 8px rgba(0, 0, 0, 0.70),
+                  0 24px 56px rgba(0, 0, 0, 0.70),
+                  0 64px 128px -32px rgba(0, 0, 0, 0.55);
+
+  --inner-highlight:  inset 0 1px 0 rgba(255, 255, 255, 0.06),
+                      inset 0 -1px 0 rgba(0, 0, 0, 0.5);
+  --inner-highlight-strong:
+                      inset 0 1px 0 rgba(255, 255, 255, 0.09),
+                      inset 0 -1px 0 rgba(0, 0, 0, 0.6);
+
+  --shadow-glow:        0 0 0 1px var(--primary-glow-soft),
+                        0 10px 32px var(--primary-glow);
+  --shadow-glow-soft:   0 0 0 1px var(--primary-glow-soft),
+                        0 8px 24px var(--primary-glow-soft);
+  --shadow-ai-glow:     0 0 0 1px color-mix(in srgb, var(--ai) 22%, transparent),
+                        0 10px 32px var(--ai-glow);
+
+  --rail-active-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.18),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.30),
+        0 2px 4px rgba(0, 0, 0, 0.50),
+        0 10px 28px -6px var(--primary-glow);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-input-background: var(--input-background);
-  --color-switch-background: var(--switch-background);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 6px);
-  --radius-md: calc(var(--radius) - 3px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 6px);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-}
 
+/* ─── Tailwind CSS-var bridge ────────────────────────────────────────── */
 @layer base {
-  * {
-    @apply border-border;
+  :root {
+    --color-background:               var(--background);
+    --color-foreground:               var(--foreground);
+    --color-card:                     var(--card);
+    --color-card-foreground:          var(--card-foreground);
+    --color-popover:                  var(--popover);
+    --color-popover-foreground:       var(--popover-foreground);
+    --color-primary:                  var(--primary);
+    --color-primary-foreground:       var(--primary-foreground);
+    --color-secondary:                var(--secondary);
+    --color-secondary-foreground:     var(--secondary-foreground);
+    --color-muted:                    var(--muted);
+    --color-muted-foreground:         var(--muted-foreground);
+    --color-accent:                   var(--accent);
+    --color-accent-foreground:        var(--accent-foreground);
+    --color-destructive:              var(--destructive);
+    --color-destructive-foreground:   var(--destructive-foreground);
+    --color-border:                   var(--border);
+    --color-input:                    var(--input);
+    --color-input-background:         var(--input-background);
+    --color-switch-background:        var(--switch-background);
+    --color-ring:                     var(--ring);
+    --color-chart-1:                  var(--chart-1);
+    --color-chart-2:                  var(--chart-2);
+    --color-chart-3:                  var(--chart-3);
+    --color-chart-4:                  var(--chart-4);
+    --color-chart-5:                  var(--chart-5);
+    --radius-sm:  calc(var(--radius) - 6px);
+    --radius-md:  calc(var(--radius) - 4px);
+    --radius-lg:  var(--radius);
+    --radius-xl:  calc(var(--radius) + 4px);
+    --color-sidebar:                      var(--sidebar);
+    --color-sidebar-foreground:           var(--sidebar-foreground);
+    --color-sidebar-primary:              var(--sidebar-primary);
+    --color-sidebar-primary-foreground:   var(--sidebar-primary-foreground);
+    --color-sidebar-accent:               var(--sidebar-accent);
+    --color-sidebar-accent-foreground:    var(--sidebar-accent-foreground);
+    --color-sidebar-border:               var(--sidebar-border);
+    --color-sidebar-ring:                 var(--sidebar-ring);
   }
-  
-  /* Better focus styles */
+}
+
+
+/* ─── Base reset ──────────────────────────────────────────────────────── */
+@layer base {
+  * { @apply border-border; }
+
   *:focus-visible {
-    @apply outline-none ring-2 ring-primary/20 ring-offset-2 ring-offset-background;
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: 6px;
   }
-  
-  /* Remove focus outline for buttons and interactive elements that already have hover states */
   button:focus-visible,
-  [role="button"]:focus-visible {
-    @apply outline-none ring-0;
-  }
+  [role="button"]:focus-visible { outline: none; }
 
-  body {
-    @apply bg-background text-foreground;
-  }
-  
   html {
+    font-size: var(--font-size);
     scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "ss01", "cv11";
   }
-  
-  ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+
+  /* Body — atmospheric radial accent tints + subtle linear background.
+     Gives the cockpit "ambient" feel without being a flashy gradient. */
+  body {
+    background:
+      var(--background-radial),
+      linear-gradient(180deg, var(--background) 0%, var(--background-alt) 100%);
+    background-attachment: fixed;
+    color: var(--foreground);
+    font-family: 'Inter', 'Sora', system-ui, -apple-system, sans-serif;
+    line-height: 1.55;
+    letter-spacing: -0.005em;
+    font-feature-settings: "ss01", "cv11", "tnum";
+    min-height: 100vh;
   }
-  
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  
+
+  h1 { font-size: 1.875rem; font-weight: 700; line-height: 1.16; letter-spacing: -0.024em; color: var(--foreground-strong); }
+  h2 { font-size: 1.5rem;   font-weight: 700; line-height: 1.22; letter-spacing: -0.020em; color: var(--foreground-strong); }
+  h3 { font-size: 1.125rem; font-weight: 600; line-height: 1.35; letter-spacing: -0.012em; }
+  h4 { font-size: 1rem;     font-weight: 600; line-height: 1.45; }
+  p  { line-height: 1.65; }
+
+  .font-display { font-family: 'Sora', 'Inter', system-ui, sans-serif; letter-spacing: -0.024em; }
+  .tabular { font-variant-numeric: tabular-nums; }
+
+  /* Refined scrollbar — quiet but visible */
+  ::-webkit-scrollbar       { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb {
-    background: rgba(8, 145, 178, 0.3);
-    border-radius: 10px;
+    background: rgba(20, 16, 12, 0.16);
+    border: 2px solid transparent;
+    background-clip: content-box;
+    border-radius: 99px;
   }
-  
-  ::-webkit-scrollbar-thumb:hover {
-    background: rgba(8, 145, 178, 0.5);
-  }
-  
-  .dark ::-webkit-scrollbar-thumb {
-    background: rgba(34, 211, 238, 0.3);
-  }
-  
-  .dark ::-webkit-scrollbar-thumb:hover {
-    background: rgba(34, 211, 238, 0.5);
-  }
+  ::-webkit-scrollbar-thumb:hover { background-color: rgba(20, 16, 12, 0.32); background-clip: content-box; }
+  .dark ::-webkit-scrollbar-thumb       { background: rgba(255, 255, 255, 0.10); background-clip: content-box; }
+  .dark ::-webkit-scrollbar-thumb:hover { background-color: rgba(255, 255, 255, 0.22); background-clip: content-box; }
+
+  ::selection { background: var(--primary-soft); color: var(--foreground-strong); }
 }
 
-@layer base {
-  :where(:not(:has([class*=' text-']), :not(:has([class^='text-'])))) {
-    h1 {
-      font-size: var(--text-2xl);
-      font-weight: 700;
-      line-height: 1.3;
-      letter-spacing: -0.02em;
-    }
 
-    h2 {
-      font-size: var(--text-xl);
-      font-weight: 600;
-      line-height: 1.4;
-      letter-spacing: -0.01em;
-    }
-
-    h3 {
-      font-size: var(--text-lg);
-      font-weight: 600;
-      line-height: 1.5;
-    }
-
-    h4 {
-      font-size: var(--text-base);
-      font-weight: 600;
-      line-height: 1.5;
-    }
-
-    p {
-      font-size: var(--text-base);
-      font-weight: var(--font-weight-normal);
-      line-height: 1.6;
-    }
-
-    label {
-      font-size: var(--text-sm);
-      font-weight: 500;
-      line-height: 1.5;
-    }
-
-    button {
-      font-size: var(--text-sm);
-      font-weight: 500;
-      line-height: 1.5;
-    }
-
-    input {
-      font-size: var(--text-sm);
-      font-weight: var(--font-weight-normal);
-      line-height: 1.5;
-    }
-  }
-}
-
-html {
-  font-size: var(--font-size);
-}
-
+/* ─── Utility classes ─────────────────────────────────────────────────── */
 @layer utilities {
-  .glass-card {
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(8, 145, 178, 0.2);
-    box-shadow: 0 4px 24px 0 rgba(8, 145, 178, 0.15);
+
+  /* ─── Surface primitives — generous rounding, real depth ─────────── */
+
+  /* Bento panel — primary card surface. 24px radius, layered shadow,
+     inner highlight, subtle hover lift. The "premium SaaS card" feel. */
+  .bento {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--inner-highlight), var(--shadow-md);
+    transition: box-shadow .28s cubic-bezier(.2,.8,.2,1),
+                border-color .22s ease,
+                transform .28s cubic-bezier(.2,.8,.2,1);
   }
-  
-  .dark .glass-card {
-    background: rgba(15, 23, 42, 0.95);
-    border: 1px solid rgba(34, 211, 238, 0.2);
-    box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.5);
+  .bento:hover {
+    box-shadow: var(--inner-highlight), var(--shadow-lg);
+    border-color: var(--border-strong);
+    transform: translateY(-1px);
   }
-  
-  .glass-panel {
-    background: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(8, 145, 178, 0.15);
+
+  /* Lighter bento for nested sections */
+  .bento-2 {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 18px;
   }
-  
-  .dark .glass-panel {
-    background: rgba(15, 23, 42, 0.8);
-    border: 1px solid rgba(34, 211, 238, 0.15);
+
+  /* Hero panel — biggest cards, used on Login/Start/page headers */
+  .panel-elevated {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-hero);
+    box-shadow: var(--inner-highlight-strong), var(--shadow-hero);
   }
-  
-  .gradient-text {
-    background: linear-gradient(135deg, #0891b2 0%, #06b6d4 50%, #22d3ee 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+
+  /* Top bar — frosted depth without being "glassy" */
+  .topbar {
+    background: color-mix(in srgb, var(--background) 80%, transparent);
+    -webkit-backdrop-filter: saturate(150%) blur(20px);
+    backdrop-filter: saturate(150%) blur(20px);
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 1px 0 var(--border-soft);
   }
-  
-  .floating {
-    animation: floating 6s ease-in-out infinite;
+
+  /* ─── Pill rail (top-bar segmented nav) ──────────────────────────── */
+  .pill-rail {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07),
+                inset 0 0 0 1px rgba(0, 0, 0, 0.02);
   }
-  
-  @keyframes floating {
-    0%, 100% { transform: translateY(0px) translateX(0px); }
-    33% { transform: translateY(-20px) translateX(10px); }
-    66% { transform: translateY(10px) translateX(-10px); }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px;
+    border-radius: 999px;
+    font-size: 13px; font-weight: 500;
+    color: var(--muted-foreground);
+    transition: color .2s ease, background .2s ease, box-shadow .2s ease;
   }
-  
-  .glow-effect {
-    box-shadow: 0 0 30px rgba(8, 145, 178, 0.4);
+  .pill:hover { color: var(--foreground); }
+  .pill[data-active="true"] {
+    background: var(--surface);
+    color: var(--foreground-strong);
+    box-shadow: var(--shadow-xs),
+                inset 0 1px 0 rgba(255, 255, 255, 0.10);
   }
-  
-  .dark .glow-effect {
-    box-shadow: 0 0 30px rgba(34, 211, 238, 0.4);
+  .dark .pill[data-active="true"] {
+    background: var(--surface-3);
+    box-shadow: var(--shadow-xs),
+                inset 0 1px 0 rgba(255, 255, 255, 0.07);
   }
-  
-  /* Remove outline from recharts SVG elements */
+  .pill-primary {
+    background: var(--primary);
+    color: var(--primary-foreground);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.20),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.10),
+      0 4px 12px -2px var(--primary-glow);
+  }
+  .pill-primary:hover {
+    background: var(--primary-hover);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.24),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.12),
+      0 6px 18px -2px var(--primary-glow);
+  }
+
+  /* ─── KPI / stat cards ───────────────────────────────────────────── */
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 20px 22px;
+    box-shadow: var(--inner-highlight), var(--shadow-sm);
+    transition: transform .28s cubic-bezier(.2,.8,.2,1),
+                border-color .2s ease,
+                box-shadow .28s cubic-bezier(.2,.8,.2,1);
+  }
+  .stat:hover {
+    transform: translateY(-2px);
+    border-color: var(--border-accent);
+    box-shadow: var(--inner-highlight), var(--shadow-md);
+  }
+
+  /* ─── Status chips ───────────────────────────────────────────────── */
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+    line-height: 1; letter-spacing: 0.01em;
+    border: 1px solid transparent;
+  }
+  .chip-success { background: var(--success-soft); color: var(--success); border-color: color-mix(in srgb, var(--success) 18%, transparent); }
+  .chip-warning { background: var(--warning-soft); color: var(--warning); border-color: color-mix(in srgb, var(--warning) 18%, transparent); }
+  .chip-danger  { background: var(--danger-soft);  color: var(--danger);  border-color: color-mix(in srgb, var(--danger) 18%, transparent); }
+  .chip-info    { background: var(--info-soft);    color: var(--info);    border-color: color-mix(in srgb, var(--info) 18%, transparent); }
+  .chip-accent  { background: var(--primary-soft); color: var(--primary); border-color: color-mix(in srgb, var(--primary) 18%, transparent); }
+  .chip-ai      { background: var(--ai-soft);      color: var(--ai);      border-color: color-mix(in srgb, var(--ai) 18%, transparent); }
+  .chip-neutral { background: var(--surface-2);    color: var(--muted-foreground); border-color: var(--border); }
+
+  /* ─── Status dot ─────────────────────────────────────────────────── */
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 999px; }
+  .dot-pulse { position: relative; }
+  .dot-pulse::after {
+    content: ''; position: absolute; inset: -4px; border-radius: 999px;
+    background: currentColor; opacity: .3;
+    animation: dot-pulse 1.8s ease-out infinite;
+  }
+  @keyframes dot-pulse {
+    0%   { transform: scale(.6); opacity: .35; }
+    100% { transform: scale(2.0); opacity: 0; }
+  }
+
+  .surface-primary { background: var(--primary-soft); color: var(--primary); }
+  .surface-ai      { background: var(--ai-soft);      color: var(--ai); }
+
+  /* ─── Recharts cleanup ───────────────────────────────────────────── */
   .recharts-wrapper,
   .recharts-surface,
   .recharts-wrapper svg,
   .recharts-wrapper *:focus,
-  .recharts-wrapper *:focus-visible {
-    outline: none !important;
-  }
-  
-  /* Remove hover effects on recharts bars */
+  .recharts-wrapper *:focus-visible { outline: none !important; }
   .recharts-bar-rectangle:hover,
-  .recharts-rectangle:hover {
-    filter: none !important;
-    opacity: 1 !important;
+  .recharts-rectangle:hover { filter: none !important; opacity: 1 !important; }
+  .recharts-cartesian-grid line { stroke: var(--border); stroke-dasharray: 3 3; }
+  .recharts-text { fill: var(--muted-foreground); font-size: 11px; }
+
+
+  /* ─── Polished button refinements (data-slot driven) ─────────────── */
+  /* Primary button — inner highlight + bottom shadow + accent ambient glow.
+     Fully token-driven so all accent palettes look premium. */
+  button[data-slot="button"].bg-primary,
+  [data-slot="button"].bg-primary {
+    background: var(--primary);
+    color: var(--primary-foreground);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.20),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.12),
+      0 1px 2px rgba(0, 0, 0, 0.10),
+      0 8px 20px -4px var(--primary-glow);
+    transition: background .2s ease, transform .12s ease, box-shadow .2s ease;
   }
+  button[data-slot="button"].bg-primary:hover,
+  [data-slot="button"].bg-primary:hover {
+    background: var(--primary-hover);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.24),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.14),
+      0 2px 4px rgba(0, 0, 0, 0.12),
+      0 12px 28px -4px var(--primary-glow);
+  }
+  button[data-slot="button"].bg-primary:active,
+  [data-slot="button"].bg-primary:active {
+    transform: translateY(1px) scale(.98);
+    transition-duration: .08s;
+    box-shadow:
+      inset 0 1px 1px rgba(0, 0, 0, 0.12),
+      0 1px 2px rgba(0, 0, 0, 0.10);
+  }
+
+  /* Outline / secondary buttons — subtle elevation lifts on hover */
+  button[data-slot="button"].border:not(.bg-primary):not(.bg-destructive),
+  [data-slot="button"].border:not(.bg-primary):not(.bg-destructive) {
+    background: var(--surface);
+    border-color: var(--border);
+    box-shadow: var(--inner-highlight), var(--shadow-xs);
+    transition: background .2s ease, border-color .2s ease, box-shadow .2s ease, transform .12s ease;
+  }
+  button[data-slot="button"].border:not(.bg-primary):not(.bg-destructive):hover,
+  [data-slot="button"].border:not(.bg-primary):not(.bg-destructive):hover {
+    background: var(--surface-2);
+    border-color: var(--border-strong);
+    box-shadow: var(--inner-highlight), var(--shadow-sm);
+  }
+
+  /* Ghost — chrome-less */
+  button[data-slot="button"].bg-transparent,
+  [data-slot="button"].bg-transparent { box-shadow: none; }
+
+
+  /* ─── Input refinements ──────────────────────────────────────────── */
+  input[data-slot="input"],
+  textarea[data-slot="textarea"] {
+    background: var(--input-background);
+    border: 1px solid var(--border);
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.02);
+    transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+  }
+  .dark input[data-slot="input"],
+  .dark textarea[data-slot="textarea"] {
+    box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.30);
+  }
+  input[data-slot="input"]:hover,
+  textarea[data-slot="textarea"]:hover {
+    border-color: var(--border-strong);
+  }
+  input[data-slot="input"]:focus-visible,
+  textarea[data-slot="textarea"]:focus-visible {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.02),
+                0 0 0 3px var(--primary-soft);
+  }
+  .dark input[data-slot="input"]:focus-visible,
+  .dark textarea[data-slot="textarea"]:focus-visible {
+    box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.30),
+                0 0 0 3px var(--primary-soft);
+  }
+  input[data-slot="input"]::placeholder,
+  textarea[data-slot="textarea"]::placeholder {
+    color: var(--muted-strong);
+  }
+
+  /* Select trigger — match input refinement */
+  [data-slot="select-trigger"] {
+    background: var(--input-background);
+    border: 1px solid var(--border);
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.02);
+    transition: border-color .2s ease, box-shadow .2s ease;
+  }
+  .dark [data-slot="select-trigger"] {
+    box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.30);
+  }
+  [data-slot="select-trigger"]:hover { border-color: var(--border-strong); }
+  [data-slot="select-trigger"][data-state="open"],
+  [data-slot="select-trigger"]:focus-visible {
+    border-color: var(--primary);
+    outline: none;
+    box-shadow: 0 0 0 3px var(--primary-soft);
+  }
+
+
+  /* ─── Card primitive refinement ─────────────────────────────────── */
+  div[data-slot="card"] {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--inner-highlight), var(--shadow-md);
+    transition: box-shadow .28s cubic-bezier(.2,.8,.2,1),
+                border-color .22s ease,
+                transform .28s cubic-bezier(.2,.8,.2,1);
+  }
+  div[data-slot="card"]:hover {
+    box-shadow: var(--inner-highlight), var(--shadow-lg);
+    transform: translateY(-1px);
+  }
+
+
+  /* ─── Dialog refinement ─────────────────────────────────────────── */
+  [data-slot="dialog-overlay"] {
+    background: rgba(8, 6, 4, 0.62);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+  [data-slot="dialog-content"] {
+    background: var(--popover);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    box-shadow: var(--inner-highlight-strong), var(--shadow-xl);
+  }
+
+  [data-slot="tabs-list"] {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px;
+  }
+  [data-slot="tabs-trigger"][data-state="active"] {
+    background: var(--primary);
+    color: var(--primary-foreground);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  }
+  [data-slot="tabs-trigger"]:not([data-state="active"]) {
+    color: var(--muted-foreground);
+  }
+  [data-slot="tabs-trigger"]:not([data-state="active"]):hover {
+    color: var(--foreground);
+    background: var(--surface-3);
+  }
+
+
+  /* ─── Table refinement ──────────────────────────────────────────── */
+  thead[data-slot="table-header"] {
+    background: var(--surface-2);
+  }
+  thead[data-slot="table-header"] th {
+    color: var(--muted-foreground);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-strong);
+  }
+  tbody[data-slot="table-body"] tr {
+    border-bottom: 1px solid var(--border-soft);
+    transition: background .15s ease;
+  }
+  tbody[data-slot="table-body"] tr:hover {
+    background: var(--surface-2);
+  }
+  tbody[data-slot="table-body"] td {
+    padding: 12px 16px;
+    color: var(--foreground);
+  }
+
+
+  /* ─── Tabs refinement ───────────────────────────────────────────── */
+  [data-slot="tabs-list"] {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 4px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.07);
+  }
+  [data-slot="tabs-trigger"] {
+    border-radius: 10px;
+    transition: background .2s ease, color .2s ease, box-shadow .2s ease;
+    color: var(--muted-foreground);
+  }
+  [data-slot="tabs-trigger"][data-state="active"] {
+    background: var(--surface);
+    color: var(--foreground-strong);
+    box-shadow: var(--shadow-xs);
+  }
+  .dark [data-slot="tabs-trigger"][data-state="active"] {
+    background: var(--surface-3);
+  }
+
+
+  /* ─── Badge refinement ──────────────────────────────────────────── */
+  [data-slot="badge"] {
+    border-radius: 999px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+
+  /* ─── Dropdown / Popover ────────────────────────────────────────── */
+  [data-slot="dropdown-menu-content"],
+  [data-slot="popover-content"],
+  [data-slot="select-content"] {
+    background: var(--popover);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: var(--inner-highlight), var(--shadow-lg);
+    padding: 4px;
+  }
+  [data-slot="dropdown-menu-item"],
+  [data-slot="select-item"] {
+    border-radius: 8px;
+    transition: background .14s ease, color .14s ease;
+  }
+  [data-slot="dropdown-menu-item"][data-highlighted],
+  [data-slot="dropdown-menu-item"]:hover,
+  [data-slot="select-item"][data-highlighted],
+  [data-slot="select-item"]:hover {
+    background: var(--surface-2);
+    color: var(--foreground-strong);
+  }
+
+
+  /* ─── Separator ─────────────────────────────────────────────────── */
+  [data-slot="separator"],
+  [data-slot="dropdown-menu-separator"],
+  [data-slot="select-separator"] {
+    background: var(--border);
+    height: 1px;
+    margin: 4px 0;
+  }
+
+
+  /* ─── Switch / Checkbox ─────────────────────────────────────────── */
+  button[data-slot="switch"][data-state="checked"] {
+    background: var(--primary);
+    box-shadow: 0 0 0 1px var(--primary-glow-soft),
+                0 4px 12px -4px var(--primary-glow);
+  }
+  button[data-slot="switch"][data-state="unchecked"] {
+    background: var(--switch-background);
+  }
+
+
+  /* ─── Cockpit Rail — the modern operations rail look ────────────── */
+  /* This works alongside App.tsx's RailItem component. The component
+     handles the active fill+glow inline; these utility classes power
+     other rail-style elements (Ask Rafiq footer, mobile rail). */
+  .rail-spot {
+    width: 44px; height: 44px;
+    border-radius: 14px;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background .22s ease, color .22s ease, box-shadow .22s ease, transform .12s ease;
+  }
+  .rail-spot:hover {
+    background: var(--surface-2);
+    color: var(--foreground-strong);
+  }
+  .rail-spot[data-active="true"] {
+    background: var(--primary);
+    color: var(--primary-foreground);
+    box-shadow: var(--rail-active-shadow);
+  }
+  .rail-spot[data-active="true"]:hover {
+    background: var(--primary-hover);
+  }
+
+
+  /* ─── Motion ─────────────────────────────────────────────────────── */
+  .fade-in {
+    animation: fadeIn .42s cubic-bezier(.2,.8,.2,1) both;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .rise-in    { animation: riseIn .56s cubic-bezier(.2,.8,.2,1) both; }
+  .rise-in-1  { animation: riseIn .56s cubic-bezier(.2,.8,.2,1) .08s both; }
+  .rise-in-2  { animation: riseIn .56s cubic-bezier(.2,.8,.2,1) .16s both; }
+  .rise-in-3  { animation: riseIn .56s cubic-bezier(.2,.8,.2,1) .26s both; }
+  .rise-in-4  { animation: riseIn .56s cubic-bezier(.2,.8,.2,1) .38s both; }
+  @keyframes riseIn {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .scale-in { animation: scaleIn .28s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(.96); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  /* Soft accent breathing (used on Start page ambient orbs) */
+  .ambient {
+    position: absolute;
+    border-radius: 999px;
+    filter: blur(80px);
+    pointer-events: none;
+    animation: breathe 18s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    0%, 100% { transform: translate3d(0, 0, 0) scale(1);    opacity: .55; }
+    50%      { transform: translate3d(0, -10px, 0) scale(1.04); opacity: .75; }
+  }
+
+  /* Soft glow ring pulse — used once when something gets generated */
+  .pulse-once { animation: pulseOnce 1.4s ease-out 1 both; }
+  @keyframes pulseOnce {
+    0%   { box-shadow: 0 0 0 0 var(--ai-soft); }
+    100% { box-shadow: 0 0 0 18px transparent; }
+  }
+
+  .reveal { animation: reveal .48s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes reveal {
+    from { opacity: 0; transform: translateY(10px); filter: blur(2px); }
+    to   { opacity: 1; transform: translateY(0); filter: blur(0); }
+  }
+
+  /* Subtle shimmer for skeletons */
+  .skel {
+    background: linear-gradient(90deg, var(--surface-2) 0%, var(--surface-3) 50%, var(--surface-2) 100%);
+    background-size: 200% 100%;
+    animation: skel 1.4s ease-in-out infinite;
+    border-radius: 8px;
+  }
+  @keyframes skel {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  .divider { height: 1px; background: var(--border); }
+
+  input, textarea, select { font-family: inherit; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .01ms !important;
+    }
+  }
+
+
+  /* ─── Backwards-compat aliases for components still using legacy names ─ */
+  .glass-card  { @apply bento; }
+  .glass-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    box-shadow: var(--inner-highlight), var(--shadow-xs);
+  }
+  .gradient-text { color: var(--primary); }
+  .floating { animation: floating 14s ease-in-out infinite; }
+  @keyframes floating {
+    0%, 100% { transform: translateY(0) translateX(0); }
+    50%      { transform: translateY(-12px) translateX(6px); }
+  }
+  .glow-effect { box-shadow: var(--shadow-glow); }
+  .stat-card { @apply stat; }
+  .nav-item { transition: background .2s ease, color .2s ease; }
+  .section-divider { @apply divider; }
+  .badge-success { @apply chip chip-success; }
 }

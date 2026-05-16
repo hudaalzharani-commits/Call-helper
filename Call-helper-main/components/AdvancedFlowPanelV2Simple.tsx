@@ -3,10 +3,10 @@
  * Advanced Flow Panel V2 - Wizard Style Navigation (Simple Version)
  * ====================================================================
  * 
- * نفس طريقة عرض GrayAreaWizard:
- * - خطوة واحدة في كل مرة
- * - Breadcrumb لتتبع المسار
- * - زر رجوع
+ * نفس طريقة Show GrayAreaWizard:
+ * - step واحدة في كل مرة
+ * - Breadcrumb لتتبع الroute
+ * - زر Back
  * 
  * ====================================================================
  */
@@ -36,14 +36,14 @@ interface AdvancedFlowPanelV2Props {
   steps: Step[];
   problemDescription: string;
   isGrayAreaMode: boolean;
-  initialFilteredRouteIds?: string[] | undefined;
+  initialFilteredRouteIds?: string[];
   onFlowComplete: (result: {
     completedSteps: Array<{
       stepId: string;
       stepName: string;
       selectedSubCondition: SubCondition;
     }>;
-    finalAction: 'continue' | 'force_solution' | 'direct_answer' | 'escalation';
+    finalAction: 'continue' | 'force_solution' | 'escalation';
     escalationDetails?: string;
     solutionDetails?: string;
   }) => void;
@@ -51,7 +51,7 @@ interface AdvancedFlowPanelV2Props {
     activeRoute: string;
     currentStep: { name: string; order: number };
     subCondition: string;
-    action: 'continue' | 'force_solution' | 'direct_answer' | 'escalation';
+    action: 'continue' | 'force_solution' | 'escalation';
   }) => void;
 }
 
@@ -91,41 +91,24 @@ export function AdvancedFlowPanelV2({
   
   const [selectedConditionId, setSelectedConditionId] = useState<string | null>(null);
   const [flowFinished, setFlowFinished] = useState(false);
-  const [finalAction, setFinalAction] = useState<'continue' | 'force_solution' | 'direct_answer' | 'escalation' | null>(null);
+  const [finalAction, setFinalAction] = useState<'continue' | 'force_solution' | 'escalation' | null>(null);
 
   // ====================================================================
   // Initialize Available Routes
   // ====================================================================
 
   useEffect(() => {
-    const omitted = initialFilteredRouteIds === undefined;
-    const raw = initialFilteredRouteIds ?? [];
-    const filterIds = raw.filter(Boolean);
-
-    if (filterIds.length > 0) {
-      const filteredRoutes = routes.filter((r) => r.isActive && filterIds.includes(r.id));
-      const ids = filteredRoutes.map((r) => r.id);
-      if (ids.length > 0) {
-        setWizardHistory([{ type: 'route_select', availableRouteIds: ids }]);
-        return;
-      }
-    }
-
-    // مصفوفة صريحة وفارغة = سياق محدد لكن لا مسارات مطابقة (لا نرجع لعرض «الكل»)
-    if (!omitted) {
-      setWizardHistory([{ type: 'route_select', availableRouteIds: [] }]);
-      return;
-    }
-
     if (isGrayAreaMode) {
-      setWizardHistory([{ type: 'route_select', availableRouteIds: [] }]);
-      return;
+      if (initialFilteredRouteIds && initialFilteredRouteIds.length > 0) {
+        const filteredRoutes = routes.filter(r => r.isActive && initialFilteredRouteIds.includes(r.id));
+        setWizardHistory([{ type: 'route_select', availableRouteIds: filteredRoutes.map(r => r.id) }]);
+      } else {
+        setWizardHistory([{ type: 'route_select', availableRouteIds: [] }]);
+      }
+    } else {
+      const allActiveRoutes = routes.filter(r => r.isActive);
+      setWizardHistory([{ type: 'route_select', availableRouteIds: allActiveRoutes.map(r => r.id) }]);
     }
-
-    const allActiveRoutes = routes.filter((r) => r.isActive);
-    setWizardHistory([
-      { type: 'route_select', availableRouteIds: allActiveRoutes.map((r) => r.id) },
-    ]);
   }, [routes, isGrayAreaMode, initialFilteredRouteIds]);
 
   // ====================================================================
@@ -288,14 +271,14 @@ export function AdvancedFlowPanelV2({
         finishFlow(newFlowPath, 'continue');
       }
     } else {
-      // force_solution or direct_answer or escalation
+      // force_solution or escalation
       finishFlow(newFlowPath, selectedCondition.action);
     }
   };
 
   const finishFlow = (
     path: Array<{ route: Route; step: Step; subCondition: SubCondition }>,
-    action: 'continue' | 'force_solution' | 'direct_answer' | 'escalation'
+    action: 'continue' | 'force_solution' | 'escalation'
   ) => {
     setFlowFinished(true);
     setFinalAction(action);
@@ -312,9 +295,7 @@ export function AdvancedFlowPanelV2({
       completedSteps,
       finalAction: action,
       escalationDetails: action === 'escalation' ? lastStep.subCondition.actionDetails : undefined,
-      solutionDetails: action === 'force_solution' || action === 'direct_answer'
-        ? lastStep.subCondition.actionDetails
-        : undefined,
+      solutionDetails: action === 'force_solution' ? lastStep.subCondition.actionDetails : undefined,
     });
 
     console.log('🏁 Flow finished:', { action, completedSteps: completedSteps.length });
@@ -348,29 +329,31 @@ export function AdvancedFlowPanelV2({
   // No routes available
   if (currentWizardStep.type === 'route_select' && currentWizardStep.availableRouteIds.length === 0) {
     return (
-      <div className="glass-panel border-2 border-border rounded-xl p-6 text-center space-y-3">
-        <AlertCircle className="size-12 text-muted-foreground mx-auto mb-1" />
+      <div className="glass-panel border-2 border-border rounded-xl p-6 text-center">
+        <AlertCircle className="size-12 text-muted-foreground mx-auto mb-3" />
         <p className="text-muted-foreground text-sm font-semibold">
-          {isGrayAreaMode
-            ? 'لا توجد مسارات مربوطة بهذا السؤال'
-            : 'لا توجد مسارات متاحة'}
+          {isGrayAreaMode 
+            ? 'No routes linked to this question.'
+            : 'No routes available.'
+          }
         </p>
         <p className="text-xs text-muted-foreground mt-2">
-          {isGrayAreaMode
-            ? 'يرجى ربط المسارات المناسبة بهذا السؤال من صفحة الإعدادات المتقدمة'
-            : 'يرجى تفعيل بعض المسارات من لوحة الإعدادات'}
+          {isGrayAreaMode 
+            ? 'Link routes to this question in Advanced Settings.'
+            : 'Enable some routes in Settings.'
+          }
         </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4" dir="rtl">
-      {/* Breadcrumb - المسار الحالي */}
+    <div className="space-y-4">
+      {/* Breadcrumb - الroute الحالي */}
       {flowPath.length > 0 && !flowFinished && (
         <div className="glass-panel rounded-lg p-3 border">
           <div className="flex items-center gap-2 justify-end flex-wrap">
-            <span className="text-[10px] text-muted-foreground">المسار الحالي:</span>
+            <span className="text-[10px] text-muted-foreground">Current route:</span>
             {flowPath.map((item, index) => (
               <div key={index} className="flex items-center gap-2">
                 <Badge variant="outline" className="text-[10px]">
@@ -391,9 +374,9 @@ export function AdvancedFlowPanelV2({
           {/* Header */}
           <div className="flex items-center gap-2 pb-3 border-b border-border justify-end">
             <h4 className="font-bold text-foreground">
-              {currentWizardStep.type === 'route_select' && 'اختر المسار المناسب'}
-              {currentWizardStep.type === 'step_conditions' && currentStep && `حدد الحالة: ${currentStep.name}`}
-              {currentWizardStep.type === 'child_conditions' && `حدد الحالة: ${currentWizardStep.parentCondition.name}`}
+              {currentWizardStep.type === 'route_select' && 'Pick a route'}
+              {currentWizardStep.type === 'step_conditions' && currentStep && `Select Status: ${currentStep.name}`}
+              {currentWizardStep.type === 'child_conditions' && `Select Status: ${currentWizardStep.parentCondition.name}`}
             </h4>
             {currentWizardStep.type === 'route_select' ? (
               <Layers className="size-5 text-primary" />
@@ -413,15 +396,15 @@ export function AdvancedFlowPanelV2({
                   <button
                     key={route.id}
                     onClick={() => handleRouteSelect(route.id)}
-                    className="w-full glass-panel border-2 border-border hover:border-primary/50 rounded-lg p-4 text-right transition-all group"
+                    className="w-full glass-panel border-2 border-border hover:border-primary/50 rounded-lg p-4 text-left transition-all group"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <MapPin className="size-4 text-primary" />
                           <h5 className="font-semibold text-foreground">{route.name}</h5>
-                          <Badge className="bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-400 border-0 text-[10px]">
-                            المرحلة {route.order}
+                          <Badge className="bg-primary/10 text-primary dark:bg-primary-soft dark:text-primary border-0 text-[10px]">
+                            Stage {route.order}
                           </Badge>
                         </div>
                         {route.description && (
@@ -459,12 +442,12 @@ export function AdvancedFlowPanelV2({
                 
                 if (totalLinkedRoutes > 0 || totalChildConditions > 0) {
                   return (
-                    <div className="glass-panel rounded-lg p-3 border border-cyan-500/30 bg-cyan-500/5 mb-3">
+                    <div className="glass-panel rounded-lg p-3 border border-primary/30 bg-primary/5 mb-3">
                       <div className="flex items-center gap-2 justify-end">
-                        <p className="text-[11px] text-cyan-700 dark:text-cyan-300">
-                          💡 هذه الخطوة تحتوي على {totalLinkedRoutes > 0 && `${totalLinkedRoutes} مسار متصل`}{totalLinkedRoutes > 0 && totalChildConditions > 0 && ' و '}{totalChildConditions > 0 && `${totalChildConditions} خطوة فرعية`}
+                        <p className="text-[11px] text-primary dark:text-primary">
+                          💡 This step contains {totalLinkedRoutes > 0 && `${totalLinkedRoutes} Connected route`}{totalLinkedRoutes > 0 && totalChildConditions > 0 && ' and '}{totalChildConditions > 0 && `${totalChildConditions} Sub-step`}
                         </p>
-                        <GitBranch className="size-3 text-cyan-600 dark:text-cyan-400" />
+                        <GitBranch className="size-3 text-primary dark:text-primary" />
                       </div>
                     </div>
                   );
@@ -495,7 +478,7 @@ export function AdvancedFlowPanelV2({
                     }`}
                     onClick={() => handleConditionSelect(subCond.id)}
                   >
-                    <div className="flex items-start gap-3 text-right">
+                    <div className="flex items-start gap-3 text-left">
                       <Checkbox
                         checked={isSelected}
                         onCheckedChange={() => handleConditionSelect(subCond.id)}
@@ -506,10 +489,10 @@ export function AdvancedFlowPanelV2({
                           <div className="flex items-center gap-2">
                             {/* Icons for linked routes or child conditions */}
                             {subCond.action === 'continue' && totalLinkedCount > 0 && (
-                              <GitBranch className="size-4 text-cyan-600 dark:text-cyan-400" />
+                              <GitBranch className="size-4 text-primary dark:text-primary" />
                             )}
                             {hasChildConditions && (
-                              <FolderTree className="size-4 text-blue-600 dark:text-blue-400" />
+                              <FolderTree className="size-4 text-primary dark:text-primary" />
                             )}
                           </div>
                           <p className="text-sm font-semibold text-foreground">{subCond.name}</p>
@@ -519,33 +502,28 @@ export function AdvancedFlowPanelV2({
                         {grayAreaSettings.showActionTags && (
                           <div className="flex items-center gap-2 justify-end flex-wrap mt-2">
                             {subCond.action === 'force_solution' && (
-                              <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-0 text-[10px]">
-                                حل مباشر
-                              </Badge>
-                            )}
-                            {subCond.action === 'direct_answer' && (
-                              <Badge className="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-0 text-[10px]">
-                                إجابة مباشرة
+                              <Badge className="bg-success/10 text-success dark:text-success border-0 text-[10px]">
+                                Direct resolve
                               </Badge>
                             )}
                             {subCond.action === 'escalation' && (
-                              <Badge className="bg-orange-500/10 text-orange-600 dark:text-orange-400 border-0 text-[10px]">
-                                تصعيد
+                              <Badge className="bg-primary/10 text-primary dark:text-orange-400 border-0 text-[10px]">
+                                Escalate
                               </Badge>
                             )}
                             {subCond.action === 'continue' && (
                               <>
-                                <Badge className="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-0 text-[10px]">
-                                  متابعة
+                                <Badge className="bg-primary/10 text-primary dark:text-primary border-0 text-[10px]">
+                                  Continue
                                 </Badge>
                                 {totalLinkedCount > 0 && (
                                   <Badge variant="outline" className="text-[10px]">
-                                    {totalLinkedCount} مسار متصل
+                                    {totalLinkedCount} Connected route
                                   </Badge>
                                 )}
                                 {hasChildConditions && (
                                   <Badge variant="outline" className="text-[10px]">
-                                    {subCond.childConditions!.length} خطوة فرعية
+                                    {subCond.childConditions!.length} Sub-step
                                   </Badge>
                                 )}
                               </>
@@ -557,10 +535,10 @@ export function AdvancedFlowPanelV2({
                           <div className="mt-2 pt-2 border-t border-border">
                             <p className="text-xs font-semibold text-foreground mb-1">
                               {subCond.action === 'escalation' 
-                                ? '⚠️ ملاحظات قبل التصعيد:' 
-                                : subCond.action === 'force_solution' || subCond.action === 'direct_answer'
-                                ? '💡 توجيهات الحل:'
-                                : 'تفاصيل:'}
+                                ? '⚠️ Notes before escalation:' 
+                                : subCond.action === 'force_solution'
+                                ? '💡 Resolution guidance:'
+                                : 'Details:'}
                             </p>
                             <p className="text-xs text-muted-foreground">{subCond.actionDetails}</p>
                           </div>
@@ -580,13 +558,11 @@ export function AdvancedFlowPanelV2({
                 const selected = currentConditions.find(sc => sc.id === selectedConditionId);
                 if (selected) handleProceed(selected);
               }}
-              className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white hover:from-orange-600 hover:to-red-600 font-bold"
+              className="w-full bg-gradient-to-r bg-primary text-white hover:from-orange-600 hover:to-red-600 font-bold"
             >
-              {currentConditions.find(sc => sc.id === selectedConditionId)?.action === 'force_solution'
-                ? '✓ تطبيق الحل'
-                : currentConditions.find(sc => sc.id === selectedConditionId)?.action === 'direct_answer'
-                  ? '✓ تطبيق إجابة مباشرة'
-                  : '✓ تطبيق التصعيد'}
+              {currentConditions.find(sc => sc.id === selectedConditionId)?.action === 'force_solution' 
+                ? '✓ Apply resolution' 
+                : '✓ Apply escalation'}
             </Button>
           )}
         </div>
@@ -596,36 +572,30 @@ export function AdvancedFlowPanelV2({
       {flowFinished && (
         <div className={`glass-panel rounded-xl p-5 border-2 ${
           finalAction === 'continue'
-            ? 'border-emerald-500/50 bg-emerald-50/30 dark:bg-emerald-950/20'
+            ? 'border-success/50 bg-success/10/30 dark:bg-emerald-950/20'
             : finalAction === 'force_solution'
-            ? 'border-orange-500/50 bg-orange-50/30 dark:bg-orange-950/20'
-            : finalAction === 'direct_answer'
-            ? 'border-cyan-500/50 bg-cyan-50/30 dark:bg-cyan-950/20'
-            : 'border-red-500/50 bg-red-50/30 dark:bg-red-950/20'
+            ? 'border-primary/50 bg-orange-50/30 dark:bg-orange-950/20'
+            : 'border-danger/50 bg-danger/10/30 dark:bg-red-950/20'
         }`}>
           <div className="flex items-center gap-3 mb-4">
             {finalAction === 'continue' ? (
-              <CheckCircle2 className="size-8 text-emerald-600 dark:text-emerald-400" />
+              <CheckCircle2 className="size-8 text-success dark:text-success" />
             ) : finalAction === 'force_solution' ? (
-              <StopCircle className="size-8 text-orange-600 dark:text-orange-400" />
-            ) : finalAction === 'direct_answer' ? (
-              <CheckCircle2 className="size-8 text-cyan-600 dark:text-cyan-400" />
+              <StopCircle className="size-8 text-primary dark:text-orange-400" />
             ) : (
-              <AlertCircle className="size-8 text-red-600 dark:text-red-400" />
+              <AlertCircle className="size-8 text-danger dark:text-red-400" />
             )}
-            <div className="text-right flex-1">
+            <div className="text-left flex-1">
               <h4 className="font-bold text-foreground">
                 {finalAction === 'continue' 
-                  ? 'تمت جميع الخطوات بنجاح'
+                  ? 'All steps completed.'
                   : finalAction === 'force_solution'
-                  ? 'تم إيقاف العملية - يوجد حل'
-                  : finalAction === 'direct_answer'
-                  ? 'تم تطبيق إجابة مباشرة'
-                  : 'تم التصعيد للجهة المختصة'
+                  ? 'Stopped — resolution available.'
+                  : 'Escalated to the relevant team.'
                 }
               </h4>
               <p className="text-xs text-muted-foreground mt-1">
-                تم إنشاء الرد بناءً على المسار المحدد
+                Response created based on the selected route.
               </p>
             </div>
           </div>
@@ -636,7 +606,7 @@ export function AdvancedFlowPanelV2({
             size="sm"
             className="w-full"
           >
-            🔄 إعادة المحاولة
+            🔄 Retry
           </Button>
         </div>
       )}
@@ -650,13 +620,13 @@ export function AdvancedFlowPanelV2({
             className="w-full"
           >
             <ArrowRight className="size-4 ml-2" />
-            رجوع
+            Back
           </Button>
         </div>
       )}
 
       <p className="text-[10px] text-center text-muted-foreground pt-2">
-        سيتم توليد الصيغة تلقائياً بعد إتمام الخطوات
+        The response will be generated automatically after the steps complete.
       </p>
     </div>
   );

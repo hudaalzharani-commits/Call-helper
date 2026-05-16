@@ -10,6 +10,11 @@ import User from '../models/User.js';
 import Case from '../models/Case.js';
 import KnowledgeBase from '../models/KnowledgeBase.js';
 import { getFrequentIssueThreshold } from '../utils/frequentIssueThreshold.js';
+import {
+  ANALYTICS_TZ,
+  enumerateCalendarDays,
+  resolveAnalyticsRange,
+} from '../utils/analyticsDateRange.js';
 
 /**
  * Get summary statistics
@@ -150,27 +155,7 @@ export async function getSummaryStats() {
  */
 export async function getTimeSeriesData(period = '7d', range = {}) {
   try {
-    const { from, to } = range;
-    let startDate;
-    let endDate;
-
-    if (from && to) {
-      startDate = new Date(from);
-      endDate = new Date(to);
-      if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
-        throw new Error('Invalid from or to date');
-      }
-      if (startDate > endDate) {
-        const swap = startDate;
-        startDate = endDate;
-        endDate = swap;
-      }
-    } else {
-      const days = parseInt(String(period).replace(/[^\d]/g, ''), 10) || 7;
-      endDate = new Date();
-      startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-    }
+    const { startDate, endDate, fromYmd, toYmd } = resolveAnalyticsRange(period, range);
 
     // Aggregate calls by day
     const timeSeriesData = await CallLog.aggregate([
@@ -182,7 +167,11 @@ export async function getTimeSeriesData(period = '7d', range = {}) {
       {
         $group: {
           _id: {
-            $dateToString: { format: '%Y-%m-%d', date: '$createdAt' }
+            $dateToString: {
+              format: '%Y-%m-%d',
+              date: '$createdAt',
+              timezone: ANALYTICS_TZ,
+            },
           },
           count: { $sum: 1 },
           resolved: {
@@ -225,31 +214,19 @@ export async function getTimeSeriesData(period = '7d', range = {}) {
       }
     ]);
     
-    // Fill in missing dates with zero values
-    const filledData = [];
-    const currentDate = new Date(startDate);
-    const fillEnd = new Date(endDate);
-    if (from && to) {
-      currentDate.setHours(0, 0, 0, 0);
-      fillEnd.setHours(23, 59, 59, 999);
-    }
-
-    while (currentDate <= fillEnd) {
-      const dateStr = currentDate.toISOString().split('T')[0];
-      const existingData = timeSeriesData.find(d => d.date === dateStr);
-      
-      filledData.push({
+    const dayKeys = enumerateCalendarDays(fromYmd, toYmd);
+    const filledData = dayKeys.map((dateStr) => {
+      const existingData = timeSeriesData.find((d) => d.date === dateStr);
+      return {
         date: dateStr,
         count: existingData?.count || 0,
         resolved: existingData?.resolved || 0,
         active: existingData?.active || 0,
         pending: existingData?.pending || 0,
         escalated: existingData?.escalated || 0,
-        closed: existingData?.closed || 0
-      });
-      
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
+        closed: existingData?.closed || 0,
+      };
+    });
     
     return {
       success: true,
@@ -267,13 +244,19 @@ export async function getTimeSeriesData(period = '7d', range = {}) {
  * Get hourly activity distribution
  * @returns {Promise<Object>} Hourly activity data
  */
-export async function getHourlyActivity() {
+export async function getHourlyActivity(range = {}) {
   try {
-    const hourlyData = await CallLog.aggregate([
+    const pipeline = [];
+    const { from, to } = range;
+    if (from && to) {
+      const { startDate, endDate } = resolveAnalyticsRange('7d', range);
+      pipeline.push({ $match: { createdAt: { $gte: startDate, $lte: endDate } } });
+    }
+    pipeline.push(
       {
         $project: {
-          hour: { $hour: '$createdAt' }
-        }
+          hour: { $hour: { date: '$createdAt', timezone: ANALYTICS_TZ } },
+        },
       },
       {
         $group: {
@@ -282,10 +265,12 @@ export async function getHourlyActivity() {
         }
       },
       {
-        $sort: { _id: 1 }
-      }
-    ]);
-    
+        $sort: { _id: 1 },
+      },
+    );
+
+    const hourlyData = await CallLog.aggregate(pipeline);
+
     // Fill in all 24 hours
     const filledData = Array.from({ length: 24 }, (_, hour) => {
       const existing = hourlyData.find(d => d._id === hour);

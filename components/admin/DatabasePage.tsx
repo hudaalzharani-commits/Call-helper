@@ -775,17 +775,17 @@ export function DatabasePage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <h2 className="text-3xl font-bold text-foreground">Cases Management</h2>
-        <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center lg:w-auto lg:min-w-[min(100%,24rem)]">
-          <div className="relative min-w-0 flex-1">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
+        <h2 className="shrink-0 text-3xl font-bold text-foreground">Cases Management</h2>
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center lg:flex-1 lg:max-w-4xl">
+          <div className="relative min-w-0 w-full flex-1 sm:min-w-[20rem] lg:min-w-[28rem]">
             <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="search"
               placeholder="بحث في قاعدة البيانات (CaseID، كلمات، تصنيف…)"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="pr-10 text-right"
+              className="h-10 w-full pr-10 text-right text-base"
               aria-label="بحث في الحالات"
             />
           </div>

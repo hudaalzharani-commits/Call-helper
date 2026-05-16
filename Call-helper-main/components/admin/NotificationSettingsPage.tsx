@@ -29,7 +29,7 @@ export function NotificationSettingsPage() {
           <h2 className="text-2xl font-bold text-foreground mb-2">Notification Settings</h2>
           <p className="text-muted-foreground">إدارة التنبيهات والإشعارات</p>
         </div>
-        <Button className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white">
+        <Button className="bg-primary text-primary-foreground hover:bg-primary-hover text-primary-foreground">
           <Save className="size-4 ml-2" />
           حفظ الإعدادات
         </Button>

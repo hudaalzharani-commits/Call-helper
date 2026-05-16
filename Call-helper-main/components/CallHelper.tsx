@@ -680,6 +680,10 @@ export function CallHelper({
 
   /** ينتقل إلى لوحة «علّم رفيق من تجربتك» مع تعبئة الحقول من المكالمة الحالية */
   const openTeachRafeeqFromExperience = () => {
+    const dbResponse =
+      isMatchedResponse && matchedProblem?.response?.trim()
+        ? matchedProblem.response.trim()
+        : "";
     window.dispatchEvent(
       new CustomEvent("app:navigate", {
         detail: {
@@ -687,7 +691,7 @@ export function CallHelper({
           prefill: {
             entityType,
             problemDetails: problemSummary,
-            correctInfo: generatedText,
+            correctInfo: dbResponse,
           },
         },
       }),
@@ -871,7 +875,7 @@ export function CallHelper({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Left Panel - Input Form */}
         <Card className="glass-card border-0 rounded-3xl overflow-hidden shadow-lg">
-          <div className="bg-gradient-to-r from-cyan-500/10 to-blue-500/10 dark:from-cyan-500/5 dark:to-blue-500/5 p-4 sm:p-6 border-b">
+          <div className="bg-surface-2 border-b border-border p-4 sm:p-6 border-b">
             <h2 className="text-lg sm:text-xl font-bold text-foreground flex items-center gap-2">
               <MessageCircle className="size-5 sm:size-6 text-primary" />
               بيانات البلاغ
@@ -935,12 +939,12 @@ export function CallHelper({
               disabled={!customerName || !entityType || !problemSummary}
               className={`w-full group relative overflow-hidden rounded-xl py-3.5 transition-all duration-300 shadow-lg disabled:opacity-40 disabled:cursor-not-allowed ${
                 isGenerating
-                  ? "bg-gradient-to-r from-cyan-400 to-blue-400"
-                  : "bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 active:scale-[0.98]"
+                  ? "bg-primary"
+                  : "bg-primary text-primary-foreground hover:opacity-95 active:scale-[0.98]"
               }`}
             >
               {isGenerating && (
-                <div className="absolute inset-0 bg-gradient-to-r from-cyan-300/50 to-blue-300/50 animate-pulse" />
+                <div className="absolute inset-0 bg-primary/20 animate-pulse" />
               )}
               <div className="relative flex items-center justify-center gap-2.5 text-white font-bold text-sm">
                 <Wand2 className={`size-4 ${isGenerating ? "animate-spin" : ""}`} />
@@ -998,7 +1002,7 @@ export function CallHelper({
                                 setShowWhyPopup(true);
                               }
                             }}
-                            className="w-full px-3 py-2 text-xs bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-lg hover:from-cyan-600 hover:to-blue-700 transition-all font-medium shadow-md flex items-center justify-center gap-1.5"
+                            className="w-full px-3 py-2 text-xs bg-primary text-primary-foreground text-white rounded-lg hover:opacity-95 transition-all font-medium shadow-md flex items-center justify-center gap-1.5"
                           >
                             <Info className="size-3" />
                             المزيد من التفاصيل
@@ -1010,7 +1014,7 @@ export function CallHelper({
                 )}
               </div>
               {isAlternativeFormat && (
-                <Badge className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white border-0 shadow-md text-xs">
+                <Badge className="bg-primary text-primary-foreground text-white border-0 shadow-md text-xs">
                   صيغة بديلة
                 </Badge>
               )}
@@ -1050,14 +1054,14 @@ export function CallHelper({
                   descriptionMatchPercentage >= 90 
                     ? 'border-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20' 
                     : descriptionMatchPercentage >= 80 
-                    ? 'border-cyan-500/50 bg-cyan-50/50 dark:bg-cyan-950/20'
+                    ? 'border-primary/30 bg-primary-soft'
                     : 'border-yellow-500/50 bg-yellow-50/50 dark:bg-yellow-950/20'
                 ) : (
                   // Use confidence score colors
                   confidenceScore >= 90
                     ? 'border-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20'
                     : confidenceScore >= 80
-                    ? 'border-cyan-500/50 bg-cyan-50/50 dark:bg-cyan-950/20'
+                    ? 'border-primary/30 bg-primary-soft'
                     : 'border-yellow-500/50 bg-yellow-50/50 dark:bg-yellow-950/20'
                 )
               }`}>
@@ -1068,13 +1072,13 @@ export function CallHelper({
                         descriptionMatchPercentage >= 90 
                           ? 'bg-emerald-500' 
                           : descriptionMatchPercentage >= 80 
-                          ? 'bg-cyan-500'
+                          ? 'bg-primary'
                           : 'bg-yellow-500'
                       ) : (
                         confidenceScore >= 90
                           ? 'bg-emerald-500'
                           : confidenceScore >= 80
-                          ? 'bg-cyan-500'
+                          ? 'bg-primary'
                           : 'bg-yellow-500'
                       )
                     }`} />
@@ -1083,13 +1087,13 @@ export function CallHelper({
                         descriptionMatchPercentage >= 90 
                           ? 'text-emerald-700 dark:text-emerald-400' 
                           : descriptionMatchPercentage >= 80 
-                          ? 'text-cyan-700 dark:text-cyan-400'
+                          ? 'text-primary'
                           : 'text-yellow-700 dark:text-yellow-400'
                       ) : (
                         confidenceScore >= 90
                           ? 'text-emerald-700 dark:text-emerald-400'
                           : confidenceScore >= 80
-                          ? 'text-cyan-700 dark:text-cyan-400'
+                          ? 'text-primary'
                           : 'text-yellow-700 dark:text-yellow-400'
                       )
                     }`}>
@@ -1119,13 +1123,13 @@ export function CallHelper({
                         descriptionMatchPercentage >= 90 
                           ? 'text-emerald-600 dark:text-emerald-400' 
                           : descriptionMatchPercentage >= 80 
-                          ? 'text-cyan-600 dark:text-cyan-400'
+                          ? 'text-primary'
                           : 'text-yellow-600 dark:text-yellow-400'
                       ) : (
                         confidenceScore >= 90
                           ? 'text-emerald-600 dark:text-emerald-400'
                           : confidenceScore >= 80
-                          ? 'text-cyan-600 dark:text-cyan-400'
+                          ? 'text-primary'
                           : 'text-yellow-600 dark:text-yellow-400'
                       )
                     }`}>
@@ -1304,12 +1308,12 @@ export function CallHelper({
                       }}
                       className={`py-2.5 sm:py-3 rounded-xl transition-all duration-300 font-semibold flex flex-col items-center justify-center gap-1 shadow-md ${
                         activeButton === "retry"
-                          ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white"
+                          ? "bg-primary text-primary-foreground text-white"
                           : "glass-panel hover:bg-accent/50 border"
                       }`}
                     >
-                      <RefreshCcw className={`size-4 ${activeButton === "retry" ? "rotate-180" : ""} transition-transform ${activeButton === "retry" ? "" : "text-cyan-600 dark:text-cyan-400"}`} />
-                      <span className={`text-[10px] sm:text-xs ${activeButton === "retry" ? "" : "text-cyan-700 dark:text-cyan-300"}`}>صيغة أخرى</span>
+                      <RefreshCcw className={`size-4 ${activeButton === "retry" ? "rotate-180" : ""} transition-transform ${activeButton === "retry" ? "" : "text-primary"}`} />
+                      <span className={`text-[10px] sm:text-xs ${activeButton === "retry" ? "" : "text-primary"}`}>صيغة أخرى</span>
                     </button>
 
                     {/* ============ ADVANCED MODE BUTTON ============ */}
@@ -1320,12 +1324,12 @@ export function CallHelper({
                             onClick={handleAdvancedModeToggle}
                             className={`py-2.5 sm:py-3 rounded-xl transition-all duration-300 font-semibold flex flex-col items-center justify-center gap-1 shadow-md relative ${
                                 activeButton === "advanced"
-                                  ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white"
+                                  ? "bg-primary text-primary-foreground text-white"
                                   : "glass-panel hover:bg-accent/50 border"
                             }`}
                           >
                             {isAdvancedModeEnabled && (
-                              <div className="absolute -top-1 -right-1 size-3 bg-cyan-500 rounded-full border-2 border-background" />
+                              <div className="absolute -top-1 -right-1 size-3 bg-primary rounded-full border-2 border-background" />
                             )}
                             <Sliders className={`size-4 ${activeButton === "advanced" ? "rotate-12" : ""} transition-transform ${activeButton === "advanced" ? "" : "text-blue-600 dark:text-blue-400"}`} />
                             <span className={`text-[10px] sm:text-xs ${activeButton === "advanced" ? "" : "text-blue-700 dark:text-blue-300"}`}>وضع متقدم</span>
@@ -1810,7 +1814,7 @@ export function CallHelper({
             <DialogHeader className="border-b border-border pb-4 bg-background dark:bg-gray-900">
               <DialogTitle className="text-right flex items-center gap-3 justify-end text-lg">
                 <span className="text-foreground">محادثة رفيق</span>
-                <div className="p-3 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl shadow-lg border-2 border-cyan-300 dark:border-cyan-400">
+                <div className="p-3 bg-primary rounded-xl shadow-lg border-2 border-primary/30">
                   <Bot className="size-6 text-white" />
                 </div>
               </DialogTitle>
@@ -1822,7 +1826,7 @@ export function CallHelper({
             {!isRafeeqActive ? (
               <div className="flex-1 flex items-center justify-center p-8 bg-background dark:bg-gray-900">
                 <div className="text-center space-y-6">
-                  <div className="mx-auto w-20 h-20 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center shadow-2xl floating">
+                  <div className="mx-auto w-20 h-20 bg-primary rounded-full flex items-center justify-center shadow-2xl floating">
                     <Bot className="size-10 text-white" />
                   </div>
                   <div className="space-y-2">
@@ -1831,7 +1835,7 @@ export function CallHelper({
                   </div>
                   <button
                     onClick={() => setIsRafeeqActive(true)}
-                    className="px-8 py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl font-bold hover:from-cyan-600 hover:to-blue-700 transition-all flex items-center gap-3 mx-auto shadow-lg"
+                    className="px-8 py-3.5 bg-primary text-primary-foreground text-white rounded-xl font-bold hover:opacity-95 transition-all flex items-center gap-3 mx-auto shadow-lg"
                   >
                     <Bot className="size-5" />
                     <span>تشغيل رفيق</span>
@@ -1847,7 +1851,7 @@ export function CallHelper({
                         مرحباً! أنا رفيق، مساعدك الذكي. كيف يمكنني مساعدتك؟
                       </p>
                     </div>
-                    <div className="p-2 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex-shrink-0 shadow-lg">
+                    <div className="p-2 bg-primary rounded-full flex-shrink-0 shadow-lg">
                       <Bot className="size-5 text-white" />
                     </div>
                   </div>
@@ -1861,7 +1865,7 @@ export function CallHelper({
                       }
                     }}
                     disabled={!chatMessage.trim()}
-                    className="p-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-all shadow-lg"
+                    className="p-3.5 bg-primary text-primary-foreground hover:opacity-95 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-all shadow-lg"
                   >
                     <Send className="size-5" />
                   </button>

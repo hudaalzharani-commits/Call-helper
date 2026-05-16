@@ -480,31 +480,31 @@ const MOCK_GRAY_AREA_SETTINGS: GrayAreaSettings = {
       id: 'technical',
       title: 'مشكلة تقنية',
       isEnabled: true,
-      linkedRouteIds: [],
+      linkedRouteIds: ['route-1'],
     },
     {
       id: 'operational',
       title: 'مشكلة تشغيلية',
       isEnabled: true,
-      linkedRouteIds: [],
+      linkedRouteIds: ['route-3'],
     },
     {
       id: 'financial',
       title: 'مشكلة مالية',
       isEnabled: true,
-      linkedRouteIds: ['route-2'], // مربوط بمسار الدفع
+      linkedRouteIds: ['route-2'],
     },
     {
       id: 'complaint',
       title: 'شكوى',
       isEnabled: true,
-      linkedRouteIds: [],
+      linkedRouteIds: ['route-2', 'route-3'],
     },
     {
       id: 'general_inquiry',
       title: 'استفسار عام',
       isEnabled: true,
-      linkedRouteIds: [],
+      linkedRouteIds: ['route-1', 'route-2', 'route-3'],
     },
   ],
   forceRoutingOnConflict: true,
@@ -512,6 +512,27 @@ const MOCK_GRAY_AREA_SETTINGS: GrayAreaSettings = {
   showActionTags: true,
   showActionDetails: true,
 };
+
+const DEFAULT_GRAY_AREA_ROUTE_LINKS: Record<string, string[]> = {
+  technical: ['route-1'],
+  operational: ['route-3'],
+  financial: ['route-2'],
+  complaint: ['route-2', 'route-3'],
+  general_inquiry: ['route-1', 'route-2', 'route-3'],
+};
+
+/** يملأ مسارات Gray Area الفارغة (بيانات قديمة في localStorage) */
+function mergeGrayAreaRouteLinks(settings: GrayAreaSettings): GrayAreaSettings {
+  return {
+    ...settings,
+    questions: settings.questions.map((q) => {
+      if (q.linkedRouteIds.length > 0) return q;
+      const fallback = DEFAULT_GRAY_AREA_ROUTE_LINKS[q.id];
+      if (!fallback?.length) return q;
+      return { ...q, linkedRouteIds: [...fallback] };
+    }),
+  };
+}
 
 /**
  * Mock Scoring Settings
@@ -706,7 +727,9 @@ export function AdvancedSettingsProvider({ children }: { children: ReactNode }) 
   // State Management
   const [routes, setRoutes] = useState<Route[]>(persistedSettings?.routes || MOCK_ROUTES);
   const [steps, setSteps] = useState<Step[]>(persistedSettings?.steps || MOCK_STEPS);
-  const [grayAreaSettings, setGrayAreaSettings] = useState<GrayAreaSettings>(persistedSettings?.grayAreaSettings || MOCK_GRAY_AREA_SETTINGS);
+  const [grayAreaSettings, setGrayAreaSettings] = useState<GrayAreaSettings>(() =>
+    mergeGrayAreaRouteLinks(persistedSettings?.grayAreaSettings || MOCK_GRAY_AREA_SETTINGS),
+  );
   const [scoringSettings, setScoringSettings] = useState<ScoringSettings>(
     ensureRequiredScoringWeights(persistedSettings?.scoringSettings || MOCK_SCORING_SETTINGS)
   );

@@ -153,14 +153,14 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
                     {user.avatar ? (
                       <AvatarImage src={user.avatar} alt={user.name} />
                     ) : (
-                      <AvatarFallback className="bg-gradient-to-br from-cyan-500 to-blue-500 text-white">
+                      <AvatarFallback className="bg-primary text-white">
                         <User className="size-9" />
                       </AvatarFallback>
                     )}
                   </Avatar>
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="absolute bottom-0 right-0 p-1.5 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-full hover:from-cyan-600 hover:to-blue-600 transition-all shadow-lg"
+                    className="absolute bottom-0 right-0 p-1.5 bg-primary text-primary-foreground text-white rounded-full hover:from-primary hover:to-primary transition-all shadow-lg"
                   >
                     <Camera className="size-3.5" />
                   </button>
@@ -186,7 +186,7 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
                   <Button
                     size="sm"
                     onClick={() => fileInputRef.current?.click()}
-                    className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white"
+                    className="bg-primary text-primary-foreground hover:bg-primary-hover text-primary-foreground"
                   >
                     <Upload className="size-3.5 ml-2" />
                     تحميل صورة
@@ -234,7 +234,7 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
                 <Button
                   size="sm"
                   onClick={() => setIsChangingPassword(true)}
-                  className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white"
+                  className="bg-primary text-primary-foreground hover:bg-primary-hover text-primary-foreground"
                 >
                   <Lock className="size-3.5 ml-2" />
                   تغيير
@@ -325,7 +325,7 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
                   <Button
                     size="sm"
                     onClick={handlePasswordChange}
-                    className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white"
+                    className="bg-primary text-primary-foreground hover:bg-primary-hover text-primary-foreground"
                   >
                     <Check className="size-3.5 ml-2" />
                     حفظ التغييرات
@@ -351,9 +351,9 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
           </div>
 
           {/* Security Notice */}
-          <div className="glass-card border border-cyan-200 dark:border-cyan-800 bg-cyan-50/50 dark:bg-cyan-950/20 p-4 rounded-xl">
+          <div className="glass-card border border-primary/20 dark:border-cyan-800 bg-primary-soft/50 dark:bg-primary-soft/20 p-4 rounded-xl">
             <div className="flex items-start gap-3">
-              <Lock className="size-4 text-cyan-600 dark:text-cyan-400 flex-shrink-0 mt-0.5" />
+              <Lock className="size-4 text-primary flex-shrink-0 mt-0.5" />
               <div>
                 <h4 className="font-medium text-foreground text-sm mb-1">نصائح الأمان</h4>
                 <ul className="text-xs text-muted-foreground space-y-0.5">

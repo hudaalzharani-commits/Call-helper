@@ -1,31 +1,33 @@
 import { useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { LogIn, Loader2 } from 'lucide-react';
+import { LogIn, Loader2, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Logo } from './Logo';
+import { ThemeToggle } from './ThemeToggle';
 
-export function Login() {
+interface LoginProps {
+  onBack?: () => void;
+}
+
+export function Login({ onBack }: LoginProps) {
   const { login } = useAuth();
   const [emailOrUsername, setEmailOrUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [isEmailFocused, setIsEmailFocused] = useState(false);
-  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
+  const [password, setPassword]               = useState('');
+  const [showPassword, setShowPassword]       = useState(false);
+  const [isLoading, setIsLoading]             = useState(false);
+  const [error, setError]                     = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
-
     try {
       const success = await login(emailOrUsername, password);
       if (!success) {
         setError('البريد الإلكتروني أو اسم المستخدم أو كلمة المرور غير صحيحة');
       }
-    } catch (err) {
+    } catch {
       setError('حدث خطأ أثناء تسجيل الدخول');
     } finally {
       setIsLoading(false);
@@ -33,72 +35,154 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Animated Background Orbs */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
-        <div className="absolute top-20 right-20 w-[500px] h-[500px] bg-cyan-400/10 dark:bg-cyan-500/10 rounded-full blur-3xl floating" />
-        <div className="absolute bottom-20 left-20 w-[500px] h-[500px] bg-blue-400/10 dark:bg-blue-500/10 rounded-full blur-3xl floating" style={{ animationDelay: '2s' }} />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-teal-400/5 dark:bg-teal-500/5 rounded-full blur-3xl floating" style={{ animationDelay: '4s' }} />
+    <div
+      className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden"
+      style={{ background: 'var(--background)' }}
+    >
+      <div className="absolute top-6 left-6 z-20">
+        <ThemeToggle />
       </div>
 
-      <div className="w-full max-w-md">
-        {/* Logo and Header */}
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-6">
-            <Logo size="large" />
-          </div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">مرحباً بك</h1>
-          <p className="text-muted-foreground">سجل دخولك للمتابعة</p>
+      {onBack && (
+        <button
+          type="button"
+          onClick={onBack}
+          className="absolute bottom-6 left-6 z-20 flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm transition-colors hover:bg-[var(--surface-2)]"
+          style={{ color: 'var(--muted-foreground)' }}
+          aria-label="العودة لصفحة البداية"
+        >
+          <ArrowLeft className="size-4 shrink-0" aria-hidden />
+          <span>العودة</span>
+        </button>
+      )}
+
+      {/* Ambient background */}
+      <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
+        <div
+          className="ambient"
+          style={{
+            top: '-30%', right: '-20%', width: 720, height: 720,
+            background: 'radial-gradient(circle, var(--primary) 0%, transparent 65%)',
+            opacity: 0.10,
+          }}
+        />
+        <div
+          className="ambient"
+          style={{
+            bottom: '-30%', left: '-20%', width: 600, height: 600,
+            background: 'radial-gradient(circle, var(--ai) 0%, transparent 65%)',
+            opacity: 0.06,
+            animationDelay: '5s',
+          }}
+        />
+        <div
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage:
+              'linear-gradient(var(--foreground) 1px, transparent 1px), linear-gradient(90deg, var(--foreground) 1px, transparent 1px)',
+            backgroundSize: '56px 56px',
+          }}
+        />
+      </div>
+
+      {/* Login card */}
+      <div className="w-full max-w-md fade-in">
+        {/* Logo */}
+        <div className="flex flex-col items-center mb-10">
+          <Logo size="large" />
+          <p className="mt-5 text-sm tracking-wide" style={{ color: 'var(--muted-foreground)' }}>
+            سجّل الدخول إلى لوحة التحكم
+          </p>
         </div>
 
-        {/* Login Form */}
-        <div className="glass-panel border-2 border-border rounded-3xl p-8 shadow-2xl">
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="panel-elevated p-8">
+          <form onSubmit={handleSubmit} className="space-y-5" dir="rtl">
+
+            {/* Username / email */}
             <div className="space-y-2">
+              <label
+                htmlFor="emailOrUsername"
+                className="block text-xs font-semibold tracking-[0.08em] uppercase"
+                style={{ color: 'var(--muted-strong)' }}
+              >
+                اسم المستخدم أو البريد
+              </label>
               <Input
                 id="emailOrUsername"
                 type="text"
-                placeholder={isEmailFocused || emailOrUsername ? "" : "الرجاء إدخال البريد الالكتروني أو اسم المستخدم"}
+                placeholder="مثال: admin"
+                className="h-11 rounded-xl text-right"
                 value={emailOrUsername}
                 onChange={(e) => setEmailOrUsername(e.target.value)}
                 required
-                className="glass-card border-2 border-border focus:border-primary transition-all h-12 text-foreground placeholder:text-muted-foreground"
                 disabled={isLoading}
-                onFocus={() => setIsEmailFocused(true)}
-                onBlur={() => setIsEmailFocused(false)}
+                autoComplete="username"
               />
             </div>
 
+            {/* Password */}
             <div className="space-y-2">
-              <Input
-                id="password"
-                type="password"
-                placeholder={isPasswordFocused || password ? "" : "••••••••"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="glass-card border-2 border-border focus:border-primary transition-all h-12 text-foreground placeholder:text-muted-foreground"
-                disabled={isLoading}
-                onFocus={() => setIsPasswordFocused(true)}
-                onBlur={() => setIsPasswordFocused(false)}
-              />
+              <label
+                htmlFor="password"
+                className="block text-xs font-semibold tracking-[0.08em] uppercase"
+                style={{ color: 'var(--muted-strong)' }}
+              >
+                كلمة المرور
+              </label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  autoComplete="current-password"
+                  className="h-11 rounded-xl pl-10 text-right"
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 hover:text-foreground transition-colors"
+                  style={{ color: 'var(--muted-foreground)' }}
+                  aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                >
+                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </div>
             </div>
 
+            {/* Error */}
             {error && (
-              <div className="bg-red-50 dark:bg-red-950/30 border-2 border-red-200 dark:border-red-900 rounded-xl p-3 text-red-600 dark:text-red-400 text-sm text-center">
+              <div
+                className="rounded-xl p-3 text-sm"
+                style={{
+                  background: 'var(--danger-soft)',
+                  color: 'var(--danger)',
+                  border: '1px solid var(--border)',
+                }}
+                role="alert"
+              >
                 {error}
               </div>
             )}
 
+            {/* Submit */}
             <Button
               type="submit"
-              className="w-full h-12 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white rounded-xl shadow-lg transition-all duration-300 border-2 border-cyan-400 dark:border-cyan-300"
               disabled={isLoading}
+              className="w-full h-11 rounded-xl font-semibold"
+              style={{
+                background: 'var(--primary)',
+                color: 'var(--primary-foreground)',
+              }}
             >
               {isLoading ? (
                 <>
                   <Loader2 className="size-4 ml-2 animate-spin" />
-                  جاري تسجيل الدخول...
+                  جاري تسجيل الدخول…
                 </>
               ) : (
                 <>
@@ -108,7 +192,13 @@ export function Login() {
               )}
             </Button>
           </form>
+
         </div>
+
+        {/* Footer */}
+        <p className="mt-6 text-center text-xs" style={{ color: 'var(--muted-strong)' }}>
+          رفيق · مساعد المكالمات · v1.0
+        </p>
       </div>
     </div>
   );

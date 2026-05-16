@@ -54,11 +54,16 @@ import { Calendar as CalendarComponent } from "./ui/calendar";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
-import { formatAppDate, formatAppMonthDay, formatAppWeekdayFullDate, formatAppTime } from "../utils/dateDisplay";
+import {
+  formatAppDate,
+  formatAppMonthDay,
+  formatAppWeekdayFullDate,
+  formatAppTime,
+  toLocalCalendarDateKey,
+} from "../utils/dateDisplay";
 
 /** نطاق التقويم المعروض في المؤشرات (يُستخدم للسلاسل الزمنية وقائمة الإفادات المؤكدة) */
 function computeIndicatorDateRange(
@@ -166,13 +171,14 @@ export function LiveIndicators() {
           selectedPeriod,
           appliedDateRange,
         );
+        const rangeKeys = {
+          from: toLocalCalendarDateKey(start),
+          to: toLocalCalendarDateKey(end),
+        };
         const [summary, series, hourly, distribution] = await Promise.all([
           getSummaryStats(),
-          getTimeSeriesData({
-            from: start.toISOString(),
-            to: end.toISOString(),
-          }),
-          getHourlyActivity(),
+          getTimeSeriesData(rangeKeys),
+          getHourlyActivity(rangeKeys),
           getDistributionStats(),
         ]);
 
@@ -246,8 +252,33 @@ export function LiveIndicators() {
     }
   };
 
+  const periodCasesTotal = useMemo(
+    () => timeSeries.reduce((sum, p) => sum + (Number(p.count) || 0), 0),
+    [timeSeries],
+  );
+
+  const dailyCasesChartTitle = useMemo(() => {
+    switch (selectedPeriod) {
+      case "today":
+        return "سجل الحالات اليومية - اليوم";
+      case "week":
+        return "سجل الحالات اليومية - هذا الأسبوع";
+      case "month":
+        return "سجل الحالات اليومية - هذا الشهر";
+      case "year":
+        return "سجل الحالات اليومية - هذه السنة";
+      case "custom":
+        return "سجل الحالات اليومية - الفترة المحددة";
+      default:
+        return "سجل الحالات اليومية";
+    }
+  }, [selectedPeriod]);
+
   const statsCards = useMemo(() => {
-    const callsToday = summaryStats?.callsToday ?? 0;
+    const callsInPeriod =
+      selectedPeriod === "today"
+        ? (summaryStats?.callsToday ?? periodCasesTotal)
+        : periodCasesTotal;
     const topIssueCount = distributionStats?.topCategories?.[0]?.count ?? 0;
     const activeCalls = summaryStats?.activeCalls ?? 0;
 
@@ -258,7 +289,7 @@ export function LiveIndicators() {
     return [
       {
         title: "سجل الحالات اليومية",
-        value: String(callsToday),
+        value: String(callsInPeriod),
         change: callsChange,
         trend: typeof callsTrend === "number" ? (callsTrend >= 0 ? "up" : "down") : "neutral",
         color: "from-slate-300 to-slate-200",
@@ -289,11 +320,11 @@ export function LiveIndicators() {
         activeColor: "from-cyan-500 to-blue-600",
       },
     ];
-  }, [summaryStats, distributionStats]);
+  }, [summaryStats, distributionStats, selectedPeriod, periodCasesTotal]);
 
   const dailyCasesData = useMemo(() => {
     return timeSeries.map((p) => ({
-      name: formatAppMonthDay(new Date(p.date)),
+      name: formatAppMonthDay(new Date(`${p.date}T12:00:00`)),
       value: p.count,
     }));
   }, [timeSeries]);
@@ -367,10 +398,6 @@ export function LiveIndicators() {
             <DialogTitle className="text-right">
               الإفادات المؤكدة — المشكلة والحل
             </DialogTitle>
-            <DialogDescription className="text-right">
-              سجلات بصيغة مولّدة وسكور العرض النهائي 100٪، ضمن الفترة المعروضة
-              أعلاه في الصفحة.
-            </DialogDescription>
           </DialogHeader>
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-white px-6 py-4 dark:bg-zinc-950">
             {confirmedBriefingsLoading && (
@@ -700,7 +727,7 @@ export function LiveIndicators() {
               <CardHeader className="bg-gradient-to-r from-cyan-500/15 to-blue-500/15 dark:from-cyan-500/10 dark:to-blue-500/10 rounded-t-2xl border-b border-border">
                 <CardTitle className="text-foreground text-right font-bold flex items-center gap-2">
                   <div className="w-1 h-6 bg-gradient-to-b from-cyan-500 to-blue-600 rounded-full" />
-                  سجل الحالات اليومية - آخر 7 أيام
+                  {dailyCasesChartTitle}
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-6">
@@ -866,8 +893,8 @@ export function LiveIndicators() {
                         setConfirmedBriefingsLoading(true);
                         const { start, end } = getDateRange();
                         getConfirmedBriefings({
-                          from: start.toISOString(),
-                          to: end.toISOString(),
+                          from: toLocalCalendarDateKey(start),
+                          to: toLocalCalendarDateKey(end),
                           limit: 100,
                         })
                           .then((res) =>

@@ -81,6 +81,36 @@ export function formatAppWeekdayFullDate(d: Date | string | number): string {
   });
 }
 
+/** مفتاح يوم تقويمي محلي YYYY-MM-DD */
+export function toLocalCalendarDateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** مفتاح يوم للتحليلات — نفس منطقة الخادم (Asia/Riyadh) */
+export const ANALYTICS_TIMEZONE = 'Asia/Riyadh';
+
+export function toAnalyticsDateKey(d: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: ANALYTICS_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
+}
+
+/** تسمية ساعة للمخطط (0 → 12 ص، 14 → 2 م) */
+export function formatChartHourLabel(hour: number, fallbackName?: string): string {
+  if (fallbackName && fallbackName !== `${hour}:00`) return fallbackName;
+  const h = hour % 24;
+  if (h === 0) return '12 ص';
+  if (h < 12) return `${h} ص`;
+  if (h === 12) return '12 م';
+  return `${h - 12} م`;
+}
+
 export function formatAppTime(d: Date | string | number): string {
   const x = toDate(d);
   if (Number.isNaN(x.getTime())) return '—';

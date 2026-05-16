@@ -552,6 +552,10 @@ export function CallHelper({
 
   /** ينتقل إلى لوحة «علّم رفيق من تجربتك» مع تعبئة الحقول من المكالمة الحالية */
   const openTeachRafeeqFromExperience = () => {
+    const dbResponse =
+      isMatchedResponse && matchedProblem?.response?.trim()
+        ? matchedProblem.response.trim()
+        : "";
     window.dispatchEvent(
       new CustomEvent("app:navigate", {
         detail: {
@@ -559,7 +563,7 @@ export function CallHelper({
           prefill: {
             entityType,
             problemDetails: problemSummary,
-            correctInfo: generatedText,
+            correctInfo: dbResponse,
           },
         },
       }),
