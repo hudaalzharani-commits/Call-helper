@@ -9,7 +9,7 @@
  * 1. Routing Rules - قواعد التوجيه (بدون keywords لأن الـ AI يتعامل معها)
  * 2. Steps - الخطوات (تنعكس تلقائياً من Routes + إضافة sub-conditions)
  * 3. Gray Area Settings - إعدادات عتبة الثقة
- * 4. Scoring Settings - إعدادات النتائج والأوزان
+ * 4. Scoring Settings - {t('admin.advancedSettings.scoringTitle')}
  * 
  * ====================================================================
  */
@@ -70,8 +70,10 @@ import {
   DialogFooter,
 } from '../ui/dialog';
 import { toast } from 'sonner';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export function AdvancedSettingsPage() {
+  const { t, dir } = useLanguage();
   const {
     routes,
     steps,
@@ -230,7 +232,7 @@ export function AdvancedSettingsPage() {
 
   const handleAddRoute = () => {
     if (!newRouteName.trim()) {
-      toast.error('يرجى إدخال اسم المسار');
+      toast.error(t('admin.advancedSettings.enterRouteName'));
       return;
     }
 
@@ -248,13 +250,13 @@ export function AdvancedSettingsPage() {
     setNewRouteEntityTypes([]);
     setPendingCategoryInput('');
     setShowAddRouteDialog(false);
-    toast.success('تم إضافة المسار بنجاح');
+    toast.success(t('admin.advancedSettings.routeAdded'));
   };
 
   const handleDeleteRoute = (routeId: string, routeName: string) => {
-    if (confirm(`هل أنت متأكد من حذف المسار "${routeName}"؟ سيتم حذف جميع الخطوات المرتبطة به.`)) {
+    if (confirm(t('admin.advancedSettings.deleteRouteConfirm', { name: routeName }))) {
       deleteRoute(routeId);
-      toast.success('تم حذف المسار');
+      toast.success(t('admin.advancedSettings.routeDeleted'));
     }
   };
 
@@ -271,7 +273,7 @@ export function AdvancedSettingsPage() {
     if (!editingRoute) return;
     
     if (!newRouteName.trim()) {
-      toast.error('يرجى إدخال اسم المسار');
+      toast.error(t('admin.advancedSettings.enterRouteName'));
       return;
     }
 
@@ -291,7 +293,7 @@ export function AdvancedSettingsPage() {
     setNewRouteCategories([]);
     setNewRouteEntityTypes([]);
     setPendingCategoryInput('');
-    toast.success('تم تحديث المسار بنجاح');
+    toast.success(t('admin.advancedSettings.routeUpdated'));
   };
 
   // 🎯 إضافة/إزالة فئة من قائمة targeting (تجنب التكرار وtrim)
@@ -320,12 +322,12 @@ export function AdvancedSettingsPage() {
 
   const handleAddSubCondition = () => {
     if (!newSubConditionName.trim()) {
-      toast.error('يرجى إدخال اسم الخطوة');
+      toast.error(t('admin.advancedSettings.enterStepName'));
       return;
     }
 
     if (newSubConditionAction !== 'continue' && !newSubConditionDetails.trim()) {
-      toast.error('يرجى إدخال تفاصيل الإجراء');
+      toast.error(t('admin.advancedSettings.enterActionDetails'));
       return;
     }
 
@@ -346,7 +348,7 @@ export function AdvancedSettingsPage() {
       }).filter(Boolean);
 
       if (stepIds.length === 0) {
-        toast.error('لم يتم العثور على الخطوات المستهدفة');
+        toast.error(t('admin.advancedSettings.stepsNotFound'));
         return;
       }
 
@@ -361,7 +363,7 @@ export function AdvancedSettingsPage() {
         ''
       );
 
-      toast.success(`✅ تم إضافة الخطوة في ${stepIds.length} مسار`);
+      toast.success(t('admin.advancedSettings.stepAddedMulti', { count: stepIds.length }));
     } else {
       // Single route mode: Use normal addSubCondition
       addSubCondition(
@@ -374,7 +376,7 @@ export function AdvancedSettingsPage() {
         newSubConditionParentId || undefined
       );
 
-      toast.success('تم إضافة الخطوة بنجاح');
+      toast.success(t('admin.advancedSettings.stepAdded'));
     }
 
     // Reset form
@@ -391,7 +393,7 @@ export function AdvancedSettingsPage() {
     if (!editingSubCondition) return;
 
     if (!newSubConditionName.trim()) {
-      toast.error('يرجى إدخال اسم الشرط');
+      toast.error(t('admin.advancedSettings.enterConditionName'));
       return;
     }
 
@@ -413,7 +415,7 @@ export function AdvancedSettingsPage() {
       );
 
       const linkedCount = currentStep?.linkedStepIds?.length || 0;
-      toast.success(`✅ تم تحديث الخطوة في ${linkedCount + 1} مسار`);
+      toast.success(t('admin.advancedSettings.stepUpdatedMulti', { count: linkedCount + 1 }));
     } else {
       // Normal update (current only)
       updateSubCondition(
@@ -426,7 +428,7 @@ export function AdvancedSettingsPage() {
         }
       );
 
-      toast.success('تم تحديث الشرط');
+      toast.success(t('admin.advancedSettings.conditionUpdated'));
     }
 
     // Reset
@@ -448,13 +450,13 @@ export function AdvancedSettingsPage() {
       
       if (confirm(message)) {
         deleteLinkedSubCondition(stepId, subConditionId, false);
-        toast.success('تم حذف الخطوة من المسار الحالي');
+        toast.success(t('admin.advancedSettings.stepDeletedCurrent'));
       }
     } else {
       // Normal delete
-      if (confirm(`هل أنت متأكد من حذف الشرط "${name}"؟`)) {
+      if (confirm(t('admin.advancedSettings.deleteConditionConfirm', { name }))) {
         deleteSubCondition(stepId, subConditionId);
-        toast.success('تم حذف الشرط');
+        toast.success(t('admin.advancedSettings.conditionDeleted'));
       }
     }
   };
@@ -469,10 +471,10 @@ export function AdvancedSettingsPage() {
   const handleSaveAllSettings = async () => {
     const saved = await saveSettings();
     if (saved) {
-      toast.success('تم حفظ جميع الإعدادات بنجاح');
+      toast.success(t('admin.advancedSettings.allSaved'));
       return;
     }
-    toast.error('تعذر حفظ الإعدادات، حاول مرة أخرى');
+    toast.error(t('admin.toast.saveFailed'));
   };
 
   /** 
@@ -502,10 +504,10 @@ export function AdvancedSettingsPage() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       
-      toast.success('✅ تم تصدير الإعدادات بنجاح');
+      toast.success(t('admin.advancedSettings.exportSuccess'));
     } catch (error) {
       console.error('Export error:', error);
-      toast.error('❌ فشل تصدير الإعدادات');
+      toast.error(t('admin.advancedSettings.exportFailed'));
     }
   };
 
@@ -527,13 +529,13 @@ export function AdvancedSettingsPage() {
         const success = importSettings(settingsData);
         
         if (success) {
-          toast.success('✅ تم استيراد الإعدادات بنجاح');
+          toast.success(t('admin.advancedSettings.importSuccess'));
         } else {
-          toast.error('❌ ملف الإعدادات غير صالح');
+          toast.error(t('admin.advancedSettings.importInvalid'));
         }
       } catch (error) {
         console.error('Import error:', error);
-        toast.error('❌ فشل قراءة ملف الإعدادات');
+        toast.error(t('admin.advancedSettings.importReadFailed'));
       }
       
       // Reset file input
@@ -552,22 +554,22 @@ export function AdvancedSettingsPage() {
   const ActionBadge = ({ action }: { action: SubCondition['action'] }) => {
     const config = {
       continue: {
-        label: 'متابعة',
+        label: t('admin.advancedSettings.actionContinue'),
         color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400',
         icon: PlayCircle,
       },
       force_solution: {
-        label: 'إيقاف وحل',
+        label: t('admin.advancedSettings.actionForceSolution'),
         color: 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400',
         icon: StopCircle,
       },
       direct_answer: {
-        label: 'إجابة مباشرة',
+        label: t('admin.advancedSettings.actionDirectAnswer'),
         color: 'bg-primary-soft text-primary',
         icon: Check,
       },
       escalation: {
-        label: 'تصعيد',
+        label: t('admin.advancedSettings.actionEscalation'),
         color: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400',
         icon: AlertCircle,
       },
@@ -658,29 +660,29 @@ export function AdvancedSettingsPage() {
               <ActionBadge action={subCond.action} />
               {level > 0 && (
                 <Badge variant="outline" className="text-xs">
-                  متداخلة {level}
+                  {t('admin.advancedSettings.nestedLevel', { level })}
                 </Badge>
               )}
               {/* 🔗 Linked SubCondition Badge - يظهر فقط للخطوات المضافة في مسارات متعددة */}
               {isLinkedSubCondition && level === 0 && (
                 <Badge 
                   className="bg-primary-soft text-primary border-0 flex items-center gap-1 text-xs"
-                  title={`مرتبطة مع ${linkedStepsCount} ${linkedStepsCount === 1 ? 'مسار آخر' : 'مسارات أخرى'}`}
+                  title={t('admin.advancedSettings.linkedWith', { count: linkedStepsCount, label: linkedStepsCount === 1 ? t('admin.advancedSettings.linkedRouteOther') : t('admin.advancedSettings.linkedRoutesOther') })}
                 >
                   <Link2 className="size-3" />
-                  مرتبطة ({linkedStepsCount + 1})
+                  {t('admin.advancedSettings.linkedBadge', { count: linkedStepsCount + 1 })}
                 </Badge>
               )}
               {/* Badge for linked routes */}
               {subCond.action === 'continue' && totalLinkedRoutesCount > 0 && (
                 <Badge variant="outline" className="text-xs">
-                  {totalLinkedRoutesCount} مسار متصل
+                  {t('admin.advancedSettings.connectedRoutes', { count: totalLinkedRoutesCount })}
                 </Badge>
               )}
               {/* Badge for child conditions */}
               {hasChildConditions && (
                 <Badge variant="outline" className="text-xs">
-                  {subCond.childConditions!.length} خطوة فرعية
+                  {t('admin.advancedSettings.childSteps', { count: subCond.childConditions!.length })}
                 </Badge>
               )}
             </div>
@@ -727,30 +729,30 @@ export function AdvancedSettingsPage() {
   // ====================================================================
 
   return (
-    <div className="space-y-6" dir="rtl">
+    <div className="space-y-6" dir={dir}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-foreground mb-2">إعدادات الوضع المتقدم</h2>
+          <h2 className="text-2xl font-bold text-foreground mb-2">{t('admin.advancedSettings.title')}</h2>
           <p className="text-muted-foreground">
-            التحكم في سلوك زر "الوضع المتقدم" في صفحة Call Helper
+            {t('admin.advancedSettings.subtitle')}
           </p>
         </div>
         <div className="flex gap-2">
           <Button 
             variant="outline" 
             className="border-2"
-            onClick={() => toast.info('سيتم إعادة تعيين الإعدادات')}
+            onClick={() => toast.info(t('admin.advancedSettings.resetInfo'))}
           >
             <RotateCcw className="size-4 ml-2" />
-            إعادة تعيين
+            {t('admin.advancedSettings.reset')}
           </Button>
           <Button 
             className="bg-primary text-primary-foreground hover:bg-primary-hover text-primary-foreground"
             onClick={handleSaveAllSettings}
           >
             <Save className="size-4 ml-2" />
-            حفظ التغييرات
+            {t('admin.advancedSettings.saveChanges')}
           </Button>
         </div>
       </div>
@@ -770,9 +772,9 @@ export function AdvancedSettingsPage() {
           <div className="flex items-center gap-2">
             <GitBranch className="size-6 text-primary" />
             <div>
-              <h3 className="text-lg font-bold text-foreground">قواعد التوجيه (Routes)</h3>
+              <h3 className="text-lg font-bold text-foreground">{t('admin.advancedSettings.routesTitle')}</h3>
               <p className="text-xs text-muted-foreground">
-                المسارات الرئيسية - ستظهر في زر الوضع المتقدم بالترتيب
+                {t('admin.advancedSettings.routesDesc')}
               </p>
             </div>
           </div>
@@ -782,7 +784,7 @@ export function AdvancedSettingsPage() {
             size="sm"
           >
             <Plus className="size-4 ml-2" />
-            إضافة مسار
+            {t('admin.advancedSettings.addRoute')}
           </Button>
         </div>
 
@@ -790,8 +792,8 @@ export function AdvancedSettingsPage() {
           {routes.length === 0 ? (
             <div className="text-center py-12 glass-card rounded-xl border border-border">
               <GitBranch className="size-12 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground">لا توجد مسارات بعد</p>
-              <p className="text-xs text-muted-foreground mt-1">اضغط "إضافة مسار" للبدء</p>
+              <p className="text-muted-foreground">{t('admin.advancedSettings.noRoutes')}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('admin.advancedSettings.noRoutesHint')}</p>
             </div>
           ) : (
             routes.map((route) => {
@@ -829,12 +831,12 @@ export function AdvancedSettingsPage() {
                       {route.isActive ? (
                         <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400 border-0">
                           <Power className="size-3 ml-1" />
-                          نشط
+                          {t('admin.advancedSettings.active')}
                         </Badge>
                       ) : (
                         <Badge className="bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400 border-0">
                           <Power className="size-3 ml-1" />
-                          معطل
+                          {t('admin.advancedSettings.disabled')}
                         </Badge>
                       )}
 
@@ -842,7 +844,7 @@ export function AdvancedSettingsPage() {
                       {route.parentSteps.length > 0 && (
                         <Badge className="bg-primary-soft text-primary border-0 flex items-center gap-1">
                           <GitBranch className="size-3" />
-                          مسار مربوط
+                          {t('admin.advancedSettings.linkedRoute')}
                         </Badge>
                       )}
 
@@ -871,7 +873,7 @@ export function AdvancedSettingsPage() {
                       )}
 
                       <Badge variant="outline" className="text-xs">
-                        {step?.subConditions.length || 0} {step?.subConditions.length === 1 ? 'خطوة' : 'خطوات'}
+                        {step?.subConditions.length || 0} {step?.subConditions.length === 1 ? t('admin.advancedSettings.stepOne') : t('admin.advancedSettings.stepsMany')}
                       </Badge>
                     </div>
 
@@ -884,7 +886,7 @@ export function AdvancedSettingsPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleEditRoute(route)}
-                        title="تعديل المسار"
+                        title={t('admin.advancedSettings.editRouteTitle')}
                       >
                         <Edit2 className="size-4 text-primary" />
                       </Button>
@@ -892,7 +894,7 @@ export function AdvancedSettingsPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDeleteRoute(route.id, route.name)}
-                        title="حذف المسار"
+                        title={t('admin.advancedSettings.deleteRouteTitle')}
                       >
                         <Trash2 className="size-4 text-red-500" />
                       </Button>
@@ -904,7 +906,7 @@ export function AdvancedSettingsPage() {
                     <div className="border-t border-border p-4 bg-muted/30">
                       <div className="flex items-center justify-between mb-3">
                         <p className="text-sm font-semibold text-foreground">
-                          الخطوات والإجراءات:
+                          {t('admin.advancedSettings.stepsAndActions')}
                         </p>
                         <Button
                           size="sm"
@@ -915,14 +917,14 @@ export function AdvancedSettingsPage() {
                           }}
                         >
                           <Plus className="size-3 ml-1" />
-                          إضافة خطوة
+                          {t('admin.advancedSettings.addStep')}
                         </Button>
                       </div>
 
                       {step.subConditions.length === 0 ? (
                         <div className="text-center py-6 glass-card rounded-lg border border-border">
                           <p className="text-xs text-muted-foreground">
-                            لا توجد خطوات - اضغط "إضافة خطوة" لتحديد الإجراءات
+                            {t('admin.advancedSettings.noSteps')}
                           </p>
                         </div>
                       ) : (
@@ -949,17 +951,17 @@ export function AdvancedSettingsPage() {
         <div className="flex items-center gap-2 mb-4">
           <AlertTriangle className="size-5 text-orange-500" />
           <div>
-            <h3 className="text-base font-bold text-foreground">إعدادات Gray Area</h3>
+            <h3 className="text-base font-bold text-foreground">{t('admin.advancedSettings.grayAreaTitle')}</h3>
             <p className="text-xs text-muted-foreground">
-              التحكم في خيارات Gray Area
+              {t('admin.advancedSettings.grayAreaDesc')}
             </p>
           </div>
         </div>
 
         <div className="space-y-4">
-          {/* أسئلة Gray Area - 5 أسئلة ثابتة */}
+          {/* {t('admin.advancedSettings.grayQuestions')} - 5 أسئلة ثابتة */}
           <div className="space-y-2">
-            <Label className="text-sm text-foreground">أسئلة Gray Area</Label>
+            <Label className="text-sm text-foreground">{t('admin.advancedSettings.grayQuestions')}</Label>
             
             <div className="space-y-3">
               {grayAreaSettings.questions.map((question, index) => (
@@ -1015,7 +1017,7 @@ export function AdvancedSettingsPage() {
                         className="h-9 text-xs"
                       >
                         <Link2 className="size-3 ml-1" />
-                        ربط ({question.linkedRouteIds.length})
+                        {t('admin.advancedSettings.linkRoutes', { count: question.linkedRouteIds.length })}
                       </Button>
 
                       {/* Switch التفعيل */}
@@ -1030,7 +1032,7 @@ export function AdvancedSettingsPage() {
                           }}
                         />
                         <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                          {question.isEnabled ? 'مفعّل' : 'معطّل'}
+                          {question.isEnabled ? t('admin.advancedSettings.enabled') : t('admin.advancedSettings.disabledSwitch')}
                         </span>
                       </div>
                     </div>
@@ -1040,16 +1042,16 @@ export function AdvancedSettingsPage() {
             </div>
             
             <p className="text-[11px] text-muted-foreground">
-              💡 أسئلة ثابتة لتوجيه المستخدم في Gray Area - لا يمكن إضافة أو حذف، فقط تعديل وتفعيل
+              {t('admin.advancedSettings.grayQuestionsHint')}
             </p>
           </div>
 
           {/* Force Routing When Conflict Occurs */}
           <div className="flex items-center justify-between p-3 glass-card rounded-lg border border-border">
             <div>
-              <p className="text-sm font-medium text-foreground">إجبار التوجيه عند التعارض</p>
+              <p className="text-sm font-medium text-foreground">{t('admin.advancedSettings.forceRouting')}</p>
               <p className="text-[11px] text-muted-foreground">
-                توجيه تلقائي عند تعارض المسارات
+                {t('admin.advancedSettings.forceRoutingDesc')}
               </p>
             </div>
             <Switch
@@ -1063,9 +1065,9 @@ export function AdvancedSettingsPage() {
           {/* Show Hint Before Decision */}
           <div className="flex items-center justify-between p-3 glass-card rounded-lg border border-border">
             <div>
-              <p className="text-sm font-medium text-foreground">عرض تلميح قبل القرار</p>
+              <p className="text-sm font-medium text-foreground">{t('admin.advancedSettings.showHint')}</p>
               <p className="text-[11px] text-muted-foreground">
-                رسالة توجيهية قبل اتخاذ القرار
+                {t('admin.advancedSettings.showHintDesc')}
               </p>
             </div>
             <Switch
@@ -1079,9 +1081,9 @@ export function AdvancedSettingsPage() {
           {/* Show Action Tags */}
           <div className="flex items-center justify-between p-3 glass-card rounded-lg border border-border">
             <div>
-              <p className="text-sm font-medium text-foreground">عرض TAG الإجراء</p>
+              <p className="text-sm font-medium text-foreground">{t('admin.advancedSettings.showActionTag')}</p>
               <p className="text-[11px] text-muted-foreground">
-                إظهار/إخفاء شارات الإجراء (متابعة، إيقاف وحل، تصعيد) في الخطوات
+                {t('admin.advancedSettings.showActionTagDesc')}
               </p>
             </div>
             <Switch
@@ -1095,9 +1097,9 @@ export function AdvancedSettingsPage() {
           {/* Show Action Details */}
           <div className="flex items-center justify-between p-3 glass-card rounded-lg border border-border">
             <div>
-              <p className="text-sm font-medium text-foreground">عرض ملاحظات الإجراء</p>
+              <p className="text-sm font-medium text-foreground">{t('admin.advancedSettings.showActionNotes')}</p>
               <p className="text-[11px] text-muted-foreground">
-                إظهار/إخفاء ملاحظات (توجيهات الحل) و (ملاحظات التصعيد) في الخطوات
+                {t('admin.advancedSettings.showActionNotesDesc')}
               </p>
             </div>
             <Switch
@@ -1118,9 +1120,9 @@ export function AdvancedSettingsPage() {
         <div className="flex items-center gap-2 mb-4">
           <Award className="size-5 text-primary" />
           <div>
-            <h3 className="text-base font-bold text-foreground">إعدادات النتائج والأوزان</h3>
+            <h3 className="text-base font-bold text-foreground">{t('admin.advancedSettings.scoringTitle')}</h3>
             <p className="text-xs text-muted-foreground">
-              عتبات النتيجة وأوزان العوامل
+              {t('admin.advancedSettings.scoringDesc')}
             </p>
           </div>
         </div>
@@ -1129,9 +1131,9 @@ export function AdvancedSettingsPage() {
           {/* Score Thresholds */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <Label className="text-sm font-semibold text-foreground">عتبات النتيجة النهائية</Label>
+              <Label className="text-sm font-semibold text-foreground">{t('admin.advancedSettings.thresholdsTitle')}</Label>
               <Badge variant="outline" className="text-[10px]">
-                تتحكم في سلوك مساعد المكالمات
+                {t('admin.advancedSettings.thresholdsDesc')}
               </Badge>
             </div>
             
@@ -1142,10 +1144,10 @@ export function AdvancedSettingsPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                      <Label className="text-sm font-semibold text-foreground">رد مباشر تلقائي</Label>
+                      <Label className="text-sm font-semibold text-foreground">{t('admin.advancedSettings.autoDirect')}</Label>
                     </div>
                     <p className="text-[10px] text-muted-foreground">
-                      عند وصول النسبة لهذا الحد أو أكثر، يتم إنشاء الرد تلقائياً بدون تدخل المستخدم
+                      {t('admin.advancedSettings.autoDirectDesc')}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
@@ -1178,10 +1180,10 @@ export function AdvancedSettingsPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <div className="w-2 h-2 rounded-full bg-primary"></div>
-                      <Label className="text-sm font-semibold text-foreground">وضع متقدم اختياري</Label>
+                      <Label className="text-sm font-semibold text-foreground">{t('admin.advancedSettings.optionalAdvanced')}</Label>
                     </div>
                     <p className="text-[10px] text-muted-foreground">
-                      يظهر زر "وضع متقدم" + رد مقترح. المستخدم يختار بين الرد المباشر أو التحكم اليدوي (جميع المسارات متاحة)
+                      {t('admin.advancedSettings.optionalAdvancedDesc')}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
@@ -1214,10 +1216,10 @@ export function AdvancedSettingsPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <div className="w-2 h-2 rounded-full bg-orange-500"></div>
-                      <Label className="text-sm font-semibold text-foreground">منطقة رمادية (إجباري)</Label>
+                      <Label className="text-sm font-semibold text-foreground">{t('admin.advancedSettings.grayAreaThreshold')}</Label>
                     </div>
                     <p className="text-[10px] text-muted-foreground">
-                      أقل من هذا الحد، يجب على المستخدم اختيار نوع المشكلة. تظهر فقط المسارات المربوطة بالسؤال المختار
+                      {t('admin.advancedSettings.grayAreaThresholdDesc')}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
@@ -1255,7 +1257,7 @@ export function AdvancedSettingsPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-primary">●</span>
-                  <span>{scoringSettings.scoreThresholds.showAdvanced}% - {scoringSettings.scoreThresholds.directAnswer - 1}% = وضع متقدم اختياري</span>
+                  <span>{scoringSettings.scoreThresholds.showAdvanced}% - {scoringSettings.scoreThresholds.directAnswer - 1}% = {t('admin.advancedSettings.optionalAdvanced')}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-orange-600 dark:text-orange-400">●</span>
@@ -1268,7 +1270,7 @@ export function AdvancedSettingsPage() {
           {/* Weights */}
           <div className="space-y-2 pt-4 border-t border-border">
             <div className="flex items-center justify-between">
-              <Label className="text-sm font-semibold text-foreground">أوزان العوامل</Label>
+              <Label className="text-sm font-semibold text-foreground">{t('admin.advancedSettings.weightsTitle')}</Label>
               <Button
                 variant="ghost"
                 size="sm"
@@ -1284,14 +1286,14 @@ export function AdvancedSettingsPage() {
                 className="text-xs h-8"
               >
                 <Plus className="size-3 ml-1" />
-                إضافة وزن
+                {t('admin.advancedSettings.addWeight')}
               </Button>
             </div>
             
             <div className="glass-card border border-border rounded-lg p-3 space-y-1.5 max-h-64 overflow-y-auto">
               {scoringSettings.weights.length === 0 ? (
                 <p className="text-xs text-muted-foreground text-center py-2">
-                  لا توجد أوزان محددة
+                  {t('admin.advancedSettings.noWeights')}
                 </p>
               ) : (
                 scoringSettings.weights.map((weight, index) => (
@@ -1361,9 +1363,9 @@ export function AdvancedSettingsPage() {
           {/* Decay Rate */}
           <div className="flex items-center justify-between p-3 glass-card rounded-lg border border-border">
             <div>
-              <p className="text-sm font-medium text-foreground">معدل التدهور (Decay Rate)</p>
+              <p className="text-sm font-medium text-foreground">{t('admin.advancedSettings.decayRate')}</p>
               <p className="text-[11px] text-muted-foreground">
-                عدد الأيام لتدهور النتيجة
+                {t('admin.advancedSettings.decayRateDesc')}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -1403,24 +1405,24 @@ export function AdvancedSettingsPage() {
       }}>
         <DialogContent
           className="glass-card flex max-h-[min(88vh,44rem)] w-full max-w-[min(100vw-2rem,32rem)] flex-col gap-0 overflow-hidden border-2 p-0 sm:max-w-xl"
-          dir="rtl"
+          dir={dir}
         >
           <DialogHeader className="shrink-0 space-y-1.5 border-b border-border px-6 pb-4 pt-6 text-right pe-12 sm:text-right">
             <DialogTitle className="text-right text-lg">
-              {editingRoute ? 'تعديل المسار' : 'إضافة مسار جديد'}
+              {editingRoute ? t('admin.advancedSettings.editRouteDialog') : t('admin.advancedSettings.addRouteDialog')}
             </DialogTitle>
             <DialogDescription className="text-right text-sm leading-relaxed">
-              {editingRoute 
-                ? 'قم بتعديل بيانات المسار'
-                : 'أدخل اسم المسار واختر الخطوات التي سيرتبط بها (اختياري)'}
+              {editingRoute
+                ? t('admin.advancedSettings.editRouteDesc')
+                : t('admin.advancedSettings.addRouteDesc')}
             </DialogDescription>
           </DialogHeader>
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-6 py-4">
             <div className="space-y-2">
-              <Label htmlFor="route-name">اسم المسار</Label>
+              <Label htmlFor="route-name">{t('admin.advancedSettings.routeNameLabel')}</Label>
               <Input
                 id="route-name"
-                placeholder="مثال: التسجيل، الدفع، التأشيرة..."
+                placeholder={t('admin.advancedSettings.routeNamePlaceholder')}
                 value={newRouteName}
                 onChange={(e) => setNewRouteName(e.target.value)}
                 className="glass-card border-2 border-border text-right"
@@ -1433,24 +1435,24 @@ export function AdvancedSettingsPage() {
                 <Target className="size-4 text-primary mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
                   <Label className="text-sm font-semibold text-foreground">
-                    ربط المسار بسياق المكالمة (اختياري)
+                    {t('admin.advancedSettings.routeContextTitle')}
                   </Label>
                   <p className="text-xs text-muted-foreground mt-1">
                     عند ترك الحقول فارغة → ينطبق المسار على جميع الفئات وأنواع الجهات.
                     إذا حدّدت قيماً → يظهر المسار في الوضع المتقدم فقط عند تطابق فئة الحالة / نوع الجهة.
                   </p>
                   <p className="text-xs text-primary mt-1">
-                    💡 مثال: لربط مسار "التأشيرة" بفئة "التأشيرة" فقط، أضف "التأشيرة" في "فئات الحالة".
+                    {t('admin.advancedSettings.routeContextExample')}
                   </p>
                 </div>
               </div>
 
               {/* Categories */}
               <div className="space-y-2">
-                <Label className="text-xs text-foreground">فئات الحالة المرتبطة</Label>
+                <Label className="text-xs text-foreground">{t('admin.advancedSettings.linkedCategories')}</Label>
                 <div className="flex gap-2">
                   <Input
-                    placeholder="اكتب اسم الفئة (مثال: التأشيرة) ثم اضغط Enter"
+                    placeholder={t('admin.advancedSettings.categoryPlaceholder')}
                     value={pendingCategoryInput}
                     onChange={(e) => setPendingCategoryInput(e.target.value)}
                     onKeyDown={(e) => {
@@ -1474,7 +1476,7 @@ export function AdvancedSettingsPage() {
                 </div>
                 {newRouteCategories.length === 0 ? (
                   <p className="text-xs text-muted-foreground italic">
-                    لا توجد فئات محددة — المسار ينطبق على جميع الفئات.
+                    {t('admin.advancedSettings.noCategories')}
                   </p>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
@@ -1500,7 +1502,7 @@ export function AdvancedSettingsPage() {
 
               {/* Entity Types */}
               <div className="space-y-2">
-                <Label className="text-xs text-foreground">أنواع الجهات المرتبطة</Label>
+                <Label className="text-xs text-foreground">{t('admin.advancedSettings.linkedEntities')}</Label>
                 <div className="flex flex-wrap gap-1.5">
                   {CALL_HELPER_ENTITY_TYPES.map((entityType) => {
                     const isSelected = newRouteEntityTypes.includes(entityType);
@@ -1523,7 +1525,7 @@ export function AdvancedSettingsPage() {
                 </div>
                 {newRouteEntityTypes.length === 0 && (
                   <p className="text-xs text-muted-foreground italic">
-                    لم يتم تحديد نوع جهة — المسار ينطبق على جميع الأنواع.
+                    {t('admin.advancedSettings.noEntities')}
                   </p>
                 )}
               </div>
@@ -1531,15 +1533,15 @@ export function AdvancedSettingsPage() {
 
             {/* Parent Steps Selector */}
             <div className="space-y-2">
-              <Label>ربط بخطوات سابقة (اختياري)</Label>
+              <Label>{t('admin.advancedSettings.parentStepsLabel')}</Label>
               <p className="text-xs text-muted-foreground mb-2">
-                💡 اختر الخطوات التي عند اختيارها سيفتح هذا المسار
+                {t('admin.advancedSettings.parentStepsHint')}
               </p>
               
               <div className="glass-card border-2 border-border rounded-lg p-3 max-h-64 overflow-y-auto space-y-2">
                 {steps.length === 0 ? (
                   <p className="text-xs text-muted-foreground text-center py-4">
-                    لا توجد خطوات متاحة للربط
+                    {t('admin.advancedSettings.noStepsToLink')}
                   </p>
                 ) : (
                   steps
@@ -1597,7 +1599,7 @@ export function AdvancedSettingsPage() {
                  }).length === 0 && 
                  steps.length > 0 && (
                   <p className="text-xs text-muted-foreground text-center py-4">
-                    لا توجد خطوات من مسارات أخرى متاحة للربط
+                    {t('admin.advancedSettings.noOtherRouteSteps')}
                   </p>
                 )}
               </div>
@@ -1636,11 +1638,11 @@ export function AdvancedSettingsPage() {
               setNewRouteEntityTypes([]);
               setPendingCategoryInput('');
             }}>
-              إلغاء
+              {t('admin.advancedSettings.cancel')}
             </Button>
             <Button onClick={editingRoute ? handleUpdateRoute : handleAddRoute} className="bg-primary text-primary-foreground text-white">
               <Plus className="size-4 ml-2" />
-              {editingRoute ? 'حفظ' : 'إضافة'}
+              {editingRoute ? t('admin.advancedSettings.save') : t('admin.advancedSettings.add')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1674,7 +1676,7 @@ export function AdvancedSettingsPage() {
             ].filter(Boolean);
 
             if (stepIds.length === 0) {
-              toast.error('لم يتم العثور على الخطوات المستهدفة');
+              toast.error(t('admin.advancedSettings.stepsNotFound'));
               return;
             }
 
@@ -1689,7 +1691,7 @@ export function AdvancedSettingsPage() {
               ''
             );
 
-            toast.success(`✅ تم إضافة الخطوة في ${stepIds.length} مسار`);
+            toast.success(t('admin.advancedSettings.stepAddedMulti', { count: stepIds.length }));
           } else {
             // Single route mode: Use normal addSubCondition
             addSubCondition(
@@ -1702,7 +1704,7 @@ export function AdvancedSettingsPage() {
               data.parentId || undefined
             );
 
-            toast.success('تم إضافة الخطوة بنجاح');
+            toast.success(t('admin.advancedSettings.stepAdded'));
           }
         }}
         onUpdate={(data) => {
@@ -1726,7 +1728,7 @@ export function AdvancedSettingsPage() {
             );
 
             const linkedCount = currentStep?.linkedStepIds?.length || 0;
-            toast.success(`✅ تم تحديث الخطوة في ${linkedCount + 1} مسار`);
+            toast.success(t('admin.advancedSettings.stepUpdatedMulti', { count: linkedCount + 1 }));
           } else {
             // Normal update (current only)
             updateSubCondition(
@@ -1739,7 +1741,7 @@ export function AdvancedSettingsPage() {
               }
             );
 
-            toast.success('تم تحديث الشرط');
+            toast.success(t('admin.advancedSettings.conditionUpdated'));
           }
         }}
         routes={routes}
@@ -1750,7 +1752,7 @@ export function AdvancedSettingsPage() {
 
       {/* Gray Area Question Route Linking Dialog */}
       <Dialog open={showRouteLinkDialog} onOpenChange={setShowRouteLinkDialog}>
-        <DialogContent className="glass-card border-2 max-h-[80vh] overflow-y-auto" dir="rtl">
+        <DialogContent className="glass-card border-2 max-h-[80vh] overflow-y-auto" dir={dir}>
           <DialogHeader>
             <DialogTitle className="text-right">
               ربط المسارات - {selectedQuestion?.title}

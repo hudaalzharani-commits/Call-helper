@@ -21,33 +21,22 @@ import { isPrivilegedStaff, isModeratorOrAdmin } from '../utils/appRoles';
 import { isGranularCreateEnabled } from '../utils/uiVisibility';
 import { cn } from './ui/utils';
 import { formatAppDate, formatAppDateTime } from '../utils/dateDisplay';
+import { useI18nLayout } from '../hooks/useI18nLayout';
+import type { TranslationKey } from '../i18n/translations';
 
 /** تباين أوضح داخل الـ Dialog (مثل نافذة «لماذا تظهر هنا؟») حتى لا يذوب النص في خلفية الثيم */
 const OPERATIONAL_DIALOG_PANEL =
   'max-h-[min(90vh,40rem)] overflow-y-auto shadow-2xl outline-none !border-border !bg-popover !text-popover-foreground';
 
-const OP_UPDATE_TYPE_AR: Record<OperationalUpdate['type'], string> = {
-  maintenance: 'صيانة',
-  incident: 'حادثة',
-  enhancement: 'تحسين',
-  announcement: 'إعلان',
-};
-
-const OP_UPDATE_STATUS_AR: Record<OperationalUpdate['status'], string> = {
-  scheduled: 'مجدول',
-  ongoing: 'جاري التنفيذ',
-  completed: 'مكتمل',
-  cancelled: 'ملغى',
-};
-
-const OP_UPDATE_PRIORITY_AR: Record<OperationalUpdate['priority'], string> = {
-  high: 'عالية',
-  medium: 'متوسطة',
-  low: 'منخفضة',
-};
-
 export function OperationalUpdates() {
   const { user } = useAuth();
+  const { t } = useI18nLayout();
+  const opTypeLabel = (type: OperationalUpdate['type']) =>
+    t(`operational.types.${type}` as TranslationKey);
+  const opStatusLabel = (status: OperationalUpdate['status']) =>
+    t(`operational.statuses.${status}` as TranslationKey);
+  const opPriorityLabel = (priority: OperationalUpdate['priority']) =>
+    t(`operational.priorities.${priority}` as TranslationKey);
   const canManage = isPrivilegedStaff(user?.role);
   const canDeleteOperational = isModeratorOrAdmin(user?.role);
   const canCreateOperational = isGranularCreateEnabled(user, 'action_operational_update_create');
@@ -88,7 +77,7 @@ export function OperationalUpdates() {
     } catch (error) {
       console.error('Error loading updates:', error);
       setUpdates([]);
-      toast.error(error instanceof Error ? error.message : 'تعذّر تحميل التحديثات التشغيلية');
+      toast.error(error instanceof Error ? error.message : t('operational.loadFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -99,55 +88,55 @@ export function OperationalUpdates() {
   // ========================
   const handleCreateUpdate = async () => {
     if (!canManage) {
-      toast.error('لا تملك صلاحية إضافة تحديث تشغيلي');
+      toast.error(t('operational.noPermissionAdd'));
       return;
     }
     try {
       await createOperationalUpdate(formData);
-      toast.success('تم إنشاء التحديث');
+      toast.success(t('operational.created'));
       setIsCreateDialogOpen(false);
       resetForm();
       await loadUpdates();
     } catch (error) {
       console.error('Error creating update:', error);
-      toast.error(error instanceof Error ? error.message : 'فشل الإنشاء');
+      toast.error(error instanceof Error ? error.message : t('operational.createFailed'));
     }
   };
 
   const handleUpdateUpdate = async () => {
     if (!selectedUpdate) return;
     if (!canManage) {
-      toast.error('لا تملك صلاحية التعديل');
+      toast.error(t('operational.noPermissionEdit'));
       return;
     }
 
     try {
       await updateOperationalUpdate(selectedUpdate.id, { ...formData, endDate: formData.endDate ?? null });
-      toast.success('تم حفظ التعديلات');
+      toast.success(t('operational.saved'));
       setIsEditDialogOpen(false);
       setSelectedUpdate(null);
       resetForm();
       await loadUpdates();
     } catch (error) {
       console.error('Error updating update:', error);
-      toast.error(error instanceof Error ? error.message : 'فشل التحديث');
+      toast.error(error instanceof Error ? error.message : t('operational.updateFailed'));
     }
   };
 
   const handleDeleteUpdate = async (id: string) => {
     if (!canDeleteOperational) {
-      toast.error('لا تملك صلاحية حذف التحديثات (المشرف أو المسؤول فقط)');
+      toast.error(t('operational.noPermissionDelete'));
       return;
     }
-    if (!confirm('هل أنت متأكد من حذف هذا التحديث؟')) return;
+    if (!confirm(t('operational.confirmDelete'))) return;
 
     try {
       await deleteOperationalUpdate(id);
-      toast.success('تم الحذف');
+      toast.success(t('operational.deleted'));
       await loadUpdates();
     } catch (error) {
       console.error('Error deleting update:', error);
-      toast.error(error instanceof Error ? error.message : 'فشل الحذف');
+      toast.error(error instanceof Error ? error.message : t('operational.deleteFailed'));
     }
   };
 
@@ -202,30 +191,16 @@ export function OperationalUpdates() {
       cancelled: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
     };
 
-    const labels = {
-      scheduled: 'مجدول',
-      ongoing: 'جاري التنفيذ',
-      completed: 'مكتمل',
-      cancelled: 'ملغى',
-    };
-
     return (
       <Badge className={variants[status]}>
-        {labels[status]}
+        {opStatusLabel(status)}
       </Badge>
     );
   };
 
-  const getTypeBadge = (type: OperationalUpdate['type']) => {
-    const labels = {
-      maintenance: 'صيانة',
-      incident: 'حادثة',
-      enhancement: 'تحسين',
-      announcement: 'إعلان',
-    };
-
-    return <Badge variant="outline">{labels[type]}</Badge>;
-  };
+  const getTypeBadge = (type: OperationalUpdate['type']) => (
+    <Badge variant="outline">{opTypeLabel(type)}</Badge>
+  );
 
   const getPriorityBadge = (priority: OperationalUpdate['priority']) => {
     const variants = {
@@ -234,15 +209,9 @@ export function OperationalUpdates() {
       low: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
     };
 
-    const labels = {
-      high: 'عالية',
-      medium: 'متوسطة',
-      low: 'منخفضة',
-    };
-
     return (
       <Badge className={variants[priority]}>
-        {labels[priority]}
+        {opPriorityLabel(priority)}
       </Badge>
     );
   };
@@ -258,9 +227,9 @@ export function OperationalUpdates() {
         u.type,
         u.status,
         u.priority,
-        OP_UPDATE_TYPE_AR[u.type],
-        OP_UPDATE_STATUS_AR[u.status],
-        OP_UPDATE_PRIORITY_AR[u.priority],
+        opTypeLabel(u.type),
+        opStatusLabel(u.status),
+        opPriorityLabel(u.priority),
         ...(u.affectedServices ?? []),
       ]
         .filter(Boolean)
@@ -268,7 +237,7 @@ export function OperationalUpdates() {
         .toLowerCase();
       return blob.includes(q);
     });
-  }, [updates, searchQuery]);
+  }, [updates, searchQuery, t]);
 
   // ========================
   // Render
@@ -280,7 +249,7 @@ export function OperationalUpdates() {
           <div className="p-3 bg-primary/10 rounded-xl">
             <RefreshCw className="size-8 text-primary" />
           </div>
-          <h1 className="text-foreground">التحديثات التشغيلية</h1>
+          <h1 className="text-foreground">{t('operational.title')}</h1>
         </div>
         {canCreateOperational && (
           <Button
@@ -288,7 +257,7 @@ export function OperationalUpdates() {
             className="shrink-0 bg-blue-600 hover:bg-blue-700"
           >
             <Plus className="size-4 ml-2" />
-            تحديث جديد
+            {t('operational.newUpdate')}
           </Button>
         )}
       </div>
@@ -299,11 +268,11 @@ export function OperationalUpdates() {
             <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="بحث… (عنوان، وصف، نوع، حالة، خدمات…)"
+              placeholder={t('operational.searchPlaceholder')}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="pr-10 text-right"
-              aria-label="بحث في التحديثات التشغيلية"
+              aria-label={t('operational.searchAria')}
             />
           </div>
         </CardContent>
@@ -314,39 +283,39 @@ export function OperationalUpdates() {
           <table className="w-full" dir="rtl">
             <thead>
               <tr className="bg-primary text-primary-foreground">
-                <th className="px-4 py-3 text-right text-sm font-semibold">العنوان</th>
-                <th className="px-4 py-3 text-right text-sm font-semibold whitespace-nowrap">النوع</th>
-                <th className="px-4 py-3 text-right text-sm font-semibold whitespace-nowrap">الحالة</th>
-                <th className="px-4 py-3 text-right text-sm font-semibold whitespace-nowrap">الأولوية</th>
-                <th className="px-4 py-3 text-right text-sm font-semibold whitespace-nowrap">تاريخ البدء</th>
-                <th className="px-4 py-3 text-right text-sm font-semibold whitespace-nowrap">تاريخ الانتهاء</th>
-                <th className="px-4 py-3 text-right text-sm font-semibold">الخدمات المتأثرة</th>
-                <th className="px-4 py-3 text-right text-sm font-semibold whitespace-nowrap">المنشئ</th>
-                <th className="px-4 py-3 text-right text-sm font-semibold whitespace-nowrap">تاريخ الإنشاء</th>
-                <th className="px-4 py-3 text-right text-sm font-semibold whitespace-nowrap">إجراءات</th>
+                <th className="px-4 py-3 text-right text-sm font-semibold">{t('operational.colTitle')}</th>
+                <th className="px-4 py-3 text-right text-sm font-semibold whitespace-nowrap">{t('operational.colType')}</th>
+                <th className="px-4 py-3 text-right text-sm font-semibold whitespace-nowrap">{t('operational.colStatus')}</th>
+                <th className="px-4 py-3 text-right text-sm font-semibold whitespace-nowrap">{t('operational.colPriority')}</th>
+                <th className="px-4 py-3 text-right text-sm font-semibold whitespace-nowrap">{t('operational.colStart')}</th>
+                <th className="px-4 py-3 text-right text-sm font-semibold whitespace-nowrap">{t('operational.colEnd')}</th>
+                <th className="px-4 py-3 text-right text-sm font-semibold">{t('operational.colServices')}</th>
+                <th className="px-4 py-3 text-right text-sm font-semibold whitespace-nowrap">{t('operational.colAuthor')}</th>
+                <th className="px-4 py-3 text-right text-sm font-semibold whitespace-nowrap">{t('operational.colCreated')}</th>
+                <th className="px-4 py-3 text-right text-sm font-semibold whitespace-nowrap">{t('operational.colActions')}</th>
               </tr>
             </thead>
             <tbody className="bg-background">
               {isLoading ? (
                 <tr>
                   <td colSpan={10} className="py-12 text-center">
-                    <p className="text-muted-foreground">جاري التحميل...</p>
+                    <p className="text-muted-foreground">{t('actions.loading')}</p>
                   </td>
                 </tr>
               ) : updates.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="py-12 text-center">
                     <RefreshCw className="mx-auto mb-4 size-12 text-muted-foreground" />
-                    <p className="text-muted-foreground">لا توجد تحديثات</p>
+                    <p className="text-muted-foreground">{t('operational.empty')}</p>
                   </td>
                 </tr>
               ) : filteredUpdates.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="py-12 text-center">
                     <Search className="mx-auto mb-4 size-12 text-muted-foreground" />
-                    <p className="mb-3 text-muted-foreground">لا توجد نتائج مطابقة للبحث</p>
+                    <p className="mb-3 text-muted-foreground">{t('operational.noSearchResults')}</p>
                     <Button type="button" variant="outline" size="sm" onClick={() => setSearchQuery('')}>
-                      مسح البحث
+                      {t('operational.clearSearch')}
                     </Button>
                   </td>
                 </tr>
@@ -414,7 +383,7 @@ export function OperationalUpdates() {
                             onClick={() => openEditDialog(update)}
                           >
                             <Edit className="size-3 ml-1" />
-                            تعديل
+                            {t('actions.edit')}
                           </Button>
                           {canDeleteOperational ? (
                             <Button
@@ -425,7 +394,7 @@ export function OperationalUpdates() {
                               onClick={() => handleDeleteUpdate(update.id)}
                             >
                               <Trash2 className="size-3 ml-1" />
-                              حذف
+                              {t('actions.delete')}
                             </Button>
                           ) : null}
                         </div>
@@ -446,36 +415,36 @@ export function OperationalUpdates() {
         <DialogContent className={cn('max-w-2xl', OPERATIONAL_DIALOG_PANEL)} dir="rtl">
           <DialogHeader>
             <DialogTitle className="text-right text-xl text-foreground">
-              تحديث تشغيلي جديد
+              {t('operational.addDialog')}
             </DialogTitle>
             <DialogDescription className="text-right text-base leading-relaxed text-muted-foreground">
-              أضف تحديثاً تشغيلياً جديداً
+              {t('operational.addDialogDesc')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4 text-base leading-relaxed [&_label]:font-medium [&_label]:text-foreground">
             <div className="space-y-2">
-              <Label htmlFor="title" className="text-right block">العنوان</Label>
+              <Label htmlFor="title" className="text-right block">{t('operational.colTitle')}</Label>
               <Input
                 id="title"
                 value={formData.title}
                 onChange={e => setFormData({ ...formData, title: e.target.value })}
                 className="text-right"
-                placeholder="عنوان التحديث..."
+                placeholder={t('operational.titlePlaceholder')}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="description" className="text-right block">الوصف</Label>
+              <Label htmlFor="description" className="text-right block">{t('operational.description')}</Label>
               <Textarea
                 id="description"
                 value={formData.description}
                 onChange={e => setFormData({ ...formData, description: e.target.value })}
                 className="text-right min-h-[100px]"
-                placeholder="وصف تفصيلي..."
+                placeholder={t('operational.descPlaceholder')}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-right block">النوع</Label>
+                <Label className="text-right block">{t('operational.type')}</Label>
                 <Select
                   value={formData.type}
                   onValueChange={(value: any) => setFormData({ ...formData, type: value })}
@@ -484,15 +453,15 @@ export function OperationalUpdates() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent dir="rtl">
-                    <SelectItem value="maintenance">صيانة</SelectItem>
-                    <SelectItem value="incident">حادثة</SelectItem>
-                    <SelectItem value="enhancement">تحسين</SelectItem>
-                    <SelectItem value="announcement">إعلان</SelectItem>
+                    <SelectItem value="maintenance">{opTypeLabel('maintenance')}</SelectItem>
+                    <SelectItem value="incident">{opTypeLabel('incident')}</SelectItem>
+                    <SelectItem value="enhancement">{opTypeLabel('enhancement')}</SelectItem>
+                    <SelectItem value="announcement">{opTypeLabel('announcement')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="text-right block">الأولوية</Label>
+                <Label className="text-right block">{t('operational.priority')}</Label>
                 <Select
                   value={formData.priority}
                   onValueChange={(value: any) => setFormData({ ...formData, priority: value })}
@@ -501,16 +470,16 @@ export function OperationalUpdates() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent dir="rtl">
-                    <SelectItem value="high">عالية</SelectItem>
-                    <SelectItem value="medium">متوسطة</SelectItem>
-                    <SelectItem value="low">منخفضة</SelectItem>
+                    <SelectItem value="high">{opPriorityLabel('high')}</SelectItem>
+                    <SelectItem value="medium">{opPriorityLabel('medium')}</SelectItem>
+                    <SelectItem value="low">{opPriorityLabel('low')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-right block">الحالة</Label>
+                <Label className="text-right block">{t('operational.status')}</Label>
                 <Select
                   value={formData.status}
                   onValueChange={(value: OperationalUpdate['status']) => setFormData({ ...formData, status: value })}
@@ -519,16 +488,16 @@ export function OperationalUpdates() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent dir="rtl">
-                    <SelectItem value="scheduled">مجدول</SelectItem>
-                    <SelectItem value="ongoing">جاري التنفيذ</SelectItem>
-                    <SelectItem value="completed">مكتمل</SelectItem>
-                    <SelectItem value="cancelled">ملغى</SelectItem>
+                    <SelectItem value="scheduled">{opStatusLabel('scheduled')}</SelectItem>
+                    <SelectItem value="ongoing">{opStatusLabel('ongoing')}</SelectItem>
+                    <SelectItem value="completed">{opStatusLabel('completed')}</SelectItem>
+                    <SelectItem value="cancelled">{opStatusLabel('cancelled')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="end-date-create" className="text-right block">
-                  تاريخ الانتهاء (اختياري)
+                  {t('operational.endDateOptional')}
                 </Label>
                 <Input
                   id="end-date-create"
@@ -549,22 +518,22 @@ export function OperationalUpdates() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="services" className="text-right block">الخدمات المتأثرة (مفصولة بفواصل)</Label>
+              <Label htmlFor="services" className="text-right block">{t('operational.servicesLabel')}</Label>
               <Input
                 id="services"
                 value={formData.affectedServices.join(', ')}
                 onChange={e => setFormData({ ...formData, affectedServices: e.target.value.split(/[،,]/).map(s => s.trim()) })}
                 className="text-right"
-                placeholder="مثال: نظام الحجز, البوابة الإلكترونية"
+                placeholder={t('operational.servicesPlaceholder')}
               />
             </div>
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-              إلغاء
+              {t('actions.cancel')}
             </Button>
             <Button onClick={handleCreateUpdate} className="bg-blue-600 hover:bg-blue-700">
-              إضافة
+              {t('actions.add')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -574,14 +543,14 @@ export function OperationalUpdates() {
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className={cn('max-w-2xl', OPERATIONAL_DIALOG_PANEL)} dir="rtl">
           <DialogHeader>
-            <DialogTitle className="text-right text-xl text-foreground">تعديل التحديث</DialogTitle>
+            <DialogTitle className="text-right text-xl text-foreground">{t('operational.editDialog')}</DialogTitle>
             <DialogDescription className="text-right text-base leading-relaxed text-muted-foreground">
-              تعديل بيانات التحديث التشغيلي
+              {t('operational.editDialogDesc')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4 text-base leading-relaxed [&_label]:font-medium [&_label]:text-foreground">
             <div className="space-y-2">
-              <Label htmlFor="edit-title" className="text-right block">العنوان</Label>
+              <Label htmlFor="edit-title" className="text-right block">{t('operational.colTitle')}</Label>
               <Input
                 id="edit-title"
                 value={formData.title}
@@ -590,7 +559,7 @@ export function OperationalUpdates() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-description" className="text-right block">الوصف</Label>
+              <Label htmlFor="edit-description" className="text-right block">{t('operational.description')}</Label>
               <Textarea
                 id="edit-description"
                 value={formData.description}
@@ -600,7 +569,7 @@ export function OperationalUpdates() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-right block">النوع</Label>
+                <Label className="text-right block">{t('operational.type')}</Label>
                 <Select
                   value={formData.type}
                   onValueChange={(value: any) => setFormData({ ...formData, type: value })}
@@ -609,15 +578,15 @@ export function OperationalUpdates() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent dir="rtl">
-                    <SelectItem value="maintenance">صيانة</SelectItem>
-                    <SelectItem value="incident">حادثة</SelectItem>
-                    <SelectItem value="enhancement">تحسين</SelectItem>
-                    <SelectItem value="announcement">إعلان</SelectItem>
+                    <SelectItem value="maintenance">{opTypeLabel('maintenance')}</SelectItem>
+                    <SelectItem value="incident">{opTypeLabel('incident')}</SelectItem>
+                    <SelectItem value="enhancement">{opTypeLabel('enhancement')}</SelectItem>
+                    <SelectItem value="announcement">{opTypeLabel('announcement')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="text-right block">الأولوية</Label>
+                <Label className="text-right block">{t('operational.priority')}</Label>
                 <Select
                   value={formData.priority}
                   onValueChange={(value: any) => setFormData({ ...formData, priority: value })}
@@ -626,16 +595,16 @@ export function OperationalUpdates() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent dir="rtl">
-                    <SelectItem value="high">عالية</SelectItem>
-                    <SelectItem value="medium">متوسطة</SelectItem>
-                    <SelectItem value="low">منخفضة</SelectItem>
+                    <SelectItem value="high">{opPriorityLabel('high')}</SelectItem>
+                    <SelectItem value="medium">{opPriorityLabel('medium')}</SelectItem>
+                    <SelectItem value="low">{opPriorityLabel('low')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-right block">الحالة</Label>
+                <Label className="text-right block">{t('operational.status')}</Label>
                 <Select
                   value={formData.status}
                   onValueChange={(value: OperationalUpdate['status']) => setFormData({ ...formData, status: value })}
@@ -644,16 +613,16 @@ export function OperationalUpdates() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent dir="rtl">
-                    <SelectItem value="scheduled">مجدول</SelectItem>
-                    <SelectItem value="ongoing">جاري التنفيذ</SelectItem>
-                    <SelectItem value="completed">مكتمل</SelectItem>
-                    <SelectItem value="cancelled">ملغى</SelectItem>
+                    <SelectItem value="scheduled">{opStatusLabel('scheduled')}</SelectItem>
+                    <SelectItem value="ongoing">{opStatusLabel('ongoing')}</SelectItem>
+                    <SelectItem value="completed">{opStatusLabel('completed')}</SelectItem>
+                    <SelectItem value="cancelled">{opStatusLabel('cancelled')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-end" className="text-right block">
-                  تاريخ الانتهاء (اختياري)
+                  {t('operational.endDateOptional')}
                 </Label>
                 <Input
                   id="edit-end"
@@ -675,7 +644,7 @@ export function OperationalUpdates() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-services" className="text-right block">
-                الخدمات المتأثرة (مفصولة بفواصل)
+                {t('operational.servicesLabel')}
               </Label>
               <Input
                 id="edit-services"
@@ -684,16 +653,16 @@ export function OperationalUpdates() {
                   setFormData({ ...formData, affectedServices: e.target.value.split(/[،,]/).map(s => s.trim()) })
                 }
                 className="text-right"
-                placeholder="مثال: نظام الحجز, البوابة الإلكترونية"
+                placeholder={t('operational.servicesPlaceholder')}
               />
             </div>
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              إلغاء
+              {t('actions.cancel')}
             </Button>
             <Button onClick={handleUpdateUpdate} className="bg-blue-600 hover:bg-blue-700">
-              حفظ التعديلات
+              {t('actions.save')}
             </Button>
           </DialogFooter>
         </DialogContent>

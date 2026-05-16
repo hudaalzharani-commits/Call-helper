@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+﻿import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   BookOpen,
   Search,
@@ -12,6 +12,8 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useI18nLayout } from '../hooks/useI18nLayout';
+import { tCategory } from '../i18n/translations';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -35,6 +37,8 @@ import {
   type BackendReferenceCase,
 } from '../services/knowledgeBaseService';
 import { useAuth } from '../contexts/AuthContext';
+import { isPrivilegedStaff } from '../utils/appRoles';
+import { isGranularCreateEnabled } from '../utils/uiVisibility';
 import { formatAppDate } from '../utils/dateDisplay';
 import { stripTrainingAttachmentFooter } from '../utils/trainingScenarioAttachment';
 import { getDistributionStats, type DistributionStats } from '../services/analyticsService';
@@ -42,20 +46,7 @@ import { listOperationalUpdates } from '../services/operationalUpdatesService';
 import { listTrainingEntries } from '../services/trainingEntriesService';
 import type { OperationalUpdate, TrainingEntry } from '../types';
 
-const KB_CATEGORY_LABEL_AR: Record<string, string> = {
-  technical: 'تقني',
-  billing: 'فواتير',
-  general: 'عام',
-  registration: 'تسجيل',
-  umrah: 'عمرة',
-  agent: 'وكيل',
-};
-
-const KB_CATEGORY_KEYS = Object.keys(KB_CATEGORY_LABEL_AR) as Array<keyof typeof KB_CATEGORY_LABEL_AR>;
-
-function kbCategoryLabel(cat: string) {
-  return KB_CATEGORY_LABEL_AR[cat] || cat;
-}
+const KB_CATEGORY_KEYS = ['technical', 'billing', 'general', 'registration', 'umrah', 'agent'] as const;
 
 function normCat(s: string) {
   return s.trim().toLowerCase();
@@ -78,7 +69,12 @@ export function KnowledgeBase({
   onConsumeExternalCategoryFocus?: () => void;
 } = {}) {
   const { user } = useAuth();
-  const canManage = user?.role === 'admin' || user?.role === 'moderator';
+  const { t, dir, isRtl, textAlign, inputPad, iconSide, justifyEnd } = useI18nLayout();
+
+  const kbCategoryLabel = useCallback((cat: string) => tCategory(t, cat), [t]);
+  const canEditKnowledge = isPrivilegedStaff(user?.role);
+  const canCreateKnowledgeArticle = isGranularCreateEnabled(user, 'action_knowledge_article_create');
+  const canDeleteKnowledge = user?.role === 'admin';
 
   const [articles, setArticles] = useState<KnowledgeArticle[]>([]);
   const [filteredArticles, setFilteredArticles] = useState<KnowledgeArticle[]>([]);
@@ -582,18 +578,9 @@ export function KnowledgeBase({
     return 'database';
   };
 
-  const RECORD_SOURCE_LABEL: Record<RecordSourceKind, string> = {
-    database: 'من قاعدة البيانات',
-    archive: 'من الأرشيف',
-    rafeeq_training: 'من وش تعلم رفيق؟',
-    operational_feed: 'من التحديثات التشغيلية',
-    kb_operational_origin: 'من تحديث تشغيلي (مقال معرفة)',
-    common_issues: 'من المشاكل العامة',
-  };
-
   const recordSourceBadge = (article: KnowledgeArticle) => {
     const k = recordSourceKind(article);
-    const label = RECORD_SOURCE_LABEL[k];
+    const label = t(`knowledge.sources.${k}`);
     const cls =
       k === 'archive'
         ? 'bg-slate-500/15 text-slate-800 dark:text-slate-200 border-slate-500/30'
@@ -615,40 +602,40 @@ export function KnowledgeBase({
     if (article.status === 'archived') {
       return (
         <Badge className="text-xs bg-slate-500/15 text-slate-800 dark:text-slate-200 border border-slate-500/30">
-          <Archive className="size-3 inline ml-1" />
-          مؤرشف
+          <Archive className="size-3 inline ms-1" />
+          {t('knowledge.status.archived')}
         </Badge>
       );
     }
     if (article.status === 'draft') {
       return (
         <Badge className="text-xs bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-500/30">
-          <Archive className="size-3 inline ml-1" />
-          {article.source === 'reference_case' ? 'موقوف' : 'أرشيف / مسودة'}
+          <Archive className="size-3 inline ms-1" />
+          {article.source === 'reference_case' ? t('knowledge.status.suspended') : t('knowledge.status.draft')}
         </Badge>
       );
     }
     return (
       <Badge className="text-xs bg-emerald-500/15 text-emerald-800 dark:text-emerald-200 border border-emerald-500/30">
-        <CheckCircle2 className="size-3 inline ml-1" />
-        {article.source === 'reference_case' ? 'نشط' : 'منشور'}
+        <CheckCircle2 className="size-3 inline ms-1" />
+        {article.source === 'reference_case' ? t('knowledge.status.active') : t('knowledge.status.published')}
       </Badge>
     );
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir="rtl">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-primary/10 rounded-xl">
             <BookOpen className="size-8 text-primary" />
           </div>
-          <h1 className="text-foreground">سجل المعرفة</h1>
+          <h1 className="text-foreground">{t('knowledge.title')}</h1>
         </div>
-        {canManage && (
+        {canCreateKnowledgeArticle && (
           <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700 shrink-0">
             <Plus className="size-4 ml-2" />
-            مقال جديد
+            {t('knowledge.newEntry')}
           </Button>
         )}
       </div>
@@ -658,33 +645,33 @@ export function KnowledgeBase({
           <Tabs value={visibilityTab} onValueChange={v => setVisibilityTab(v as VisibilityTab)} dir="rtl">
             <TabsList className="w-full grid grid-cols-3 h-auto flex-wrap gap-1">
               <TabsTrigger value="all" className="text-xs sm:text-sm">
-                الكل ({counts.all})
+                {t('knowledge.tabs.all')} ({counts.all})
               </TabsTrigger>
               <TabsTrigger value="published" className="text-xs sm:text-sm">
-                المنشور ({counts.published})
+                {t('knowledge.tabs.published')} ({counts.published})
               </TabsTrigger>
               <TabsTrigger value="draft" className="text-xs sm:text-sm">
-                أرشيف / موقوف ({counts.draft})
+                {t('knowledge.tabs.draft')} ({counts.draft})
               </TabsTrigger>
             </TabsList>
           </Tabs>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="relative">
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <Search className={`absolute ${iconSide} top-1/2 -translate-y-1/2 size-4 text-muted-foreground`} />
               <Input
-                placeholder="بحث في العنوان والوصف والوسوم…"
+                placeholder={t('knowledge.searchPlaceholder')}
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="pr-10 text-right"
+                className={`${inputPad} ${textAlign}`}
               />
             </div>
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="text-right">
-                <SelectValue placeholder="الفئة" />
+              <SelectTrigger className={textAlign}>
+                <SelectValue placeholder={t('knowledge.category')} />
               </SelectTrigger>
               <SelectContent dir="rtl">
-                <SelectItem value="all">جميع الفئات</SelectItem>
+                <SelectItem value="all">{t('knowledge.allCategories')}</SelectItem>
                 {KB_CATEGORY_KEYS.map(key => (
                   <SelectItem key={key} value={key}>
                     {kbCategoryLabel(key)}
@@ -701,29 +688,29 @@ export function KnowledgeBase({
           <table className="w-full" dir="rtl">
             <thead>
               <tr className="bg-primary text-primary-foreground">
-                <th className="px-4 py-3 text-right text-sm font-semibold">العنوان</th>
-                <th className="px-4 py-3 text-right text-sm font-semibold whitespace-nowrap">النوع</th>
-                <th className="px-4 py-3 text-right text-sm font-semibold whitespace-nowrap">الفئة</th>
-                <th className="px-4 py-3 text-right text-sm font-semibold whitespace-nowrap">المصدر</th>
-                <th className="px-4 py-3 text-right text-sm font-semibold whitespace-nowrap">المؤلف</th>
-                <th className="px-4 py-3 text-right text-sm font-semibold whitespace-nowrap">آخر تحديث</th>
-                <th className="px-4 py-3 text-right text-sm font-semibold whitespace-nowrap">مشاهدات</th>
-                <th className="px-4 py-3 text-right text-sm font-semibold whitespace-nowrap">مفيد</th>
-                <th className="px-4 py-3 text-right text-sm font-semibold whitespace-nowrap">إجراءات</th>
+                <th className={`px-4 py-3 ${textAlign} text-sm font-semibold`}>{t('knowledge.table.title')}</th>
+                <th className={`px-4 py-3 ${textAlign} text-sm font-semibold whitespace-nowrap`}>{t('knowledge.table.type')}</th>
+                <th className={`px-4 py-3 ${textAlign} text-sm font-semibold whitespace-nowrap`}>{t('knowledge.table.category')}</th>
+                <th className={`px-4 py-3 ${textAlign} text-sm font-semibold whitespace-nowrap`}>{t('knowledge.table.source')}</th>
+                <th className={`px-4 py-3 ${textAlign} text-sm font-semibold whitespace-nowrap`}>{t('knowledge.table.author')}</th>
+                <th className={`px-4 py-3 ${textAlign} text-sm font-semibold whitespace-nowrap`}>{t('knowledge.table.updated')}</th>
+                <th className={`px-4 py-3 ${textAlign} text-sm font-semibold whitespace-nowrap`}>{t('knowledge.table.views')}</th>
+                <th className={`px-4 py-3 ${textAlign} text-sm font-semibold whitespace-nowrap`}>{t('knowledge.table.helpful')}</th>
+                <th className={`px-4 py-3 ${textAlign} text-sm font-semibold whitespace-nowrap`}>{t('knowledge.table.actions')}</th>
               </tr>
             </thead>
             <tbody className="bg-background">
               {isLoading ? (
                 <tr>
                   <td colSpan={9} className="py-12 text-center">
-                    <p className="text-muted-foreground">جاري التحميل...</p>
+                    <p className="text-muted-foreground">{t('knowledge.loading')}</p>
                   </td>
                 </tr>
               ) : filteredArticles.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="py-12 text-center">
                     <BookOpen className="mx-auto mb-4 size-12 text-muted-foreground" />
-                    <p className="text-muted-foreground">لا توجد مقالات مطابقة</p>
+                    <p className="text-muted-foreground">{t('knowledge.empty')}</p>
                   </td>
                 </tr>
               ) : (
@@ -732,7 +719,7 @@ export function KnowledgeBase({
                     key={article.id}
                     className={`border-b border-border ${index % 2 === 0 ? 'bg-muted/30' : 'bg-background'}`}
                   >
-                    <td className="max-w-[min(28rem,40vw)] px-4 py-3 align-top text-right">
+                    <td className={`max-w-[min(28rem,40vw)] px-4 py-3 align-top ${textAlign}`}>
                       <div className="line-clamp-2 font-medium text-foreground">{article.title}</div>
                       <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                         {article.descriptionSnippet || article.content}
@@ -741,23 +728,23 @@ export function KnowledgeBase({
                     <td className="px-4 py-3 align-top text-right whitespace-nowrap">
                       {article.source === 'reference_case' ? (
                         <Badge variant="secondary" className="text-xs border-primary/30">
-                          حالة مرجع
+                          {t('knowledge.types.referenceCase')}
                         </Badge>
                       ) : article.source === 'common_issue' ? (
                         <Badge variant="outline" className="text-xs border-rose-500/40 text-rose-900 dark:text-rose-100">
-                          مشكلة عامة
+                          {t('knowledge.types.commonIssue')}
                         </Badge>
                       ) : article.source === 'operational_update' ? (
                         <Badge variant="outline" className="text-xs border-sky-500/40 text-sky-900 dark:text-sky-100">
-                          تحديث تشغيلي
+                          {t('knowledge.types.operationalUpdate')}
                         </Badge>
                       ) : article.source === 'training_entry' ? (
                         <Badge variant="outline" className="text-xs border-violet-500/40 text-violet-900 dark:text-violet-100">
-                          وش تعلم رفيق
+                          {t('knowledge.types.training')}
                         </Badge>
                       ) : (
                         <Badge variant="outline" className="text-xs">
-                          مقال معرفة
+                          {t('knowledge.types.article')}
                         </Badge>
                       )}
                     </td>
@@ -780,9 +767,9 @@ export function KnowledgeBase({
                         className="inline-flex items-center gap-1 text-sm tabular-nums text-foreground"
                         title={
                           article.source === 'reference_case'
-                            ? 'مرات التطابق'
+                            ? t('knowledge.tooltips.matchCount')
                             : article.source === 'common_issue'
-                              ? 'عدد التكرار في المكالمات'
+                              ? t('knowledge.tooltips.repeatCount')
                               : undefined
                         }
                       >
@@ -803,13 +790,13 @@ export function KnowledgeBase({
                     <td className="px-4 py-3 align-top text-right">
                       <div className="flex flex-wrap justify-end gap-1.5">
                         <Button type="button" size="sm" variant="outline" className="h-8 text-xs" onClick={() => handleViewArticle(article)}>
-                          عرض
+                          {t('knowledge.actions.view')}
                         </Button>
-                        {canManage && article.source === 'knowledge' && (
+                        {canEditKnowledge && article.source === 'knowledge' && (
                           <>
                             <Button type="button" size="sm" variant="outline" className="h-8 text-xs" onClick={() => openEditDialog(article)}>
-                              <Edit className="size-3 ml-1" />
-                              تعديل
+                              <Edit className="size-3 ms-1" />
+                              {t('knowledge.actions.edit')}
                             </Button>
                             {article.status !== 'published' && (
                               <Button
@@ -819,10 +806,11 @@ export function KnowledgeBase({
                                 className="h-8 text-xs"
                                 onClick={() => setPublished(article, true)}
                               >
-                                <CheckCircle2 className="size-3 ml-1" />
-                                نشر
+                                <CheckCircle2 className="size-3 ms-1" />
+                                {t('knowledge.actions.publish')}
                               </Button>
                             )}
+                            {canDeleteKnowledge && (
                             <Button
                               type="button"
                               size="sm"
@@ -830,9 +818,10 @@ export function KnowledgeBase({
                               className="h-8 text-xs text-destructive"
                               onClick={() => handleDeleteArticle(article)}
                             >
-                              <Trash2 className="size-3 ml-1" />
-                              حذف
+                              <Trash2 className="size-3 ms-1" />
+                              {t('knowledge.actions.delete')}
                             </Button>
+                            )}
                           </>
                         )}
                       </div>
@@ -850,12 +839,12 @@ export function KnowledgeBase({
           {selectedArticle && (
             <>
               <DialogHeader>
-                <DialogTitle className="text-right text-2xl mb-2">{selectedArticle.title}</DialogTitle>
-                <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground justify-end">
+                <DialogTitle className={`${textAlign} text-2xl mb-2`}>{selectedArticle.title}</DialogTitle>
+                <div className={`flex flex-wrap items-center gap-2 text-sm text-muted-foreground ${justifyEnd}`}>
                   {recordSourceBadge(selectedArticle)}
                   {statusBadge(selectedArticle)}
                   {selectedArticle.source === 'reference_case' && (
-                    <Badge variant="secondary">حالة مرجع (Case)</Badge>
+                    <Badge variant="secondary">{t('knowledge.types.referenceCaseFull')}</Badge>
                   )}
                   <Badge variant="outline">{kbCategoryLabel(selectedArticle.category)}</Badge>
                   <span>•</span>
@@ -864,13 +853,13 @@ export function KnowledgeBase({
                   <span>{formatAppDate(selectedArticle.createdAt)}</span>
                 </div>
               </DialogHeader>
-              <div className="py-6 text-right prose prose-slate dark:prose-invert max-w-none">
+              <div className={`py-6 ${textAlign} prose prose-slate dark:prose-invert max-w-none`}>
                 <div className="whitespace-pre-wrap">{selectedArticle.content}</div>
               </div>
               {selectedArticle.source === 'knowledge' && (
                 <div className="border-t pt-4">
-                  <p className="text-sm text-muted-foreground mb-3 text-right">هل كانت هذه المقالة مفيدة؟</p>
-                  <div className="flex items-center gap-3 justify-end">
+                  <p className={`text-sm text-muted-foreground mb-3 ${textAlign}`}>{t('knowledge.view.helpfulQuestion')}</p>
+                  <div className={`flex items-center gap-3 ${justifyEnd}`}>
                     <Button
                       variant="outline"
                       size="sm"
@@ -878,7 +867,7 @@ export function KnowledgeBase({
                       className="flex items-center gap-2"
                     >
                       <ThumbsUp className="size-4" />
-                      نعم ({selectedArticle.helpful})
+                      {t('knowledge.view.yes')} ({selectedArticle.helpful})
                     </Button>
                     <Button
                       variant="outline"
@@ -887,15 +876,15 @@ export function KnowledgeBase({
                       className="flex items-center gap-2"
                     >
                       <ThumbsDown className="size-4" />
-                      لا ({selectedArticle.notHelpful})
+                      {t('knowledge.view.no')} ({selectedArticle.notHelpful})
                     </Button>
                   </div>
                 </div>
               )}
               {selectedArticle.tags.length > 0 && (
                 <div className="border-t pt-4">
-                  <p className="text-sm text-muted-foreground mb-2 text-right">الوسوم:</p>
-                  <div className="flex flex-wrap gap-2 justify-end">
+                  <p className={`text-sm text-muted-foreground mb-2 ${textAlign}`}>{t('knowledge.view.tags')}</p>
+                  <div className={`flex flex-wrap gap-2 ${justifyEnd}`}>
                     {selectedArticle.tags.map((tag, idx) => (
                       <Badge key={idx} variant="secondary">
                         {tag}
@@ -912,27 +901,27 @@ export function KnowledgeBase({
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent className="max-w-3xl" dir="rtl">
           <DialogHeader>
-            <DialogTitle className="text-right">مقال جديد</DialogTitle>
-            <DialogDescription className="text-right">أضف مقالاً إلى قاعدة المعرفة (منشور افتراضياً)</DialogDescription>
+            <DialogTitle className={textAlign}>{t('knowledge.newEntryDialog')}</DialogTitle>
+            <DialogDescription className={textAlign}>{t('knowledge.newEntryDescription')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="title" className="text-right block">
-                العنوان
+              <Label htmlFor="title" className={`${textAlign} block`}>
+                {t('knowledge.form.title')}
               </Label>
               <Input
                 id="title"
                 value={formData.title}
                 onChange={e => setFormData({ ...formData, title: e.target.value })}
-                className="text-right"
-                placeholder="عنوان المقال..."
+                className={textAlign}
+                placeholder={t('knowledge.form.titlePlaceholder')}
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-right block">الفئة</Label>
+              <Label className={`${textAlign} block`}>{t('knowledge.category')}</Label>
               <Select value={formData.category || 'general'} onValueChange={v => setFormData({ ...formData, category: v })}>
-                <SelectTrigger className="text-right">
-                  <SelectValue placeholder="الفئة" />
+                <SelectTrigger className={textAlign}>
+                  <SelectValue placeholder={t('knowledge.category')} />
                 </SelectTrigger>
                 <SelectContent dir="rtl">
                   {KB_CATEGORY_KEYS.map(key => (
@@ -944,38 +933,38 @@ export function KnowledgeBase({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="content" className="text-right block">
-                المحتوى
+              <Label htmlFor="content" className={`${textAlign} block`}>
+                {t('knowledge.form.content')}
               </Label>
               <Textarea
                 id="content"
                 value={formData.content}
                 onChange={e => setFormData({ ...formData, content: e.target.value })}
-                className="text-right min-h-[280px]"
-                placeholder="محتوى المقال..."
+                className={`${textAlign} min-h-[280px]`}
+                placeholder={t('knowledge.form.contentPlaceholder')}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="tags" className="text-right block">
-                الوسوم (مفصولة بفواصل)
+              <Label htmlFor="tags" className={`${textAlign} block`}>
+                {t('knowledge.form.tags')}
               </Label>
               <Input
                 id="tags"
                 value={formData.tags.join(', ')}
                 onChange={e =>
-                  setFormData({ ...formData, tags: e.target.value.split(/[،,]/).map(t => t.trim()).filter(Boolean) })
+                  setFormData({ ...formData, tags: e.target.value.split(/[،,]/).map(tag => tag.trim()).filter(Boolean) })
                 }
-                className="text-right"
-                placeholder="مثال: حجز, دفع"
+                className={textAlign}
+                placeholder={t('knowledge.form.tagsPlaceholder')}
               />
             </div>
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-              إلغاء
+              {t('knowledge.actions.cancel')}
             </Button>
             <Button onClick={handleCreateArticle} className="bg-blue-600 hover:bg-blue-700">
-              نشر المقال
+              {t('knowledge.actions.publishEntry')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -984,28 +973,28 @@ export function KnowledgeBase({
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-3xl" dir="rtl">
           <DialogHeader>
-            <DialogTitle className="text-right">تعديل المقال</DialogTitle>
-            <DialogDescription className="text-right">تعديل محتوى المقال</DialogDescription>
+            <DialogTitle className={textAlign}>{t('knowledge.editDialog')}</DialogTitle>
+            <DialogDescription className={textAlign}>{t('knowledge.editDescription')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-title" className="text-right block">
-                العنوان
+              <Label htmlFor="edit-title" className={`${textAlign} block`}>
+                {t('knowledge.form.title')}
               </Label>
               <Input
                 id="edit-title"
                 value={formData.title}
                 onChange={e => setFormData({ ...formData, title: e.target.value })}
-                className="text-right"
+                className={textAlign}
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-right block">الفئة</Label>
+              <Label className={`${textAlign} block`}>{t('knowledge.category')}</Label>
               <Select
                 value={formData.category ? mapCategoryToBackend(formData.category) : 'general'}
                 onValueChange={v => setFormData({ ...formData, category: v })}
               >
-                <SelectTrigger className="text-right">
+                <SelectTrigger className={textAlign}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent dir="rtl">
@@ -1018,36 +1007,36 @@ export function KnowledgeBase({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-content" className="text-right block">
-                المحتوى
+              <Label htmlFor="edit-content" className={`${textAlign} block`}>
+                {t('knowledge.form.content')}
               </Label>
               <Textarea
                 id="edit-content"
                 value={formData.content}
                 onChange={e => setFormData({ ...formData, content: e.target.value })}
-                className="text-right min-h-[280px]"
+                className={`${textAlign} min-h-[280px]`}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-tags" className="text-right block">
-                الوسوم
+              <Label htmlFor="edit-tags" className={`${textAlign} block`}>
+                {t('knowledge.form.tagsShort')}
               </Label>
               <Input
                 id="edit-tags"
                 value={formData.tags.join(', ')}
                 onChange={e =>
-                  setFormData({ ...formData, tags: e.target.value.split(/[،,]/).map(t => t.trim()).filter(Boolean) })
+                  setFormData({ ...formData, tags: e.target.value.split(/[،,]/).map(tag => tag.trim()).filter(Boolean) })
                 }
-                className="text-right"
+                className={textAlign}
               />
             </div>
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              إلغاء
+              {t('knowledge.actions.cancel')}
             </Button>
             <Button onClick={handleUpdateArticle} className="bg-blue-600 hover:bg-blue-700">
-              حفظ التعديلات
+              {t('knowledge.actions.save')}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -20,8 +20,10 @@ import {
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { OperationalIssueTracker } from "../OperationalIssueTracker";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 export function AdminOperationalMonitoringSection() {
+  const { t } = useLanguage();
   const { isAdmin } = useAuth();
   const [isGeneralIssuesOpen, setIsGeneralIssuesOpen] = useState(true);
 
@@ -51,13 +53,13 @@ export function AdminOperationalMonitoringSection() {
       try {
         const token = localStorage.getItem("token");
         if (!token) {
-          if (!cancelled) setThresholdError("غير مسجّل الدخول");
+          if (!cancelled) setThresholdError(t('admin.operationalMonitoring.notLoggedIn'));
           return;
         }
         if (token === "local-auth-token") {
           if (!cancelled) {
             setThresholdError(
-              "تسجيل دخول محلي — للحفظ لازم تسجّل دخول من السيرفر (admin/admin123)",
+              t('admin.operationalMonitoring.localLogin'),
             );
           }
           return;
@@ -72,13 +74,13 @@ export function AdminOperationalMonitoringSection() {
           setDistributionStats(dist);
           setDistributionLoadError(null);
         } else if (!cancelled) {
-          setDistributionLoadError("تعذّر تحميل توزيع المشاكل");
+          setDistributionLoadError(t('admin.operationalMonitoring.distributionLoadFailed'));
         }
         if (!res.ok) {
           if (!cancelled) {
             const body = await res.json().catch(() => null);
             setThresholdError(
-              body?.message || `فشل تحميل الحد (HTTP ${res.status})`,
+              body?.message || t('admin.operationalMonitoring.thresholdLoadFailed', { status: res.status }),
             );
           }
           return;
@@ -97,7 +99,7 @@ export function AdminOperationalMonitoringSection() {
       } catch (err) {
         if (!cancelled) {
           setThresholdError(
-            err instanceof Error ? err.message : "تعذّر الاتصال بالسيرفر",
+            err instanceof Error ? err.message : t('admin.operationalMonitoring.connectionFailed'),
           );
         }
       }
@@ -126,12 +128,12 @@ export function AdminOperationalMonitoringSection() {
       try {
         const token = localStorage.getItem("token");
         if (!token) {
-          setThresholdError("غير مسجّل الدخول");
+          setThresholdError(t('admin.operationalMonitoring.notLoggedIn'));
           return;
         }
         if (token === "local-auth-token") {
           setThresholdError(
-            "تسجيل دخول محلي — للحفظ لازم تسجّل دخول من السيرفر (admin/admin123)",
+            t('admin.operationalMonitoring.localLogin'),
           );
           return;
         }
@@ -146,10 +148,10 @@ export function AdminOperationalMonitoringSection() {
         const body = await res.json().catch(() => null);
         if (!res.ok || !body?.success || !body?.data) {
           if (res.status === 401) {
-            throw new Error("انتهت الجلسة — سجّل دخول من جديد");
+            throw new Error(t('admin.operationalMonitoring.sessionExpired'));
           }
           if (res.status === 403) {
-            throw new Error("صلاحيات غير كافية — يحتاج حساب admin");
+            throw new Error(t('admin.operationalMonitoring.insufficientPermissions'));
           }
           throw new Error(body?.message || `HTTP ${res.status}`);
         }
@@ -171,10 +173,10 @@ export function AdminOperationalMonitoringSection() {
           setDistributionStats(dist);
           setDistributionLoadError(null);
         } catch {
-          setDistributionLoadError("تعذّر تحديث توزيع المشاكل");
+          setDistributionLoadError(t('admin.operationalMonitoring.distributionUpdateFailed'));
         }
       } catch (err) {
-        setThresholdError(err instanceof Error ? err.message : "فشل الحفظ");
+        setThresholdError(err instanceof Error ? err.message : t('admin.operationalMonitoring.saveFailed'));
       } finally {
         setIsSavingThreshold(false);
       }
@@ -255,7 +257,7 @@ export function AdminOperationalMonitoringSection() {
 
   return (
     <div className="space-y-6">
-      {/* 1) المشاكل العامة والمتكررة */}
+      {/* 1) {t('admin.operationalMonitoring.generalIssuesTitle')} */}
       <Card className="border-2 border-amber-300/60 dark:border-amber-500/40 shadow-lg overflow-hidden">
         <button
           type="button"
@@ -263,7 +265,7 @@ export function AdminOperationalMonitoringSection() {
           className="w-full text-right"
           aria-expanded={isGeneralIssuesOpen}
           aria-label={
-            isGeneralIssuesOpen ? "إخفاء تفاصيل المشاكل العامة" : "إظهار تفاصيل المشاكل العامة"
+            isGeneralIssuesOpen ? t('admin.operationalMonitoring.hideIssues') : t('admin.operationalMonitoring.showIssues')
           }
         >
           <CardHeader
@@ -276,17 +278,17 @@ export function AdminOperationalMonitoringSection() {
                 <ShieldCheck className="size-5 text-amber-600 dark:text-amber-400 shrink-0" />
                 <div className="text-right min-w-0">
                   <CardTitle className="text-base sm:text-lg font-bold text-foreground">
-                    المشاكل العامة والمتكررة
+                    {t('admin.operationalMonitoring.generalIssuesTitle')}
                   </CardTitle>
                   <p className="text-xs text-muted-foreground mt-1">
-                    الحد اليومي، متكرر اليوم، وأكثر التصنيفات شيوعاً (من قاعدة
+                    الحد اليومي، {t('admin.operationalMonitoring.repeatedToday')}، وأكثر التصنيفات شيوعاً (من قاعدة
                     البيانات)
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0 self-start">
                 <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-[10px]">
-                  خاص بالأدمن
+                  {t('admin.operationalMonitoring.adminOnly')}
                 </Badge>
                 {isGeneralIssuesOpen ? (
                   <ChevronUp className="size-5 text-muted-foreground shrink-0" />
@@ -308,7 +310,7 @@ export function AdminOperationalMonitoringSection() {
             {thresholdError && !isSavingThreshold && (
               <div className="w-full rounded-lg border-2 border-red-300/60 dark:border-red-500/40 bg-red-50/80 dark:bg-red-950/40 px-3 py-2 text-right">
                 <p className="text-xs font-bold text-red-700 dark:text-red-300">
-                  ⚠️ لم يتم الحفظ:
+                  {t('admin.operationalMonitoring.unsavedWarning')}
                   <span className="font-normal mr-1">{thresholdError}</span>
                 </p>
               </div>
@@ -324,7 +326,7 @@ export function AdminOperationalMonitoringSection() {
                   }
                   onClick={() => saveThreshold(thresholdDraft - 1)}
                   className="h-9 w-9 p-0 font-bold text-lg"
-                  aria-label="إنقاص"
+                  aria-label={t('admin.operationalMonitoring.decrease')}
                 >
                   −
                 </Button>
@@ -361,7 +363,7 @@ export function AdminOperationalMonitoringSection() {
                   }
                   onClick={() => saveThreshold(thresholdDraft + 1)}
                   className="h-9 w-9 p-0 font-bold text-lg"
-                  aria-label="زيادة"
+                  aria-label={t('admin.operationalMonitoring.increase')}
                 >
                   +
                 </Button>
@@ -378,20 +380,20 @@ export function AdminOperationalMonitoringSection() {
                 )}
                 {isSavingThreshold && (
                   <span className="text-[10px] text-muted-foreground">
-                    جاري الحفظ...
+                    {t('admin.operationalMonitoring.saving')}
                   </span>
                 )}
                 {!isSavingThreshold &&
                   thresholdSavedAt &&
                   !thresholdError && (
                     <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
-                      ✓ تم الحفظ
+                      {t('admin.operationalMonitoring.saved')}
                     </span>
                   )}
               </div>
               <div className="text-right">
                 <p className="text-sm font-bold text-foreground">
-                  الحد اليومي للمشكلة المتكررة
+                  {t('admin.operationalMonitoring.thresholdLabel')}
                 </p>
                 <p className="text-[11px] text-muted-foreground">
                   كم مرة لازم تتكرر نفس (التصنيف + مقدم الخدمة) في اليوم لتُعدّ
@@ -430,14 +432,14 @@ export function AdminOperationalMonitoringSection() {
                     </div>
                     <div className="flex items-center gap-2">
                       <h4 className="text-sm font-bold text-foreground">
-                        متكرر اليوم
+                        {t('admin.operationalMonitoring.repeatedToday')}
                       </h4>
                       <Flame className="size-4 text-orange-600 dark:text-orange-400" />
                     </div>
                   </div>
                   {frequentTodayGroups.length === 0 ? (
                     <p className="text-xs text-muted-foreground text-right">
-                      لا توجد مشاكل وصلت لحد التكرار اليومي بعد.
+                      {t('admin.operationalMonitoring.noRepeatedToday')}
                     </p>
                   ) : (
                     <div className="space-y-2 max-h-72 overflow-y-auto">
@@ -454,7 +456,7 @@ export function AdminOperationalMonitoringSection() {
                               {group.category}
                             </p>
                             <p className="text-[10px] text-muted-foreground truncate">
-                              مقدم الخدمة: {group.entityType}
+                              {t('admin.operationalMonitoring.serviceProvider', { type: group.entityType })}
                             </p>
                           </div>
                         </div>
@@ -470,14 +472,14 @@ export function AdminOperationalMonitoringSection() {
                     </Badge>
                     <div className="flex items-center gap-2">
                       <h4 className="text-sm font-bold text-foreground">
-                        المشاكل العامة
+                        {t('admin.operationalMonitoring.generalIssues')}
                       </h4>
                       <BarChart3 className="size-4 text-primary" />
                     </div>
                   </div>
                   {topCategoriesAll.length === 0 ? (
                     <p className="text-xs text-muted-foreground text-right">
-                      لا توجد بيانات بعد.
+                      {t('admin.operationalMonitoring.noData')}
                     </p>
                   ) : (
                     <div className="space-y-2 max-h-72 overflow-y-auto">

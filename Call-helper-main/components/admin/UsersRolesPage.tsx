@@ -30,6 +30,7 @@ import {
   DialogTitle,
 } from '../ui/dialog';
 import { toast } from 'sonner';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatAppDateShort } from '../../utils/dateDisplay';
 import {
@@ -149,6 +150,7 @@ function OnOffToggle({
 }
 
 export function UsersRolesPage() {
+  const { t, dir } = useLanguage();
   const { user: currentSession, refreshCurrentUser } = useAuth();
   
   // ====================================================================
@@ -198,7 +200,7 @@ export function UsersRolesPage() {
       setUsers(rows.map(mapApiUserToRow));
     } catch (e) {
       console.error(e);
-      toast.error(e instanceof Error ? e.message : 'فشل تحميل المستخدمين من الخادم');
+      toast.error(e instanceof Error ? e.message : t('admin.users.loadFailed'));
       setUsers([]);
     } finally {
       setLoadingUsers(false);
@@ -247,7 +249,7 @@ export function UsersRolesPage() {
   
   const handleAddUser = async () => {
     if (!formData.name || !formData.email || !formData.username) {
-      toast.error('يرجى ملء جميع الحقول المطلوبة');
+      toast.error(t('admin.toast.fillRequired'));
       return;
     }
 
@@ -267,13 +269,13 @@ export function UsersRolesPage() {
       toast.success(`تم إضافة المستخدم بنجاح. كلمة المرور الافتراضية: ${defaultPassword}`);
       await loadUsers();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'فشل إضافة المستخدم');
+      toast.error(e instanceof Error ? e.message : t('admin.users.addFailed'));
     }
   };
 
   const handleEditUser = async () => {
     if (!selectedUser || !formData.name || !formData.email || !formData.username) {
-      toast.error('يرجى ملء جميع الحقول المطلوبة');
+      toast.error(t('admin.toast.fillRequired'));
       return;
     }
 
@@ -297,11 +299,11 @@ export function UsersRolesPage() {
       setShowEditDialog(false);
       setSelectedUser(null);
       resetForm();
-      toast.success('تم تحديث المستخدم بنجاح');
+      toast.success(t('admin.users.userUpdated'));
       await loadUsers();
       if (currentSession?.id === selectedUser.id) await refreshCurrentUser();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'فشل تحديث المستخدم');
+      toast.error(e instanceof Error ? e.message : t('admin.users.updateFailed'));
     }
   };
 
@@ -312,10 +314,10 @@ export function UsersRolesPage() {
       await deleteAdminUser(selectedUser.id);
       setShowDeleteDialog(false);
       setSelectedUser(null);
-      toast.success('تم حذف المستخدم بنجاح');
+      toast.success(t('admin.users.userDeleted'));
       await loadUsers();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'فشل حذف المستخدم');
+      toast.error(e instanceof Error ? e.message : t('admin.users.deleteFailed'));
     }
   };
 
@@ -323,17 +325,17 @@ export function UsersRolesPage() {
     if (!selectedUser) return;
 
     if (!newPassword || !confirmPassword) {
-      toast.error('يرجى ملء جميع الحقول');
+      toast.error(t('admin.toast.fillAllFields'));
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      toast.error('كلمة المرور غير متطابقة');
+      toast.error(t('admin.toast.passwordMismatch'));
       return;
     }
 
     if (newPassword.length < 6) {
-      toast.error('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+      toast.error(t('admin.toast.passwordMinLength'));
       return;
     }
 
@@ -407,14 +409,14 @@ export function UsersRolesPage() {
         ...permPatch,
         uiVisibility: permDialogDraft.uiVisibility,
       });
-      toast.success('تم حفظ الصلاحيات');
+      toast.success(t('admin.users.permissionsSaved'));
       setShowPermissionsDialog(false);
       setPermissionsDialogUser(null);
       setPermDialogDraft(null);
       await loadUsers();
       if (currentSession?.id === u.id) await refreshCurrentUser();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'فشل حفظ الصلاحيات');
+      toast.error(e instanceof Error ? e.message : t('admin.users.permissionsSaveFailed'));
     } finally {
       setPermSavingId(null);
     }
@@ -457,9 +459,9 @@ export function UsersRolesPage() {
 
   const getStatusBadge = (status: string) => {
     const variants = {
-      'active': { label: 'نشط', color: 'bg-green-100 dark:bg-green-950 text-green-600 dark:text-green-400 border-green-200 dark:border-green-900' },
-      'inactive': { label: 'غير نشط', color: 'bg-gray-100 dark:bg-gray-950 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-900' },
-      'suspended': { label: 'موقوف', color: 'bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900' },
+      'active': { label: t('admin.users.statusActive'), color: 'bg-green-100 dark:bg-green-950 text-green-600 dark:text-green-400 border-green-200 dark:border-green-900' },
+      'inactive': { label: t('admin.users.statusInactive'), color: 'bg-gray-100 dark:bg-gray-950 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-900' },
+      'suspended': { label: t('admin.users.statusSuspended'), color: 'bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900' },
     };
     const variant = variants[status as keyof typeof variants] || variants.inactive;
     return (
@@ -480,13 +482,13 @@ export function UsersRolesPage() {
         <div className="flex items-center gap-2.5">
           <div
             className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/20 to-indigo-600/20 border border-primary/25 dark:from-violet-500/15 dark:to-indigo-600/15"
-            title="الصلاحيات"
+            title={t("admin.users.permissionsTitle")}
             aria-hidden
           >
             <Shield className="size-5 text-primary" />
           </div>
           <div>
-            <h2 className="text-lg sm:text-xl font-bold text-foreground mb-0">إدارة المستخدمين والصلاحيات</h2>
+            <h2 className="text-lg sm:text-xl font-bold text-foreground mb-0">{t("admin.users.title")}</h2>
           </div>
         </div>
         <div className="flex flex-wrap items-stretch gap-1.5 sm:justify-end">
@@ -499,7 +501,7 @@ export function UsersRolesPage() {
             className="bg-primary text-primary-foreground hover:bg-primary-hover text-primary-foreground text-xs sm:text-sm"
           >
             <UserPlus className="size-3.5 ml-1.5 sm:size-4 sm:ml-2 shrink-0" />
-            إضافة مستخدم
+            {t("admin.users.addUser")}
           </Button>
         </div>
       </div>
@@ -513,7 +515,7 @@ export function UsersRolesPage() {
             </div>
             <div className="min-w-0">
               <p className="text-lg font-bold text-foreground leading-none">{statistics.totalUsers}</p>
-              <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">إجمالي</p>
+              <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">{t("admin.users.totalUsers")}</p>
             </div>
           </div>
         </Card>
@@ -524,7 +526,7 @@ export function UsersRolesPage() {
             </div>
             <div className="min-w-0">
               <p className="text-lg font-bold text-foreground leading-none">{statistics.activeUsers}</p>
-              <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">نشط</p>
+              <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">{t("admin.users.activeUsers")}</p>
             </div>
           </div>
         </Card>
@@ -581,7 +583,7 @@ export function UsersRolesPage() {
             <div className="relative">
               <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
               <Input 
-                placeholder="ابحث..." 
+                placeholder={t("admin.users.searchPlaceholder")} 
                 className="glass-card border border-border pr-9 h-9 text-sm"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -593,7 +595,7 @@ export function UsersRolesPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all-roles">جميع الأدوار</SelectItem>
+              <SelectItem value="all-roles">{t("admin.users.allRoles")}</SelectItem>
               {APP_ROLES.map(r => (
                 <SelectItem key={r} value={r}>
                   {ROLE_LABEL_AR[r]}
@@ -606,7 +608,7 @@ export function UsersRolesPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all-status">جميع الحالات</SelectItem>
+              <SelectItem value="all-status">{t("admin.users.allStatus")}</SelectItem>
               <SelectItem value="active">نشط</SelectItem>
               <SelectItem value="inactive">غير نشط</SelectItem>
               <SelectItem value="suspended">موقوف</SelectItem>
@@ -620,13 +622,13 @@ export function UsersRolesPage() {
         <Table className="min-w-[620px] text-xs">
             <TableHeader>
               <TableRow className="border-b border-border hover:bg-transparent">
-                <TableHead className="text-right text-foreground h-8 py-1.5 text-[11px] font-semibold">المستخدم</TableHead>
-                <TableHead className="text-right text-foreground h-8 py-1.5 text-[11px] font-semibold">المعرّف</TableHead>
-                <TableHead className="text-right text-foreground h-8 py-1.5 text-[11px] font-semibold max-w-[140px]">البريد</TableHead>
-                <TableHead className="text-right text-foreground h-8 py-1.5 text-[11px] font-semibold">الدور</TableHead>
-                <TableHead className="text-right text-foreground h-8 py-1.5 text-[11px] font-semibold">الحالة</TableHead>
-                <TableHead className="text-right text-foreground h-8 py-1.5 text-[11px] font-semibold">آخر نشاط</TableHead>
-                <TableHead className="text-right text-foreground h-8 py-1.5 text-[11px] font-semibold min-w-[100px]">إجراءات</TableHead>
+                <TableHead className="text-right text-foreground h-8 py-1.5 text-[11px] font-semibold">{t("admin.users.colUser")}</TableHead>
+                <TableHead className="text-right text-foreground h-8 py-1.5 text-[11px] font-semibold">{t("admin.users.colUsername")}</TableHead>
+                <TableHead className="text-right text-foreground h-8 py-1.5 text-[11px] font-semibold max-w-[140px]">{t("admin.users.colEmail")}</TableHead>
+                <TableHead className="text-right text-foreground h-8 py-1.5 text-[11px] font-semibold">{t("admin.users.colRole")}</TableHead>
+                <TableHead className="text-right text-foreground h-8 py-1.5 text-[11px] font-semibold">{t("admin.users.colStatus")}</TableHead>
+                <TableHead className="text-right text-foreground h-8 py-1.5 text-[11px] font-semibold">{t("admin.users.colLastActive")}</TableHead>
+                <TableHead className="text-right text-foreground h-8 py-1.5 text-[11px] font-semibold min-w-[100px]">{t("admin.users.colActions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -639,7 +641,7 @@ export function UsersRolesPage() {
               ) : filteredUsers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                    لا توجد نتائج
+                    {t("admin.users.noResults")}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -692,7 +694,7 @@ export function UsersRolesPage() {
                           size="icon"
                           className="size-8 text-primary hover:text-primary/80"
                           onClick={() => openEditDialog(user)}
-                          title="تعديل"
+                          title={t("admin.users.editTitle")}
                         >
                           <Edit className="size-3.5" />
                         </Button>
@@ -701,7 +703,7 @@ export function UsersRolesPage() {
                           size="icon"
                           className="size-8 text-orange-500 hover:text-orange-600"
                           onClick={() => openChangePasswordDialog(user)}
-                          title="تغيير كلمة المرور"
+                          title={t("admin.users.changePasswordTitle")}
                         >
                           <Key className="size-3.5" />
                         </Button>
@@ -710,7 +712,7 @@ export function UsersRolesPage() {
                           size="icon"
                           className="size-8 text-red-500 hover:text-red-600 disabled:opacity-40"
                           onClick={() => openDeleteDialog(user)}
-                          title="حذف"
+                          title={t("admin.users.deleteTitle")}
                           disabled={currentSession?.id === user.id}
                         >
                           <Trash2 className="size-3.5" />
@@ -737,7 +739,7 @@ export function UsersRolesPage() {
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent className="glass-panel border-2 border-border sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle className="text-foreground">إضافة مستخدم جديد</DialogTitle>
+            <DialogTitle className="text-foreground">{t("admin.users.addUser")} جديد</DialogTitle>
             <DialogDescription className="text-muted-foreground">
               أدخل بيانات المستخدم الجديد
             </DialogDescription>
@@ -857,7 +859,7 @@ export function UsersRolesPage() {
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-3 py-1" dir="rtl">
+              <div className="space-y-3 py-1" dir={dir}>
                 {(permissionsDialogUser.role === 'moderator' ||
                   permissionsDialogUser.role === 'customer_service') && (
                   <div className="rounded-lg border border-primary/30 bg-primary/5 dark:bg-primary/10 p-3 max-h-52 overflow-y-auto space-y-2">

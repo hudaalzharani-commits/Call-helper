@@ -1,10 +1,11 @@
+import { useLanguage } from '../../contexts/LanguageContext';
 /**
  * ====================================================================
- * Add/Edit Step Dialog - حوار إضافة/تعديل الخطوات
+ * Add/Edit Step Dialog - حوار {t('admin.addStep.add')}/تعديل الخطوات
  * ====================================================================
  * 
- * Dialog مخصص لإضافة وتعديل الخطوات (SubConditions) مع دعم:
- * 1. إضافة خطوة في مسارات متعددة دفعة واحدة
+ * Dialog مخصص ل{t('admin.addStep.add')} وتعديل الخطوات (SubConditions) مع دعم:
+ * 1. {t('admin.addStep.add')} خطوة في مسارات متعددة دفعة واحدة
  * 2. تعديل مع خيار التطبيق على المسارات المرتبطة
  * 
  * ====================================================================
@@ -42,6 +43,7 @@ export function AddStepDialog({
   selectedStepId,
   editingSubCondition,
 }: AddStepDialogProps) {
+  const { t, dir } = useLanguage();
   const { getStepsBySubConditionName } = useAdvancedSettings();
   const [name, setName] = useState('');
   const [action, setAction] = useState<SubCondition['action']>('continue');
@@ -159,13 +161,13 @@ export function AddStepDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleReset()}>
-      <DialogContent className="glass-card border-2 max-h-[85vh] overflow-y-auto" dir="rtl">
+      <DialogContent className="glass-card border-2 max-h-[85vh] overflow-y-auto" dir={dir}>
         <DialogHeader>
           <DialogTitle className="text-right">
-            {editingSubCondition ? 'تعديل الخطوة' : 'إضافة خطوة جديدة'}
+            {editingSubCondition ? t('admin.addStep.editTitle') : t('admin.addStep.addTitle')}
           </DialogTitle>
           <DialogDescription className="text-right">
-            حدد الخطوة والإجراء المناسب
+            {t('admin.addStep.desc')}
           </DialogDescription>
         </DialogHeader>
         
@@ -187,9 +189,9 @@ export function AddStepDialog({
             </div>
           )}
 
-          {/* اسم الخطوة */}
+          {/* {t('admin.addStep.stepName')} */}
           <div className="space-y-2">
-            <Label htmlFor="sub-name">اسم الخطوة</Label>
+            <Label htmlFor="sub-name">{t('admin.addStep.stepName')}</Label>
             <Input
               id="sub-name"
               placeholder="مثال: دفع الفاتورة، تم الدفع..."
@@ -199,15 +201,15 @@ export function AddStepDialog({
             />
           </div>
 
-          {/* Multi-Route Selector - فقط عند الإضافة */}
+          {/* Multi-Route Selector - فقط عند ال{t('admin.addStep.add')} */}
           {!editingSubCondition && (
             <div className="space-y-3 glass-card bg-gradient-to-br from-cyan-50 to-blue-50 dark:from-cyan-950/30 dark:to-blue-950/30 border-2 border-primary/30 p-4 rounded-xl">
               <div className="flex items-center gap-2 mb-2">
                 <Link2 className="size-5 text-primary" />
-                <Label className="font-semibold text-foreground">إضافة في مسارات متعددة (جديد!)</Label>
+                <Label className="font-semibold text-foreground">{t('admin.addStep.add')} في مسارات متعددة (جديد!)</Label>
               </div>
               <p className="text-xs text-muted-foreground mb-3">
-                💡 اختر المسارات التي تريد إضافة هذه الخطوة فيها
+                💡 اختر المسارات التي تريد {t('admin.addStep.add')} هذه الخطوة فيها
               </p>
 
               <div className="glass-card border-2 border-border rounded-lg p-3 max-h-48 overflow-y-auto space-y-2">
@@ -318,12 +320,12 @@ export function AddStepDialog({
               <Select 
                 value={parentId || 'root'} 
                 onValueChange={(val) => setParentId(val === 'root' ? '' : val)}
-                dir="rtl"
+                dir={dir}
               >
                 <SelectTrigger className="glass-card border-2 border-border text-right">
                   <SelectValue placeholder="بدون ربط - خطوة رئيسية" />
                 </SelectTrigger>
-                <SelectContent className="glass-card" dir="rtl">
+                <SelectContent className="glass-card" dir={dir}>
                   <SelectItem value="root" className="text-right">
                     بدون ربط - خطوة رئيسية
                   </SelectItem>
@@ -345,14 +347,14 @@ export function AddStepDialog({
             </div>
           )}
 
-          {/* الإجراء */}
+          {/* {t('admin.addStep.action')} */}
           <div className="space-y-2">
-            <Label htmlFor="sub-action">الإجراء</Label>
-            <Select value={action} onValueChange={(val: any) => setAction(val)} dir="rtl">
+            <Label htmlFor="sub-action">{t('admin.addStep.action')}</Label>
+            <Select value={action} onValueChange={(val: any) => setAction(val)} dir={dir}>
               <SelectTrigger className="glass-card border-2 border-border text-right">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="glass-card" dir="rtl">
+              <SelectContent className="glass-card" dir={dir}>
                 <SelectItem value="continue" className="text-right">
                   <div className="flex items-center gap-2">
                     <PlayCircle className="size-4 text-emerald-500" />
@@ -381,7 +383,7 @@ export function AddStepDialog({
             </Select>
           </div>
 
-          {/* تفاصيل الإجراء */}
+          {/* تفاصيل {t('admin.addStep.action')} */}
           {action !== 'continue' && (
             <div className="space-y-2">
               <Label htmlFor="sub-details">
@@ -406,7 +408,7 @@ export function AddStepDialog({
         
         <DialogFooter className="flex gap-2">
           <Button variant="outline" onClick={handleReset}>
-            إلغاء
+            {t('admin.addStep.cancel')}
           </Button>
           <Button
             onClick={handleSubmit}
@@ -416,14 +418,14 @@ export function AddStepDialog({
             {editingSubCondition ? (
               <>
                 <Check className="size-4 ml-2" />
-                حفظ التعديلات
+                {t('admin.addStep.saveEdits')}
               </>
             ) : (
               <>
                 <Plus className="size-4 ml-2" />
-                {selectedRoutes.length > 0 
-                  ? `إضافة في ${selectedRoutes.length + 1} مسار` 
-                  : 'إضافة'}
+                {selectedRoutes.length > 0
+                  ? t('admin.addStep.addToRoutes', { count: selectedRoutes.length + 1 })
+                  : t('admin.addStep.add')}
               </>
             )}
           </Button>

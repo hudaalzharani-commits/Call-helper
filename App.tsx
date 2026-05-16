@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, type ElementType, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type ElementType, type ReactNode } from 'react';
 import {
   User, Activity, AlertCircle, BookOpen, RefreshCw, Lightbulb,
   Headphones, Bot, Sparkles, Menu, X, Shield, Settings, LogOut, ChevronLeft,
@@ -19,24 +19,33 @@ import { Logo, IconLogo } from './components/Logo';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AdvancedSettingsProvider } from './contexts/AdvancedSettingsContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 import { Login } from './components/Login';
+import { StartPage } from './components/StartPage';
 import { AdminPanel } from './components/AdminPanel';
 import { UserSettingsDialog } from './components/UserSettingsDialog';
 import { ThemeToggle } from './components/ThemeToggle';
+import { LanguageToggle } from './components/LanguageToggle';
 import { AccentPalettePicker } from './components/AccentPalettePicker';
 import { Toaster } from './components/ui/sonner';
 import { canShowAdminTab } from './utils/appRoles';
 import { isUiFlagEnabled, pageKeyForServiceId } from './utils/uiVisibility';
 
-const DASHBOARD_SERVICES = [
-  { id: 'live-indicators', name: 'المؤشرات اللحظية', icon: Activity },
-  { id: 'public-issues', name: 'المشاكل العامة', icon: AlertCircle },
-  { id: 'knowledge-base', name: 'سجل المعرفة', icon: BookOpen },
-  { id: 'operational-updates', name: 'التحديثات التشغيلية', icon: RefreshCw },
-  { id: 'what-did-rafeeq-learn', name: 'وش تعلم رفيق؟', icon: Lightbulb },
+const DASHBOARD_SERVICE_DEFS = [
+  { id: 'live-indicators', icon: Activity },
+  { id: 'public-issues', icon: AlertCircle },
+  { id: 'knowledge-base', icon: BookOpen },
+  { id: 'operational-updates', icon: RefreshCw },
+  { id: 'what-did-rafeeq-learn', icon: Lightbulb },
 ] as const;
 
-type DashboardService = (typeof DASHBOARD_SERVICES)[number];
+type DashboardServiceId = (typeof DASHBOARD_SERVICE_DEFS)[number]['id'];
+
+type DashboardService = {
+  id: DashboardServiceId;
+  name: string;
+  icon: ElementType;
+};
 
 const DASHBOARD_DEEP_LINK_SERVICE_IDS = ['teach-rafeeq-experience'] as const;
 
@@ -55,7 +64,7 @@ function isAllowedDashboardService(
   return false;
 }
 
-function RtlShell({ children }: { children: ReactNode }) {
+function AppShell({ children }: { children: ReactNode }) {
   return (
     <div dir="rtl" className="min-h-screen" style={{ background: 'var(--background)' }}>
       {children}
@@ -166,6 +175,7 @@ function RailItem({
 }
 
 function AskRafeeqRailFooter({ expanded }: { expanded: boolean }) {
+  const { t } = useLanguage();
   return (
     <div className={['pt-3 mt-3 border-t', expanded ? '' : 'w-full flex justify-center'].join(' ')} style={{ borderColor: 'var(--border)' }}>
       {expanded ? (
@@ -180,17 +190,17 @@ function AskRafeeqRailFooter({ expanded }: { expanded: boolean }) {
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold flex items-center gap-1.5 justify-end" style={{ color: 'var(--foreground)' }}>
               <Sparkles className="size-3" style={{ color: 'var(--ai)' }} />
-              اسأل رفيق
+              {t('askRafeeq.title')}
             </p>
-            <p className="text-[11px] truncate" style={{ color: 'var(--muted-foreground)' }}>مساعدك الذكي</p>
+            <p className="text-[11px] truncate" style={{ color: 'var(--muted-foreground)' }}>{t('askRafeeq.subtitle')}</p>
           </div>
           <ChevronLeft className="size-3.5 shrink-0" style={{ color: 'var(--muted-strong)' }} />
         </button>
       ) : (
         <button
           type="button"
-          title="اسأل رفيق"
-          aria-label="اسأل رفيق"
+          title={t('askRafeeq.title')}
+          aria-label={t('askRafeeq.title')}
           className="size-11 rounded-2xl flex items-center justify-center transition-all duration-200 hover:scale-[1.04]"
           style={{ background: 'var(--ai)', color: 'var(--ai-foreground)', boxShadow: 'var(--shadow-ai-glow)' }}
         >
@@ -204,14 +214,31 @@ function AskRafeeqRailFooter({ expanded }: { expanded: boolean }) {
 function AppContent() {
   const { user, logout } = useAuth();
   const { isDark } = useTheme();
+  const { t, locale } = useLanguage();
+
+  const dashboardServices = useMemo<DashboardService[]>(
+    () =>
+      DASHBOARD_SERVICE_DEFS.map((s) => ({
+        ...s,
+        name: t(`services.${s.id}`),
+      })),
+    [locale, t],
+  );
   const [selectedService, setSelectedService] = useState<string>('live-indicators');
   const [viewMode, setViewMode] = useState<'dashboard' | 'callhelper' | 'admin'>('dashboard');
   const [railExpanded, setRailExpanded] = useState(false);
   const [showUserSettings, setShowUserSettings] = useState(false);
   const [callHelperLaunch, setCallHelperLaunch] = useState<{ seed: string; nonce: number } | null>(null);
   const [knowledgeCategoryFocus, setKnowledgeCategoryFocus] = useState<string | null>(null);
+  const [preAuthScreen, setPreAuthScreen] = useState<'start' | 'login'>('start');
+  const prevUserRef = useRef(user);
 
   const clearCallHelperLaunch = useCallback(() => setCallHelperLaunch(null), []);
+
+  useEffect(() => {
+    if (prevUserRef.current && !user) setPreAuthScreen('start');
+    prevUserRef.current = user;
+  }, [user]);
   const clearKnowledgeCategoryFocus = useCallback(() => setKnowledgeCategoryFocus(null), []);
 
   useEffect(() => {
@@ -259,8 +286,8 @@ function AppContent() {
   }, [viewMode, user]);
 
   const navigableServices = useMemo(
-    () => DASHBOARD_SERVICES.filter((s) => isUiFlagEnabled(user, pageKeyForServiceId(s.id))),
-    [user],
+    () => dashboardServices.filter((s) => isUiFlagEnabled(user, pageKeyForServiceId(s.id))),
+    [user, dashboardServices],
   );
 
   useEffect(() => {
@@ -283,10 +310,13 @@ function AppContent() {
   }, [viewMode, user]);
 
   if (!user) {
+    if (preAuthScreen === 'start') {
+      return <StartPage onStart={() => setPreAuthScreen('login')} />;
+    }
     return (
-      <RtlShell>
-        <Login />
-      </RtlShell>
+      <AppShell>
+        <Login onBack={() => setPreAuthScreen('start')} />
+      </AppShell>
     );
   }
 
@@ -294,7 +324,7 @@ function AppContent() {
   const callHelperEnabled = isUiFlagEnabled(user, 'view_callhelper');
 
   return (
-    <RtlShell>
+    <AppShell>
       <header className="topbar fixed top-0 inset-x-0 z-50 h-14">
         <div className="h-full flex items-center justify-between gap-4 px-4 sm:px-6">
           <div className="flex items-center gap-3 min-w-0">
@@ -304,7 +334,7 @@ function AppContent() {
                 onClick={() => setRailExpanded(!railExpanded)}
                 className="size-9 rounded-full flex items-center justify-center hover:bg-surface-2 transition-colors"
                 style={{ color: 'var(--muted-foreground)' }}
-                aria-label={railExpanded ? 'إخفاء القائمة' : 'إظهار القائمة'}
+                aria-label={railExpanded ? t('nav.hideRail') : t('nav.showRail')}
               >
                 {railExpanded ? <X className="size-4" /> : <Menu className="size-4" />}
               </button>
@@ -314,15 +344,16 @@ function AppContent() {
           </div>
 
           <div className="hidden sm:flex pill-rail">
-            <ViewPill active={viewMode === 'dashboard'} onClick={() => setViewMode('dashboard')} icon={Activity} label="لوحة التحكم" disabled={!dashboardEnabled} />
-            <ViewPill active={viewMode === 'callhelper'} onClick={() => setViewMode('callhelper')} icon={Headphones} label="مساعد المكالمات" disabled={!callHelperEnabled} />
+            <ViewPill active={viewMode === 'dashboard'} onClick={() => setViewMode('dashboard')} icon={Activity} label={t('nav.dashboard')} disabled={!dashboardEnabled} />
+            <ViewPill active={viewMode === 'callhelper'} onClick={() => setViewMode('callhelper')} icon={Headphones} label={t('nav.callHelper')} disabled={!callHelperEnabled} />
             {canShowAdminTab(user) && (
-              <ViewPill active={viewMode === 'admin'} onClick={() => setViewMode('admin')} icon={Shield} label="الأدمن" />
+              <ViewPill active={viewMode === 'admin'} onClick={() => setViewMode('admin')} icon={Shield} label={t('nav.admin')} />
             )}
           </div>
 
           <div className="flex items-center gap-2">
             <AccentPalettePicker />
+            <LanguageToggle />
             <ThemeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -349,12 +380,12 @@ function AppContent() {
                 </div>
                 <DropdownMenuItem onClick={() => setShowUserSettings(true)} className="m-1 rounded-lg cursor-pointer flex items-center gap-2 text-sm">
                   <Settings className="size-3.5" />
-                  إعدادات الحساب
+                  {t('nav.accountSettings')}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={logout} className="m-1 rounded-lg cursor-pointer flex items-center gap-2 text-sm" style={{ color: 'var(--danger)' }}>
                   <LogOut className="size-3.5" />
-                  تسجيل الخروج
+                  {t('nav.logout')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -363,10 +394,10 @@ function AppContent() {
 
         <div className="sm:hidden flex items-center justify-center gap-1 px-4 pb-2">
           <div className="pill-rail">
-            <ViewPill active={viewMode === 'dashboard'} onClick={() => setViewMode('dashboard')} icon={Activity} label="لوحة التحكم" disabled={!dashboardEnabled} />
-            <ViewPill active={viewMode === 'callhelper'} onClick={() => setViewMode('callhelper')} icon={Headphones} label="مساعد المكالمات" disabled={!callHelperEnabled} />
+            <ViewPill active={viewMode === 'dashboard'} onClick={() => setViewMode('dashboard')} icon={Activity} label={t('nav.dashboard')} disabled={!dashboardEnabled} />
+            <ViewPill active={viewMode === 'callhelper'} onClick={() => setViewMode('callhelper')} icon={Headphones} label={t('nav.callHelper')} disabled={!callHelperEnabled} />
             {canShowAdminTab(user) && (
-              <ViewPill active={viewMode === 'admin'} onClick={() => setViewMode('admin')} icon={Shield} label="الأدمن" />
+              <ViewPill active={viewMode === 'admin'} onClick={() => setViewMode('admin')} icon={Shield} label={t('nav.admin')} />
             )}
           </div>
         </div>
@@ -386,12 +417,12 @@ function AppContent() {
             <nav className={['flex-1 flex flex-col', railExpanded ? 'gap-1' : 'gap-1.5 items-center'].join(' ')}>
               {railExpanded && (
                 <p className="px-2 pt-1 pb-2 text-[10px] font-semibold tracking-[0.18em] uppercase text-right" style={{ color: 'var(--muted-strong)' }}>
-                  الخدمات
+                  {t('nav.services')}
                 </p>
               )}
               {navigableServices.length === 0 && railExpanded ? (
                 <p className="text-xs text-right px-2 py-3 rounded-xl border border-dashed" style={{ color: 'var(--muted-foreground)', borderColor: 'var(--border)' }}>
-                  لا توجد صفحات مفعّلة في القائمة.
+                  {t('nav.noPagesEnabled')}
                 </p>
               ) : null}
               {navigableServices.map((s) => (
@@ -417,7 +448,7 @@ function AppContent() {
               onClick={(e) => e.stopPropagation()}
             >
               <p className="px-2 pt-1 pb-2 text-[10px] font-semibold tracking-[0.18em] uppercase text-right" style={{ color: 'var(--muted-strong)' }}>
-                الخدمات
+                {t('nav.services')}
               </p>
               <div className="flex flex-col gap-1">
                 {navigableServices.map((s) => (
@@ -466,12 +497,13 @@ function AppContent() {
         </main>
       </div>
       <UserSettingsDialog open={showUserSettings} onOpenChange={setShowUserSettings} />
-    </RtlShell>
+    </AppShell>
   );
 }
 
 export default function App() {
   return (
+    <LanguageProvider>
     <ThemeProvider>
       <AuthProvider>
         <AdvancedSettingsProvider>
@@ -480,5 +512,6 @@ export default function App() {
         </AdvancedSettingsProvider>
       </AuthProvider>
     </ThemeProvider>
+    </LanguageProvider>
   );
 }

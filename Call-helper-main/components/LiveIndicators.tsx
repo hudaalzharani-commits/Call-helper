@@ -86,6 +86,9 @@ import {
   toAnalyticsDateKey,
   toLocalCalendarDateKey,
 } from "../utils/dateDisplay";
+import { useLanguage } from "../contexts/LanguageContext";
+
+type IndicatorCardId = "dailyCases" | "confirmedReports" | "topProblems" | "publicIssues";
 
 /** نطاق التقويم المعروض في المؤشرات (يُستخدم للسلاسل الزمنية وقائمة الإفادات المؤكدة) */
 function computeIndicatorDateRange(
@@ -136,6 +139,7 @@ function computeIndicatorDateRange(
 }
 
 export function LiveIndicators() {
+  const { t } = useLanguage();
   const chartColors = useDashboardChartColors();
   const dailyAreaGradId = useId();
   const axisTick = useMemo(() => dashAxisTickFrom(chartColors), [chartColors]);
@@ -143,7 +147,7 @@ export function LiveIndicators() {
   const palette = useMemo(() => chartPalette(chartColors), [chartColors]);
 
   const [selectedPeriod, setSelectedPeriod] = useState("today");
-  const [selectedCategory, setSelectedCategory] = useState("سجل الحالات اليومية");
+  const [selectedCategory, setSelectedCategory] = useState<IndicatorCardId>("dailyCases");
 
   // =========================
   // Real analytics state (API-backed)
@@ -236,13 +240,13 @@ export function LiveIndicators() {
 
     if (selectedPeriod === "today") {
       const gregorianDate = formatAppDate(start);
-      return `اليوم - ${gregorianDate}`;
+      return t("liveIndicators.todayPrefix", { date: gregorianDate });
     }
 
     const startGregorian = formatAppDate(start);
     const endGregorian = formatAppDate(end);
 
-    return `${startGregorian} إلى ${endGregorian}`;
+    return t("liveIndicators.rangeTo", { start: startGregorian, end: endGregorian });
   };
 
   // Handle custom range application
@@ -250,14 +254,12 @@ export function LiveIndicators() {
     setDateRangeError("");
 
     if (!startDate || !endDate) {
-      setDateRangeError("يرجى اختيار تاريخ البداية والنهاية");
+      setDateRangeError(t("liveIndicators.pickBothDates"));
       return;
     }
 
     if (startDate > endDate) {
-      setDateRangeError(
-        "تاريخ البداية يجب أن يكون قبل تاريخ النهاية",
-      );
+      setDateRangeError(t("liveIndicators.startBeforeEnd"));
       return;
     }
 
@@ -305,19 +307,19 @@ export function LiveIndicators() {
   const dailyCasesChartTitle = useMemo(() => {
     switch (selectedPeriod) {
       case "today":
-        return "سجل الحالات اليومية - اليوم";
+        return t("liveIndicators.dailyCasesToday");
       case "week":
-        return "سجل الحالات اليومية - هذا الأسبوع";
+        return t("liveIndicators.dailyCasesWeek");
       case "month":
-        return "سجل الحالات اليومية - هذا الشهر";
+        return t("liveIndicators.dailyCasesMonth");
       case "year":
-        return "سجل الحالات اليومية - هذه السنة";
+        return t("liveIndicators.dailyCasesYear");
       case "custom":
-        return "سجل الحالات اليومية - الفترة المحددة";
+        return t("liveIndicators.dailyCasesCustom");
       default:
-        return "سجل الحالات اليومية";
+        return t("liveIndicators.dailyCases");
     }
-  }, [selectedPeriod]);
+  }, [selectedPeriod, t]);
 
   const statsCards = useMemo(() => {
     const callsInPeriod =
@@ -334,7 +336,8 @@ export function LiveIndicators() {
     const briefingRate = summaryStats?.briefingConfirmationRate ?? summaryStats?.resolutionRate ?? 0;
     return [
       {
-        title: "سجل الحالات اليومية",
+        id: "dailyCases" as const,
+        title: t("liveIndicators.dailyCases"),
         value: String(callsInPeriod),
         change: callsChange,
         trend: typeof callsTrend === "number" ? (callsTrend >= 0 ? "up" : "down") : "neutral",
@@ -342,7 +345,8 @@ export function LiveIndicators() {
         activeColor: "from-primary to-primary",
       },
       {
-        title: "الإفادات المؤكدة",
+        id: "confirmedReports" as const,
+        title: t("liveIndicators.confirmedReports"),
         value: `${briefingRate}%`,
         change: "",
         trend: "neutral",
@@ -350,7 +354,8 @@ export function LiveIndicators() {
         activeColor: "from-primary to-primary",
       },
       {
-        title: "أكثر المشاكل تكرارًا",
+        id: "topProblems" as const,
+        title: t("liveIndicators.topProblems"),
         value: String(topIssueCount),
         change: "",
         trend: "neutral",
@@ -358,7 +363,8 @@ export function LiveIndicators() {
         activeColor: "from-primary to-primary",
       },
       {
-        title: "المشاكل العامة",
+        id: "publicIssues" as const,
+        title: t("liveIndicators.publicIssues"),
         value: String(uniqueGeneralTypes),
         change: "",
         trend: "neutral",
@@ -366,7 +372,7 @@ export function LiveIndicators() {
         activeColor: "from-primary to-primary",
       },
     ];
-  }, [summaryStats, distributionStats, selectedPeriod, periodCasesTotal]);
+  }, [summaryStats, distributionStats, selectedPeriod, periodCasesTotal, t]);
 
   const dailyCasesChartData = useMemo(() => {
     if (selectedPeriod === "today") {
@@ -388,10 +394,10 @@ export function LiveIndicators() {
     const notConfirmed = Math.max(0, 100 - confirmed);
 
     return [
-      { name: "مؤكدة", value: confirmed, color: "#10b981" },
-      { name: "غير مؤكدة", value: notConfirmed, color: "#ef4444" },
+      { name: t("liveIndicators.confirmed"), value: confirmed, color: "#10b981" },
+      { name: t("liveIndicators.notConfirmed"), value: notConfirmed, color: "#ef4444" },
     ];
-  }, [summaryStats]);
+  }, [summaryStats, t]);
 
   const topIssuesData = useMemo(() => {
     const top = distributionStats?.topCategories ?? [];
@@ -430,13 +436,13 @@ export function LiveIndicators() {
         >
           <DialogHeader className="shrink-0 border-b border-border bg-zinc-100 px-6 pb-3 pt-6 text-right dark:bg-zinc-900">
             <DialogTitle className="text-right">
-              الإفادات المؤكدة — المشكلة والحل
+              {t("liveIndicators.briefingsDialogTitle")}
             </DialogTitle>
           </DialogHeader>
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-white px-6 py-4 dark:bg-zinc-950">
             {confirmedBriefingsLoading && (
               <p className="text-sm text-muted-foreground text-center py-10">
-                جاري التحميل…
+                {t("liveIndicators.briefingsLoading")}
               </p>
             )}
             {confirmedBriefingsError && (
@@ -448,7 +454,7 @@ export function LiveIndicators() {
               !confirmedBriefingsError &&
               confirmedBriefingsItems.length === 0 && (
                 <p className="text-sm text-muted-foreground text-right py-4">
-                  لا توجد إفادات مؤكدة ضمن الفترة المحددة.
+                  {t("liveIndicators.briefingsEmpty")}
                 </p>
               )}
             {!confirmedBriefingsLoading &&
@@ -463,7 +469,7 @@ export function LiveIndicators() {
                     )}
                     {row.customerName ? (
                       <span>
-                        العميل:{" "}
+                        {t("liveIndicators.customer")}{" "}
                         <span className="text-foreground font-medium">
                           {row.customerName}
                         </span>
@@ -471,7 +477,7 @@ export function LiveIndicators() {
                     ) : null}
                     {row.entityType ? (
                       <span>
-                        الجهة:{" "}
+                        {t("liveIndicators.entity")}{" "}
                         <span className="text-foreground font-medium">
                           {row.entityType}
                         </span>
@@ -479,7 +485,7 @@ export function LiveIndicators() {
                     ) : null}
                     {row.category ? (
                       <span>
-                        التصنيف:{" "}
+                        {t("liveIndicators.category")}{" "}
                         <span className="text-foreground font-medium">
                           {row.category}
                         </span>
@@ -488,7 +494,7 @@ export function LiveIndicators() {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-muted-foreground mb-1">
-                      المشكلة
+                      {t("liveIndicators.problem")}
                     </p>
                     <p className="text-sm text-foreground whitespace-pre-wrap break-words">
                       {row.problemSummary?.trim() ? row.problemSummary : "—"}
@@ -496,7 +502,7 @@ export function LiveIndicators() {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-muted-foreground mb-1">
-                      الحل / الصيغة المولّدة
+                      {t("liveIndicators.solution")}
                     </p>
                     <pre className="m-0 max-h-[220px] overflow-y-auto rounded-lg border border-border bg-zinc-100 p-3 font-sans text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words dark:bg-zinc-950">
                       {row.solution?.trim() ? row.solution : "—"}
@@ -511,7 +517,7 @@ export function LiveIndicators() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="dash-page-title mb-1 text-right">
-            المؤشرات اللحظية
+            {t("liveIndicators.title")}
           </h1>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Calendar className="size-4" />
@@ -533,25 +539,25 @@ export function LiveIndicators() {
                 value="year"
                 className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
               >
-                هذه السنة
+                {t("liveIndicators.thisYear")}
               </TabsTrigger>
               <TabsTrigger
                 value="month"
                 className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
               >
-                هذا الشهر
+                {t("liveIndicators.thisMonth")}
               </TabsTrigger>
               <TabsTrigger
                 value="week"
                 className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
               >
-                هذا الأسبوع
+                {t("liveIndicators.thisWeek")}
               </TabsTrigger>
               <TabsTrigger
                 value="today"
                 className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
               >
-                اليوم
+                {t("liveIndicators.today")}
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -575,7 +581,7 @@ export function LiveIndicators() {
                 }`}
               >
                 <CalendarIcon className="size-4 ml-2" />
-                <span>من - إلى</span>
+                <span>{t("liveIndicators.dateRange")}</span>
               </Button>
             </PopoverTrigger>
             <PopoverContent
@@ -587,10 +593,10 @@ export function LiveIndicators() {
                 {/* Header */}
                 <div className="text-center pb-4 border-b border-gray-200 dark:border-gray-700">
                   <h3 className="font-bold text-gray-900 dark:text-white mb-1">
-                    تحديد فترة مخصصة
+                    {t("liveIndicators.customRangeTitle")}
                   </h3>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    اختر تاريخ البداية والنهاية
+                    {t("liveIndicators.customRangeHint")}
                   </p>
                 </div>
 
@@ -599,7 +605,7 @@ export function LiveIndicators() {
                   {/* Start Date */}
                   <div className="space-y-3">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 text-right">
-                      من تاريخ (ميلادي)
+                      {t("liveIndicators.startDate")}
                     </label>
                     <CalendarComponent
                       mode="single"
@@ -613,7 +619,7 @@ export function LiveIndicators() {
                   {/* End Date */}
                   <div className="space-y-3">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 text-right">
-                      إلى تاريخ (ميلادي)
+                      {t("liveIndicators.endDate")}
                     </label>
                     <CalendarComponent
                       mode="single"
@@ -638,7 +644,7 @@ export function LiveIndicators() {
                 {startDate && endDate && !dateRangeError && (
                   <div className="bg-primary-soft border border-primary/20 rounded-lg p-3 text-right space-y-1">
                     <p className="text-xs text-primary mb-1">
-                      الفترة المحددة:
+                      {t("liveIndicators.selectedRange")}
                     </p>
                     <p className="text-sm font-medium text-foreground">
                       {formatAppDate(startDate)}
@@ -658,14 +664,14 @@ export function LiveIndicators() {
                     variant="outline"
                     className="flex-1 glass-card border-2 border-border hover:border-primary/40 transition-all"
                   >
-                    إلغاء
+                    {t("actions.cancel")}
                   </Button>
                   <Button
                     onClick={handleApplyCustomRange}
                     disabled={!startDate || !endDate}
                     className="flex-1 bg-primary text-primary-foreground hover:opacity-95 text-white border-0 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed shadow-lg disabled:shadow-none transition-all"
                   >
-                    تطبيق الفلتر
+                    {t("liveIndicators.applyFilter")}
                   </Button>
                 </div>
               </div>
@@ -679,11 +685,11 @@ export function LiveIndicators() {
         <Card className="border-2 border-border shadow-lg">
           <CardContent className="pt-6 text-right">
             {isLoadingAnalytics && (
-              <p className="text-sm text-muted-foreground">جاري تحميل الإحصائيات...</p>
+              <p className="text-sm text-muted-foreground">{t("liveIndicators.loadingStats")}</p>
             )}
             {analyticsError && (
               <p className="text-sm text-red-600 dark:text-red-400">
-                تعذر تحميل الإحصائيات: {analyticsError}
+                {t("liveIndicators.loadStatsFailed")} {analyticsError}
               </p>
             )}
           </CardContent>
@@ -699,14 +705,14 @@ export function LiveIndicators() {
             value={stat.value}
             change={stat.change}
             trend={stat.trend}
-            active={selectedCategory === stat.title}
-            onClick={() => setSelectedCategory(stat.title)}
+            active={selectedCategory === stat.id}
+            onClick={() => setSelectedCategory(stat.id)}
           />
         ))}
       </div>
 
       {/* Charts for "سجل الحالات اليومية" */}
-      {selectedCategory === "سجل الحالات اليومية" && (
+      {selectedCategory === "dailyCases" && (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="dash-chart-card gap-0 p-0 min-w-0">
@@ -718,7 +724,7 @@ export function LiveIndicators() {
               <CardContent className="dash-chart-canvas !p-0 !px-0">
                 {dailyCasesChartData.length === 0 ? (
                   <div className="flex h-[340px] items-center justify-center text-sm text-muted-foreground">
-                    لا توجد بيانات للفترة المحددة بعد.
+                    {t("liveIndicators.noPeriodData")}
                   </div>
                 ) : (
                 <DashboardChartFrame>
@@ -766,13 +772,13 @@ export function LiveIndicators() {
             <Card className="dash-chart-card gap-0 p-0 min-w-0">
               <CardHeader className="dash-chart-card__header border-0 rounded-none shadow-none">
                 <CardTitle className="dash-chart-card__title">
-                  النشاط على مدار اليوم
+                  {t("liveIndicators.hourlyActivity")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="dash-chart-canvas !p-0 !px-0">
                 {hourlyActivityData.length === 0 ? (
                   <div className="flex h-full items-center justify-center text-right text-sm text-muted-foreground">
-                    لا توجد بيانات نشاط لهذه الفترة بعد.
+                    {t("liveIndicators.noHourlyData")}
                   </div>
                 ) : (
                   <DashboardChartFrame>
@@ -796,7 +802,7 @@ export function LiveIndicators() {
                       <YAxis tick={axisTick} tickLine={axisLine} {...DASH_Y_AXIS_RTL} width={36} />
                       <Tooltip
                         contentStyle={dashTooltipStyle}
-                        formatter={(value: number) => [`${value}`, "عدد الحالات"]}
+                        formatter={(value: number) => [`${value}`, t("liveIndicators.casesTooltip")]}
                       />
                       <Bar
                         dataKey="value"
@@ -815,7 +821,7 @@ export function LiveIndicators() {
           <Card className="dash-chart-card gap-0 p-0 min-w-0">
             <CardHeader className="dash-chart-card__header border-0 rounded-none">
               <CardTitle className="dash-chart-card__title">
-                ملخص الحالات اليومية
+                {t("liveIndicators.dailySummary")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 pt-6">
@@ -831,15 +837,15 @@ export function LiveIndicators() {
                 return (
                   <>
                     <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
-                      <span className="text-sm text-foreground font-medium">إجمالي الحالات خلال الفترة</span>
+                      <span className="text-sm text-foreground font-medium">{t("liveIndicators.totalInPeriod")}</span>
                       <span className="dash-inline-stat">{total}</span>
                     </div>
                     <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
-                      <span className="text-sm text-foreground font-medium">متوسط الحالات اليومية</span>
+                      <span className="text-sm text-foreground font-medium">{t("liveIndicators.dailyAverage")}</span>
                       <span className="dash-inline-stat">{avg}</span>
                     </div>
                     <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
-                      <span className="text-sm text-foreground font-medium">أعلى يوم</span>
+                      <span className="text-sm text-foreground font-medium">{t("liveIndicators.peakDay")}</span>
                       <span className="dash-inline-stat">{maxLabel} ({max?.count ?? 0})</span>
                     </div>
                   </>
@@ -851,13 +857,13 @@ export function LiveIndicators() {
       )}
 
       {/* Charts for "الإفادات المؤكدة" */}
-      {selectedCategory === "الإفادات المؤكدة" && (
+      {selectedCategory === "confirmedReports" && (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="dash-chart-card gap-0 p-0 min-w-0">
               <CardHeader className="dash-chart-card__header border-0 rounded-none">
                 <CardTitle className="dash-chart-card__title">
-                  نسب الإفادات المؤكدة
+                  {t("liveIndicators.confirmedRatio")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="dash-chart-canvas !p-0 !px-0">
@@ -874,7 +880,7 @@ export function LiveIndicators() {
                       label={false}
                       style={{ cursor: "pointer" }}
                       onClick={(entry) => {
-                        if (!entry || entry.name !== "مؤكدة") return;
+                        if (!entry || entry.name !== confirmedReportsData[0]?.name) return;
                         setConfirmedBriefingsOpen(true);
                         setConfirmedBriefingsItems([]);
                         setConfirmedBriefingsError(null);
@@ -892,7 +898,7 @@ export function LiveIndicators() {
                             setConfirmedBriefingsError(
                               err instanceof Error
                                 ? err.message
-                                : "تعذّر تحميل القائمة",
+                                : t("liveIndicators.briefingsLoadFailed"),
                             ),
                           )
                           .finally(() =>
@@ -933,7 +939,7 @@ export function LiveIndicators() {
             <Card className="dash-chart-card gap-0 p-0 min-w-0">
               <CardHeader className="dash-chart-card__header border-0 rounded-none">
                 <CardTitle className="dash-chart-card__title">
-                  تفاصيل الإفادات
+                  {t("liveIndicators.briefingDetails")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4 pt-6">
@@ -946,19 +952,19 @@ export function LiveIndicators() {
                   return (
                     <>
                       <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
-                        <span className="text-sm text-foreground font-medium">إجمالي البلاغات</span>
+                        <span className="text-sm text-foreground font-medium">{t("liveIndicators.totalReports")}</span>
                         <span className="dash-inline-stat">{total}</span>
                       </div>
                       <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
-                        <span className="text-sm text-foreground font-medium">محلولة</span>
+                        <span className="text-sm text-foreground font-medium">{t("liveIndicators.resolved")}</span>
                         <span className="text-lg text-emerald-600 dark:text-emerald-400 font-bold">{resolved} ({rate}%)</span>
                       </div>
                       <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
-                        <span className="text-sm text-foreground font-medium">غير محلولة</span>
+                        <span className="text-sm text-foreground font-medium">{t("liveIndicators.unresolved")}</span>
                         <span className="text-lg text-red-600 dark:text-red-400 font-bold">{notResolved} ({Math.max(0, 100 - Number(rate))}%)</span>
                       </div>
                       <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
-                        <span className="text-sm text-foreground font-medium">معدل الحل</span>
+                        <span className="text-sm text-foreground font-medium">{t("liveIndicators.resolutionRate")}</span>
                         <span className="dash-inline-stat">{rate}%</span>
                       </div>
                     </>
@@ -971,20 +977,20 @@ export function LiveIndicators() {
       )}
 
       {/* Charts for "أكثر المشاكل تكرارًا" */}
-      {selectedCategory === "أكثر المشاكل تكرارًا" && (
+      {selectedCategory === "topProblems" && (
         <>
           <div className="grid grid-cols-1 gap-6">
             <Card className="dash-chart-card gap-0 p-0 min-w-0">
               <CardHeader className="dash-chart-card__header border-0 rounded-none">
                 <CardTitle className="dash-chart-card__title">
-                  أكثر 5 مشاكل تكراراً
+                  {t("liveIndicators.top5Problems")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-6">
                 <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
                   {/* Legend List on the Right */}
                   <div className="space-y-3 order-2 lg:order-1">
-                    <h4 className="font-bold text-foreground text-sm mb-4">أنواع المشاكل:</h4>
+                    <h4 className="font-bold text-foreground text-sm mb-4">{t("liveIndicators.problemTypes")}</h4>
                     {topIssuesData.map((item, index) => (
                       <div
                         key={index}
@@ -999,7 +1005,7 @@ export function LiveIndicators() {
                             {item.name}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {item.value} حالة
+                            {t("liveIndicators.casesCount", { count: item.value })}
                           </p>
                         </div>
                       </div>
@@ -1029,7 +1035,7 @@ export function LiveIndicators() {
                         />
                         <Tooltip
                           contentStyle={dashTooltipStyle}
-                          formatter={(value: any) => [`${value}`, 'عدد الحالات']}
+                          formatter={(value: any) => [`${value}`, t("liveIndicators.casesTooltip")]}
                           cursor={false}
                         />
                         <Bar
@@ -1063,7 +1069,7 @@ export function LiveIndicators() {
           <Card className="dash-chart-card gap-0 p-0 min-w-0">
             <CardHeader className="dash-chart-card__header border-0 rounded-none">
               <CardTitle className="dash-chart-card__title">
-                ملخص المشاكل المتكررة
+                {t("liveIndicators.repeatedSummary")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 pt-6">
@@ -1075,15 +1081,15 @@ export function LiveIndicators() {
                 return (
                   <>
                     <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
-                      <span className="text-sm text-foreground font-medium">عدد الأنواع (حسب التصنيفات)</span>
+                      <span className="text-sm text-foreground font-medium">{t("liveIndicators.typeCount")}</span>
                       <span className="dash-inline-stat">{totalTypes}</span>
                     </div>
                     <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
-                      <span className="text-sm text-foreground font-medium">أكثر مشكلة تكراراً</span>
+                      <span className="text-sm text-foreground font-medium">{t("liveIndicators.topRepeated")}</span>
                       <span className="dash-inline-stat">{top ? `${top.category} (${top.count})` : '—'}</span>
                     </div>
                     <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
-                      <span className="text-sm text-foreground font-medium">إجمالي التكرارات (Top Categories)</span>
+                      <span className="text-sm text-foreground font-medium">{t("liveIndicators.totalRepeats")}</span>
                       <span className="dash-inline-stat">{totalRepeats}</span>
                     </div>
                   </>
@@ -1095,14 +1101,14 @@ export function LiveIndicators() {
       )}
 
       {/* Charts for "المشاكل العامة" */}
-      {selectedCategory === "المشاكل العامة" && (
+      {selectedCategory === "publicIssues" && (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 dash-charts-grid--general">
             {/* Platforms Distribution */}
             <Card className="dash-chart-card gap-0 p-0 min-w-0">
               <CardHeader className="dash-chart-card__header border-0 rounded-none">
                 <CardTitle className="dash-chart-card__title">
-                  الجهات المتضررة
+                  {t("liveIndicators.affectedEntities")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="dash-chart-canvas !p-0 !px-0">
@@ -1152,13 +1158,13 @@ export function LiveIndicators() {
             <Card className="dash-chart-card gap-0 p-0 min-w-0">
               <CardHeader className="dash-chart-card__header border-0 rounded-none">
                 <CardTitle className="dash-chart-card__title">
-                  المشاكل العامة حسب التصنيف
+                  {t("liveIndicators.publicIssuesByCategory")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="dash-chart-canvas dash-chart-canvas--tall !p-0 !px-0">
                 {uniqueCommonIssuesChartData.length === 0 ? (
                   <div className="flex h-full items-center justify-center text-right text-sm text-muted-foreground">
-                    لا توجد تصنيفات مسجّلة للمشاكل العامة بعد.
+                    {t("liveIndicators.noCategoriesYet")}
                   </div>
                 ) : (
                   <DashboardChartFrame height={DASH_CHART_HEIGHT_TALL}>
@@ -1189,7 +1195,7 @@ export function LiveIndicators() {
                           borderRadius: "0.75rem",
                           color: "var(--foreground)"
                         }}
-                        formatter={(value: number) => [`${value}`, "عدد البلاغات"]}
+                        formatter={(value: number) => [`${value}`, t("liveIndicators.reportsCount")]}
                       />
                       <Bar
                         dataKey="value"
@@ -1222,7 +1228,7 @@ export function LiveIndicators() {
             <Card className="dash-chart-card gap-0 p-0 min-w-0">
               <CardHeader className="dash-chart-card__header border-0 rounded-none">
                 <CardTitle className="dash-chart-card__title">
-                  المشاكل النشطة حالياً
+                  {t("liveIndicators.activeNow")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-6">
@@ -1233,8 +1239,8 @@ export function LiveIndicators() {
                   const percent = total > 0 ? Math.round((active / total) * 100) : 0;
 
                   const data = [
-                    { name: "نشطة", value: active, color: "#d97706" },
-                    { name: "غير نشطة", value: inactive, color: "#cbd5e1" },
+                    { name: t("liveIndicators.active"), value: active, color: "#d97706" },
+                    { name: t("liveIndicators.inactive"), value: inactive, color: "#cbd5e1" },
                   ];
 
                   return (
@@ -1278,7 +1284,7 @@ export function LiveIndicators() {
                         </DashboardChartFrame>
                       </div>
                       <div className="text-center mt-4 px-6 pb-6">
-                        <p className="text-sm text-muted-foreground">نسبة المشاكل النشطة</p>
+                        <p className="text-sm text-muted-foreground">{t("liveIndicators.activeShare")}</p>
                         <p className="text-2xl text-amber-600 dark:text-amber-400 font-bold">
                           {percent}%
                         </p>
@@ -1293,7 +1299,7 @@ export function LiveIndicators() {
             <Card className="dash-chart-card gap-0 p-0 min-w-0">
               <CardHeader className="dash-chart-card__header border-0 rounded-none">
                 <CardTitle className="dash-chart-card__title">
-                  المشاكل المؤكد حلها
+                  {t("liveIndicators.resolvedConfirmed")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-6">
@@ -1304,8 +1310,8 @@ export function LiveIndicators() {
                   const percent = summaryStats?.resolutionRate ?? (total > 0 ? Math.round((resolved / total) * 100) : 0);
 
                   const data = [
-                    { name: "محلولة", value: resolved, color: "#10b981" },
-                    { name: "غير محلولة", value: notResolved, color: "#cbd5e1" },
+                    { name: t("liveIndicators.resolvedLabel"), value: resolved, color: "#10b981" },
+                    { name: t("liveIndicators.unresolvedLabel"), value: notResolved, color: "#cbd5e1" },
                   ];
 
                   return (
@@ -1349,7 +1355,7 @@ export function LiveIndicators() {
                         </DashboardChartFrame>
                       </div>
                       <div className="text-center mt-4 px-6 pb-6">
-                        <p className="text-sm text-muted-foreground">نسبة المشاكل المحلولة</p>
+                        <p className="text-sm text-muted-foreground">{t("liveIndicators.resolvedShare")}</p>
                         <p className="text-2xl text-emerald-600 dark:text-emerald-400 font-bold">{percent}%</p>
                       </div>
                     </>
@@ -1363,30 +1369,30 @@ export function LiveIndicators() {
           <Card className="dash-chart-card gap-0 p-0 min-w-0">
             <CardHeader className="dash-chart-card__header border-0 rounded-none">
               <CardTitle className="dash-chart-card__title">
-                ملخص عام
+                {t("liveIndicators.generalSummary")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 pt-6">
               <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
-                <span className="text-sm text-foreground font-medium">أنواع المشاكل العامة (غير مكررة)</span>
+                <span className="text-sm text-foreground font-medium">{t("liveIndicators.uniqueGeneralTypesLabel")}</span>
                 <span className="dash-inline-stat">
                   {distributionStats?.uniqueCategoryCount ?? uniqueCommonIssuesChartData.length}
                 </span>
               </div>
               <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
-                <span className="text-sm text-foreground font-medium">إجمالي البلاغات</span>
+                <span className="text-sm text-foreground font-medium">{t("liveIndicators.totalReports")}</span>
                 <span className="dash-inline-stat">{summaryStats?.totalCalls ?? 0}</span>
               </div>
               <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
-                <span className="text-sm text-foreground font-medium">معدل الحل</span>
+                <span className="text-sm text-foreground font-medium">{t("liveIndicators.resolutionRate")}</span>
                 <span className="dash-inline-stat">{summaryStats?.resolutionRate ?? 0}%</span>
               </div>
               <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
-                <span className="text-sm text-foreground font-medium">متوسط وقت الحل (ساعات)</span>
+                <span className="text-sm text-foreground font-medium">{t("liveIndicators.avgResolutionHours")}</span>
                 <span className="dash-inline-stat">{summaryStats?.avgResolutionTime ?? 0}</span>
               </div>
               <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
-                <span className="text-sm text-foreground font-medium">المستخدمون النشطون</span>
+                <span className="text-sm text-foreground font-medium">{t("liveIndicators.activeUsers")}</span>
                 <span className="dash-inline-stat">{summaryStats?.activeUsers ?? 0} / {summaryStats?.totalUsers ?? 0}</span>
               </div>
             </CardContent>
@@ -1399,7 +1405,7 @@ export function LiveIndicators() {
                 <div className="p-2 bg-primary rounded-xl border-2 border-primary/30">
                   <Clock className="size-5 text-white" />
                 </div>
-                <span className="font-bold">آخر تحديث</span>
+                <span className="font-bold">{t("liveIndicators.lastUpdate")}</span>
               </div>
               <div className="text-right text-muted-foreground">
                 {(() => {

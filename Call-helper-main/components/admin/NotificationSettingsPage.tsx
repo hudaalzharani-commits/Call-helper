@@ -1,3 +1,4 @@
+import { useLanguage } from '../../contexts/LanguageContext';
 import { Bell, Mail, MessageSquare, Smartphone, Save, AlertTriangle } from 'lucide-react';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
@@ -8,26 +9,28 @@ import { Textarea } from '../ui/textarea';
 import { Alert, AlertTitle, AlertDescription } from '../ui/alert';
 
 export function NotificationSettingsPage() {
+  const { t, dir } = useLanguage();
+
   return (
     <div className="space-y-6">
       <Alert
-        dir="rtl"
+        dir={dir}
         role="status"
         className="border-amber-500/50 bg-amber-50/90 text-amber-950 dark:bg-amber-950/35 dark:text-amber-50 dark:border-amber-400/45 [&>svg]:text-amber-600 dark:[&>svg]:text-amber-400"
       >
         <AlertTriangle className="size-4 shrink-0" />
         <AlertTitle className="text-amber-950 dark:text-amber-50">
-          تنبيه: صفحة إعدادات الإشعارات لا تعمل حالياً
+          {t('admin.notifications.demoAlertTitle')}
         </AlertTitle>
         <AlertDescription className="text-amber-900/90 dark:text-amber-100/90">
-          الواجهة للعرض التجريبي فقط؛ التغييرات لا تُحفظ ولا تُربَط بالخادم حتى يتم تفعيلها لاحقاً.
+          {t('admin.notifications.demoAlertDesc')}
         </AlertDescription>
       </Alert>
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-foreground mb-2">Notification Settings</h2>
-          <p className="text-muted-foreground">إدارة التنبيهات والإشعارات</p>
+          <h2 className="text-2xl font-bold text-foreground mb-2">{t('admin.notifications.title')}</h2>
+          <p className="text-muted-foreground">{t('admin.notifications.subtitle')}</p>
         </div>
         <Button className="bg-primary text-primary-foreground hover:bg-primary-hover text-primary-foreground">
           <Save className="size-4 ml-2" />
@@ -40,45 +43,45 @@ export function NotificationSettingsPage() {
         <Card className="glass-panel border-2 border-border p-6">
           <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
             <Mail className="size-5 text-primary" />
-            إشعارات البريد الإلكتروني
+            {t('admin.notifications.emailSection')}
           </h3>
           <div className="space-y-4">
             <div className="flex items-center justify-between p-4 glass-card rounded-xl border border-border">
               <div>
-                <p className="text-foreground font-medium">تسجيل دخول جديد</p>
-                <p className="text-xs text-muted-foreground">إشعار عند تسجيل دخول من جهاز جديد</p>
+                <p className="text-foreground font-medium">{t('admin.notifications.newLogin')}</p>
+                <p className="text-xs text-muted-foreground">{t('admin.notifications.newLoginDesc')}</p>
               </div>
               <Switch defaultChecked />
             </div>
 
             <div className="flex items-center justify-between p-4 glass-card rounded-xl border border-border">
               <div>
-                <p className="text-foreground font-medium">المشاكل الجديدة</p>
-                <p className="text-xs text-muted-foreground">إشعار عند إضافة مشكلة جديدة</p>
+                <p className="text-foreground font-medium">{t('admin.notifications.newIssues')}</p>
+                <p className="text-xs text-muted-foreground">{t('admin.notifications.newIssuesDesc')}</p>
               </div>
               <Switch defaultChecked />
             </div>
 
             <div className="flex items-center justify-between p-4 glass-card rounded-xl border border-border">
               <div>
-                <p className="text-foreground font-medium">تحديثات النظام</p>
-                <p className="text-xs text-muted-foreground">إشعار عند توفر تحديثات</p>
+                <p className="text-foreground font-medium">{t('admin.notifications.systemUpdates')}</p>
+                <p className="text-xs text-muted-foreground">{t('admin.notifications.systemUpdatesDesc')}</p>
               </div>
               <Switch defaultChecked />
             </div>
 
             <div className="flex items-center justify-between p-4 glass-card rounded-xl border border-border">
               <div>
-                <p className="text-foreground font-medium">التقارير الأسبوعية</p>
-                <p className="text-xs text-muted-foreground">ملخص أسبوعي للنشاطات</p>
+                <p className="text-foreground font-medium">{t('admin.notifications.weeklyReports')}</p>
+                <p className="text-xs text-muted-foreground">{t('admin.notifications.weeklyReportsDesc')}</p>
               </div>
               <Switch />
             </div>
 
             <div className="flex items-center justify-between p-4 glass-card rounded-xl border border-border">
               <div>
-                <p className="text-foreground font-medium">تنبيهات الأمان</p>
-                <p className="text-xs text-muted-foreground">إشعار فوري بالمشاكل الأمنية</p>
+                <p className="text-foreground font-medium">{t('admin.notifications.securityAlerts')}</p>
+                <p className="text-xs text-muted-foreground">{t('admin.notifications.securityAlertsDesc')}</p>
               </div>
               <Switch defaultChecked />
             </div>
@@ -89,45 +92,45 @@ export function NotificationSettingsPage() {
         <Card className="glass-panel border-2 border-border p-6">
           <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
             <Bell className="size-5 text-primary" />
-            الإشعارات الفورية
+            {t('admin.notifications.pushSection')}
           </h3>
           <div className="space-y-4">
             <div className="flex items-center justify-between p-4 glass-card rounded-xl border border-border">
               <div>
-                <p className="text-foreground font-medium">تفعيل الإشعارات الفورية</p>
-                <p className="text-xs text-muted-foreground">السماح بالإشعارات في المتصفح</p>
+                <p className="text-foreground font-medium">تفعيل {t('admin.notifications.pushSection')}</p>
+                <p className="text-xs text-muted-foreground">{t('admin.notifications.enablePushDesc')}</p>
               </div>
               <Switch defaultChecked />
             </div>
 
             <div className="flex items-center justify-between p-4 glass-card rounded-xl border border-border">
               <div>
-                <p className="text-foreground font-medium">الأحداث المهمة</p>
-                <p className="text-xs text-muted-foreground">إشعار بالأحداث عالية الأولوية</p>
+                <p className="text-foreground font-medium">{t('admin.notifications.importantEvents')}</p>
+                <p className="text-xs text-muted-foreground">{t('admin.notifications.importantEventsDesc')}</p>
               </div>
               <Switch defaultChecked />
             </div>
 
             <div className="flex items-center justify-between p-4 glass-card rounded-xl border border-border">
               <div>
-                <p className="text-foreground font-medium">تعيين المهام</p>
-                <p className="text-xs text-muted-foreground">إشعار عند تعيين مهمة جديدة</p>
+                <p className="text-foreground font-medium">{t('admin.notifications.taskAssignment')}</p>
+                <p className="text-xs text-muted-foreground">{t('admin.notifications.taskAssignmentDesc')}</p>
               </div>
               <Switch defaultChecked />
             </div>
 
             <div className="flex items-center justify-between p-4 glass-card rounded-xl border border-border">
               <div>
-                <p className="text-foreground font-medium">الردود والتعليقات</p>
-                <p className="text-xs text-muted-foreground">إشعار بالردود على مشاركاتك</p>
+                <p className="text-foreground font-medium">{t('admin.notifications.repliesComments')}</p>
+                <p className="text-xs text-muted-foreground">{t('admin.notifications.repliesCommentsDesc')}</p>
               </div>
               <Switch />
             </div>
 
             <div className="flex items-center justify-between p-4 glass-card rounded-xl border border-border">
               <div>
-                <p className="text-foreground font-medium">الإشارات</p>
-                <p className="text-xs text-muted-foreground">إشعار عند الإشارة إليك</p>
+                <p className="text-foreground font-medium">{t('admin.notifications.mentions')}</p>
+                <p className="text-xs text-muted-foreground">{t('admin.notifications.mentionsDesc')}</p>
               </div>
               <Switch defaultChecked />
             </div>
@@ -138,11 +141,11 @@ export function NotificationSettingsPage() {
         <Card className="glass-panel border-2 border-border p-6">
           <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
             <Smartphone className="size-5 text-primary" />
-            إشعارات الرسائل القصيرة
+            {t('admin.notifications.smsSectionShort')}
           </h3>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="phone" className="text-foreground">رقم الهاتف</Label>
+              <Label htmlFor="phone" className="text-foreground">{t('admin.notifications.phoneLabel')}</Label>
               <Input 
                 id="phone" 
                 type="tel" 
@@ -153,24 +156,24 @@ export function NotificationSettingsPage() {
 
             <div className="flex items-center justify-between p-4 glass-card rounded-xl border border-border">
               <div>
-                <p className="text-foreground font-medium">تفعيل الرسائل القصيرة</p>
-                <p className="text-xs text-muted-foreground">استقبال إشعارات SMS</p>
+                <p className="text-foreground font-medium">{t('admin.notifications.enableSms')}</p>
+                <p className="text-xs text-muted-foreground">{t('admin.notifications.enableSmsDesc')}</p>
               </div>
               <Switch />
             </div>
 
             <div className="flex items-center justify-between p-4 glass-card rounded-xl border border-border">
               <div>
-                <p className="text-foreground font-medium">حالات الطوارئ فقط</p>
-                <p className="text-xs text-muted-foreground">إرسال SMS للأحداث الحرجة</p>
+                <p className="text-foreground font-medium">{t('admin.notifications.emergencyOnly')}</p>
+                <p className="text-xs text-muted-foreground">{t('admin.notifications.emergencyOnlyDesc')}</p>
               </div>
               <Switch defaultChecked />
             </div>
 
             <div className="flex items-center justify-between p-4 glass-card rounded-xl border border-border">
               <div>
-                <p className="text-foreground font-medium">رموز التحقق</p>
-                <p className="text-xs text-muted-foreground">إرسال OTP عبر SMS</p>
+                <p className="text-foreground font-medium">{t('admin.notifications.otpCodes')}</p>
+                <p className="text-xs text-muted-foreground">{t('admin.notifications.otpCodesDesc')}</p>
               </div>
               <Switch defaultChecked />
             </div>
@@ -181,13 +184,13 @@ export function NotificationSettingsPage() {
         <Card className="glass-panel border-2 border-border p-6">
           <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
             <MessageSquare className="size-5 text-primary" />
-            إشعارات داخل التطبيق
+            {t('admin.notifications.inAppSection')}
           </h3>
           <div className="space-y-4">
             <div className="flex items-center justify-between p-4 glass-card rounded-xl border border-border">
               <div>
-                <p className="text-foreground font-medium">إظهار الإشعارات</p>
-                <p className="text-xs text-muted-foreground">عرض إشعارات في واجهة التطبيق</p>
+                <p className="text-foreground font-medium">{t('admin.notifications.showInApp')}</p>
+                <p className="text-xs text-muted-foreground">{t('admin.notifications.showInAppDesc')}</p>
               </div>
               <Switch defaultChecked />
             </div>
@@ -195,23 +198,23 @@ export function NotificationSettingsPage() {
             <div className="flex items-center justify-between p-4 glass-card rounded-xl border border-border">
               <div>
                 <p className="text-foreground font-medium">الأصوات</p>
-                <p className="text-xs text-muted-foreground">تشغيل صوت عند وصول إشعار</p>
+                <p className="text-xs text-muted-foreground">{t('admin.notifications.soundDesc')}</p>
               </div>
               <Switch defaultChecked />
             </div>
 
             <div className="flex items-center justify-between p-4 glass-card rounded-xl border border-border">
               <div>
-                <p className="text-foreground font-medium">شارة الأعداد</p>
-                <p className="text-xs text-muted-foreground">عرض عدد الإشعارات غير المقروءة</p>
+                <p className="text-foreground font-medium">{t('admin.notifications.badgeCount')}</p>
+                <p className="text-xs text-muted-foreground">{t('admin.notifications.badgeCountDesc')}</p>
               </div>
               <Switch defaultChecked />
             </div>
 
             <div className="flex items-center justify-between p-4 glass-card rounded-xl border border-border">
               <div>
-                <p className="text-foreground font-medium">الإشعارات المنبثقة</p>
-                <p className="text-xs text-muted-foreground">نوافذ منبثقة للإشعارات العاجلة</p>
+                <p className="text-foreground font-medium">{t('admin.notifications.popupNotifications')}</p>
+                <p className="text-xs text-muted-foreground">{t('admin.notifications.popupNotificationsDesc')}</p>
               </div>
               <Switch />
             </div>
@@ -223,7 +226,7 @@ export function NotificationSettingsPage() {
           <h3 className="text-lg font-bold text-foreground mb-4">قوالب البريد الإلكتروني</h3>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email-subject" className="text-foreground">موضوع البريد</Label>
+              <Label htmlFor="email-subject" className="text-foreground">{t('admin.notifications.emailSubjectLabel')}</Label>
               <Input 
                 id="email-subject" 
                 defaultValue="[رفيق] لديك إشعار جديد" 
@@ -232,7 +235,7 @@ export function NotificationSettingsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email-body" className="text-foreground">نص البريد</Label>
+              <Label htmlFor="email-body" className="text-foreground">{t('admin.notifications.emailBodyLabel')}</Label>
               <Textarea 
                 id="email-body" 
                 rows={6}
@@ -242,7 +245,7 @@ export function NotificationSettingsPage() {
             </div>
 
             <div className="p-4 glass-card rounded-xl border border-border">
-              <p className="text-sm text-foreground mb-2 font-medium">المتغيرات المتاحة:</p>
+              <p className="text-sm text-foreground mb-2 font-medium">{t('admin.notifications.availableVars')}</p>
               <div className="flex flex-wrap gap-2">
                 <code className="px-2 py-1 bg-primary/10 text-primary rounded text-xs">{'{{name}}'}</code>
                 <code className="px-2 py-1 bg-primary/10 text-primary rounded text-xs">{'{{email}}'}</code>
@@ -256,20 +259,20 @@ export function NotificationSettingsPage() {
 
         {/* Notification Schedule */}
         <Card className="glass-panel border-2 border-border p-6 lg:col-span-2">
-          <h3 className="text-lg font-bold text-foreground mb-4">جدولة الإشعارات</h3>
+          <h3 className="text-lg font-bold text-foreground mb-4">{t('admin.notifications.scheduleSection')}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-4 glass-card rounded-xl border border-border">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-foreground font-medium">وضع عدم الإزعاج</p>
+                <p className="text-foreground font-medium">{t('admin.notifications.dndMode')}</p>
                 <Switch />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">من</Label>
+                  <Label className="text-xs text-muted-foreground">{t('admin.notifications.from')}</Label>
                   <Input type="time" defaultValue="22:00" className="glass-card border-2 border-border h-9 text-sm" />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">إلى</Label>
+                  <Label className="text-xs text-muted-foreground">{t('admin.notifications.to')}</Label>
                   <Input type="time" defaultValue="08:00" className="glass-card border-2 border-border h-9 text-sm" />
                 </div>
               </div>
@@ -277,11 +280,11 @@ export function NotificationSettingsPage() {
 
             <div className="p-4 glass-card rounded-xl border border-border">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-foreground font-medium">أيام العطلة</p>
+                <p className="text-foreground font-medium">{t('admin.notifications.weekendDays')}</p>
                 <Switch />
               </div>
               <p className="text-xs text-muted-foreground">
-                تعطيل الإشعارات غير العاجلة في عطلة نهاية الأسبوع
+                {t('admin.notifications.weekendDaysDesc')}
               </p>
             </div>
           </div>

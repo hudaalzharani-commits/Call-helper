@@ -25,6 +25,7 @@ import { formatAppDate } from '../utils/dateDisplay';
 import {
   stripTrainingAttachmentFooter,
 } from '../utils/trainingScenarioAttachment';
+import { useI18nLayout } from '../hooks/useI18nLayout';
 
 function trainingScenarioDisplayText(entry: TrainingEntry): string {
   return stripTrainingAttachmentFooter(entry.scenario);
@@ -68,6 +69,7 @@ const TRAINING_DIALOG_PANEL =
 
 export function RafeeqTraining() {
   const { user } = useAuth();
+  const { t } = useI18nLayout();
   const canReview = isPrivilegedStaff(user?.role);
   const canAddTrainingExample = isGranularCreateEnabled(user, 'action_training_example_create');
   const canEditEntry = (e: TrainingEntry) =>
@@ -109,7 +111,7 @@ export function RafeeqTraining() {
     } catch (error) {
       console.error('Error loading training entries:', error);
       setEntries([]);
-      toast.error(error instanceof Error ? error.message : 'تعذّر تحميل أمثلة التدريب');
+      toast.error(error instanceof Error ? error.message : t('training.loadFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -134,13 +136,13 @@ export function RafeeqTraining() {
   const handleCreateEntry = async () => {
     try {
       await createTrainingEntry(formData);
-      toast.success('تم إرسال المثال للمراجعة');
+      toast.success(t('training.submitted'));
       setIsCreateDialogOpen(false);
       resetForm();
       await loadEntries();
     } catch (error) {
       console.error('Error creating entry:', error);
-      toast.error(error instanceof Error ? error.message : 'فشل الإرسال');
+      toast.error(error instanceof Error ? error.message : t('training.submitFailed'));
     }
   };
 
@@ -149,14 +151,14 @@ export function RafeeqTraining() {
 
     try {
       await updateTrainingEntry(selectedEntry.id, formData);
-      toast.success('تم حفظ التعديلات');
+      toast.success(t('training.saved'));
       setIsEditDialogOpen(false);
       setSelectedEntry(null);
       resetForm();
       await loadEntries();
     } catch (error) {
       console.error('Error updating entry:', error);
-      toast.error(error instanceof Error ? error.message : 'فشل التحديث');
+      toast.error(error instanceof Error ? error.message : t('training.updateFailed'));
     }
   };
 
@@ -165,31 +167,31 @@ export function RafeeqTraining() {
 
     try {
       await deleteTrainingEntry(id);
-      toast.success('تم الحذف');
+      toast.success(t('training.deleted'));
       await loadEntries();
     } catch (error) {
       console.error('Error deleting entry:', error);
-      toast.error(error instanceof Error ? error.message : 'فشل الحذف');
+      toast.error(error instanceof Error ? error.message : t('training.deleteFailed'));
     }
   };
 
   const handleReviewEntry = async (status: 'approved' | 'rejected') => {
     if (!selectedEntry) return;
     if (!canReview) {
-      toast.error('لا تملك صلاحية المراجعة');
+      toast.error(t('training.noReviewPermission'));
       return;
     }
 
     try {
       await reviewTrainingEntry(selectedEntry.id, status, reviewNotes);
-      toast.success(status === 'approved' ? 'تمت الموافقة' : 'تم الرفض');
+      toast.success(status === 'approved' ? t('training.approved') : t('training.rejected'));
       setIsReviewDialogOpen(false);
       setSelectedEntry(null);
       setReviewNotes('');
       await loadEntries();
     } catch (error) {
       console.error('Error reviewing entry:', error);
-      toast.error(error instanceof Error ? error.message : 'فشلت المراجعة');
+      toast.error(error instanceof Error ? error.message : t('training.reviewFailed'));
     }
   };
 
@@ -264,7 +266,7 @@ export function RafeeqTraining() {
           <div className="p-3 bg-primary/10 rounded-xl">
             <Lightbulb className="size-8 text-primary" />
           </div>
-          <h1 className="text-foreground">وش تعلم رفيق؟</h1>
+          <h1 className="text-foreground">{t('training.title')}</h1>
         </div>
         {canAddTrainingExample ? (
           <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700">

@@ -5,6 +5,7 @@ import { Card } from '../ui/card';
 import { Input } from '../ui/input';
 import { Switch } from '../ui/switch';
 import { toast } from 'sonner';
+import { useI18nLayout } from '../../hooks/useI18nLayout';
 import { formatAppDateTime } from '../../utils/dateDisplay';
 
 interface Case {
@@ -50,6 +51,7 @@ const SUBTYPE_CASE_CODE: Record<string, string> = {
 };
 
 export function DatabasePage() {
+  const { locale, dir, t } = useI18nLayout();
   const [cases, setCases] = useState<Case[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [usageCounts, setUsageCounts] = useState<Record<string, number>>({});
@@ -120,10 +122,10 @@ export function DatabasePage() {
         )
       );
 
-      toast.success(nextIsActive ? 'تم تفعيل الحالة' : 'تم تعطيل الحالة');
+      toast.success(nextIsActive ? t('admin.database.caseActivated') : t('admin.database.caseDeactivated'));
     } catch (error: any) {
       console.error('Error updating case active status:', error);
-      toast.error(error.message || 'فشل في تحديث حالة التفعيل');
+      toast.error(error.message || t('admin.database.toggleFailed'));
     }
   };
 
@@ -164,7 +166,7 @@ export function DatabasePage() {
       }
     } catch (error) {
       console.error('Error fetching cases:', error);
-      toast.error('فشل في تحميل الحالات');
+      toast.error(t('admin.database.loadFailed'));
       setUsageCounts({});
     } finally {
       setLoading(false);
@@ -294,12 +296,12 @@ export function DatabasePage() {
         throw new Error(error.message || 'Failed to create case');
       }
 
-      toast.success('تم إضافة الحالة بنجاح');
+      toast.success(t('admin.database.addSuccess'));
       resetForm();
       fetchCases();
     } catch (error: any) {
       console.error('Error adding case:', error);
-      toast.error(error.message || 'فشل في إضافة الحالة');
+      toast.error(error.message || t('admin.database.addFailed'));
     }
   };
 
@@ -346,12 +348,12 @@ export function DatabasePage() {
         throw new Error(error.message || 'Failed to update case');
       }
 
-      toast.success('تم تحديث الحالة بنجاح');
+      toast.success(t('admin.database.updateSuccess'));
       resetForm();
       fetchCases();
     } catch (error: any) {
       console.error('Error updating case:', error);
-      toast.error(error.message || 'فشل في تحديث الحالة');
+      toast.error(error.message || t('admin.database.updateFailed'));
     }
   };
 
@@ -374,11 +376,11 @@ export function DatabasePage() {
         throw new Error('Failed to delete case');
       }
 
-      toast.success('تم حذف الحالة بنجاح');
+      toast.success(t('admin.database.deleteSuccess'));
       fetchCases();
     } catch (error) {
       console.error('Error deleting case:', error);
-      toast.error('فشل في حذف الحالة');
+      toast.error(t('admin.database.deleteFailed'));
     }
   };
 
@@ -410,11 +412,11 @@ export function DatabasePage() {
         resetForm();
       }
 
-      toast.success('تمت أرشفة الحالة');
+      toast.success(t('admin.database.archiveSuccess'));
       fetchCases();
     } catch (error: unknown) {
       console.error('Error archiving case:', error);
-      toast.error(error instanceof Error ? error.message : 'فشل في أرشفة الحالة');
+      toast.error(error instanceof Error ? error.message : t('admin.database.archiveFailed'));
     } finally {
       setArchivingId(null);
     }
@@ -761,7 +763,7 @@ export function DatabasePage() {
             </Button>
             <Button
               onClick={editingCase ? handleUpdateCase : handleAddCase}
-              className="bg-primary text-primary-foreground hover:bg-primary-hover text-primary-foreground"
+              className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white"
             >
               <Save className="size-4 ml-2" />
               {editingCase ? 'Update Case' : 'Add Case'}
@@ -782,11 +784,11 @@ export function DatabasePage() {
             <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="بحث في قاعدة البيانات (CaseID، كلمات، تصنيف…)"
+              placeholder={t('admin.database.searchPlaceholder')}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="h-10 w-full pr-10 text-right text-base"
-              aria-label="بحث في الحالات"
+              aria-label={t('admin.database.searchAria')}
             />
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -796,7 +798,7 @@ export function DatabasePage() {
             </Button>
             <Button
               onClick={() => setShowAddForm(true)}
-              className="bg-primary text-primary-foreground hover:bg-primary-hover text-primary-foreground"
+              className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white"
             >
               <Plus className="size-4 ml-2" />
               Add New Case
@@ -831,7 +833,7 @@ export function DatabasePage() {
                       <p className="text-muted-foreground">No cases found. Add your first case!</p>
                       <Button
                         onClick={() => setShowAddForm(true)}
-                        className="bg-primary text-primary-foreground hover:bg-primary-hover text-primary-foreground"
+                        className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white"
                       >
                         <Plus className="size-4 ml-2" />
                         Add New Case
@@ -901,7 +903,7 @@ export function DatabasePage() {
                           size="sm"
                           disabled={archivingId === caseItem._id}
                           onClick={() => handleEditClick(caseItem)}
-                          className="bg-primary hover:bg-cyan-600 text-white text-xs px-3"
+                          className="bg-cyan-500 hover:bg-cyan-600 text-white text-xs px-3"
                         >
                           Edit
                         </Button>

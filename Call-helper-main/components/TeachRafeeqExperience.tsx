@@ -6,6 +6,7 @@ import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { createTrainingEntry } from '../services/trainingEntriesService';
+import { useI18nLayout } from '../hooks/useI18nLayout';
 import {
   stripTrainingAttachmentFooter,
   scenarioTextMentionsAttachmentLine,
@@ -20,6 +21,7 @@ type PrefillPayload = {
 };
 
 export function TeachRafeeqExperience() {
+  const { t } = useI18nLayout();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [entityType, setEntityType] = useState('');
   const [problemDetails, setProblemDetails] = useState('');
@@ -54,7 +56,7 @@ export function TeachRafeeqExperience() {
     const rawProblem = problemDetails.trim();
     const correct = correctInfo.trim();
     if (!cat || !rawProblem || !correct) {
-      toast.error('يرجى تعبئة نوع الجهة وتفاصيل المشكلة والإفادة الصحيحة.');
+      toast.error(t('teach.fillRequired'));
       return;
     }
     if (!attachmentFile && scenarioTextMentionsAttachmentLine(rawProblem)) {
@@ -75,7 +77,7 @@ export function TeachRafeeqExperience() {
         },
         attachmentFile,
       );
-      toast.success('تم الإرسال. سيظهر المثال في «وش تعلم رفيق؟» قيد المراجعة.');
+      toast.success(t('teach.submitSuccess'));
       setEntityType('');
       setProblemDetails('');
       setCorrectInfo('');
@@ -86,7 +88,7 @@ export function TeachRafeeqExperience() {
         }),
       );
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'تعذّر الإرسال');
+      toast.error(err instanceof Error ? err.message : t('teach.submitFailed'));
     } finally {
       setIsSubmitting(false);
     }
@@ -116,7 +118,7 @@ export function TeachRafeeqExperience() {
             <Lightbulb className="size-11 text-[var(--ai)] drop-shadow-sm" strokeWidth={1.5} />
             <Brain className="absolute size-[1.35rem] text-primary" strokeWidth={2} />
           </div>
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl font-display">علّم رفيق من تجربتك</h1>
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl font-display">{t('teach.title')}</h1>
         </header>
 
         <div className="panel-elevated p-6" dir="rtl">

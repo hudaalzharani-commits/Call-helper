@@ -1,3 +1,4 @@
+import { useLanguage } from '../../contexts/LanguageContext';
 import { GraduationCap, Brain, TrendingUp, Save, RefreshCw, Zap, Target, ChevronDown, ChevronUp, Edit2 } from 'lucide-react';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
@@ -14,6 +15,7 @@ import {
 import { useState } from 'react';
 
 export function LearnSettingsPage() {
+  const { t } = useLanguage();
   const [showLogSources, setShowLogSources] = useState(false);
   const [showPredictionSources, setShowPredictionSources] = useState(false);
   const [showRecommendationSources, setShowRecommendationSources] = useState(false);
@@ -22,20 +24,20 @@ export function LearnSettingsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-foreground mb-2">Learn from User Settings</h2>
-          <p className="text-muted-foreground">إعدادات التعلم الآلي والذكاء الاصطناعي</p>
+          <h2 className="text-2xl font-bold text-foreground mb-2">{t('admin.learn.title')}</h2>
+          <p className="text-muted-foreground">{t('admin.learn.subtitle')}</p>
           <p className="mt-3 text-sm font-medium text-amber-800 dark:text-amber-300 bg-amber-500/15 border border-amber-500/35 rounded-lg px-3 py-2 max-w-2xl">
-            هذه الصفحة لا تعمل حالياً — الواجهة للعرض فقط ولم يُربَط أي من الإعدادات أو الأزرار بالخادم بعد.
+            {t('admin.learn.demoNote')}
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" className="border-2">
             <RefreshCw className="size-4 ml-2" />
-            إعادة تدريب النموذج
+            {t('admin.learn.retrain')}
           </Button>
           <Button className="bg-primary text-primary-foreground hover:bg-primary-hover text-primary-foreground">
             <Save className="size-4 ml-2" />
-            حفظ الإعدادات
+            {t('admin.learn.save')}
           </Button>
         </div>
       </div>
@@ -49,7 +51,7 @@ export function LearnSettingsPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-foreground">12,456</p>
-              <p className="text-xs text-muted-foreground">تفاعلات المستخدمين</p>
+              <p className="text-xs text-muted-foreground">{t('admin.learn.statInteractions')}</p>
             </div>
           </div>
         </Card>
@@ -60,7 +62,7 @@ export function LearnSettingsPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-foreground">94.2%</p>
-              <p className="text-xs text-muted-foreground">دقة النموذج</p>
+              <p className="text-xs text-muted-foreground">{t('admin.learn.statAccuracy')}</p>
             </div>
           </div>
         </Card>
@@ -71,7 +73,7 @@ export function LearnSettingsPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-foreground">8,923</p>
-              <p className="text-xs text-muted-foreground">أنماط محفوظة</p>
+              <p className="text-xs text-muted-foreground">{t('admin.learn.statPatterns')}</p>
             </div>
           </div>
         </Card>
@@ -82,7 +84,7 @@ export function LearnSettingsPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-foreground">156</p>
-              <p className="text-xs text-muted-foreground">تحسينات تلقائية</p>
+              <p className="text-xs text-muted-foreground">{t('admin.learn.statImprovements')}</p>
             </div>
           </div>
         </Card>
@@ -93,7 +95,7 @@ export function LearnSettingsPage() {
         <Card className="glass-panel border-2 border-border p-6">
           <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
             <Brain className="size-5 text-primary" />
-            منطق التعلم من سجلات النظام
+            {t('admin.learn.logicTitle')}
           </h3>
           <div className="space-y-4">
             <div className="flex items-center justify-between p-4 glass-card rounded-xl border border-border">
@@ -240,7 +242,7 @@ export function LearnSettingsPage() {
                 className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors mt-2"
               >
                 {showLogSources ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
-                <span>{showLogSources ? 'إخفاء المصادر' : 'عرض المصادر'}</span>
+                <span>{showLogSources ? t('admin.learn.hideSources') : t('admin.learn.showSources')}</span>
               </button>
               
               {showLogSources && (
@@ -275,7 +277,7 @@ export function LearnSettingsPage() {
                 className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors mt-2"
               >
                 {showPredictionSources ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
-                <span>{showPredictionSources ? 'إخفاء المصادر' : 'عرض المصادر'}</span>
+                <span>{showPredictionSources ? t('admin.learn.hideSources') : t('admin.learn.showSources')}</span>
               </button>
               
               {showPredictionSources && (
@@ -310,7 +312,7 @@ export function LearnSettingsPage() {
                 className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors mt-2"
               >
                 {showRecommendationSources ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
-                <span>{showRecommendationSources ? 'إخفاء المصادر' : 'عرض المصادر'}</span>
+                <span>{showRecommendationSources ? t('admin.learn.hideSources') : t('admin.learn.showSources')}</span>
               </button>
               
               {showRecommendationSources && (

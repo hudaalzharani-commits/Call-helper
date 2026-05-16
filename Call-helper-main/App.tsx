@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, type ElementType, type ReactNode } from 'react';
 import {
   User, Activity, AlertCircle, BookOpen, RefreshCw, Lightbulb,
-  Headphones, Bot, Sparkles, Menu, X, Shield, Settings, LogOut, ChevronLeft,
+  Headphones, Bot, Sparkles, Menu, X, Shield, Settings, LogOut, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -19,25 +19,29 @@ import { Logo, IconLogo } from './components/Logo';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AdvancedSettingsProvider } from './contexts/AdvancedSettingsContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 import { Login } from './components/Login';
 import { StartPage } from './components/StartPage';
 import { AdminPanel } from './components/AdminPanel';
 import { UserSettingsDialog } from './components/UserSettingsDialog';
 import { ThemeToggle } from './components/ThemeToggle';
+import { LanguageToggle } from './components/LanguageToggle';
 import { AccentPalettePicker } from './components/AccentPalettePicker';
+import type { TranslationKey } from './i18n/translations';
 import { Toaster } from './components/ui/sonner';
 import { canShowAdminTab } from './utils/appRoles';
 import { isUiFlagEnabled, pageKeyForServiceId } from './utils/uiVisibility';
 
-const DASHBOARD_SERVICES = [
-  { id: 'live-indicators', name: 'المؤشرات اللحظية', icon: Activity },
-  { id: 'public-issues', name: 'المشاكل العامة', icon: AlertCircle },
-  { id: 'knowledge-base', name: 'سجل المعرفة', icon: BookOpen },
-  { id: 'operational-updates', name: 'التحديثات التشغيلية', icon: RefreshCw },
-  { id: 'what-did-rafeeq-learn', name: 'وش تعلم رفيق؟', icon: Lightbulb },
+const DASHBOARD_SERVICE_DEFS = [
+  { id: 'live-indicators', icon: Activity },
+  { id: 'public-issues', icon: AlertCircle },
+  { id: 'knowledge-base', icon: BookOpen },
+  { id: 'operational-updates', icon: RefreshCw },
+  { id: 'what-did-rafeeq-learn', icon: Lightbulb },
 ] as const;
 
-type DashboardService = (typeof DASHBOARD_SERVICES)[number];
+type DashboardServiceDef = (typeof DASHBOARD_SERVICE_DEFS)[number];
+type DashboardService = { id: DashboardServiceDef['id']; name: string; icon: DashboardServiceDef['icon'] };
 
 const DASHBOARD_DEEP_LINK_SERVICE_IDS = ['teach-rafeeq-experience'] as const;
 
@@ -56,9 +60,10 @@ function isAllowedDashboardService(
   return false;
 }
 
-function RtlShell({ children }: { children: ReactNode }) {
+function AppShell({ children }: { children: ReactNode }) {
+  const { dir } = useLanguage();
   return (
-    <div dir="rtl" className="min-h-screen" style={{ background: 'var(--background)' }}>
+    <div dir={dir} className="min-h-screen" style={{ background: 'var(--background)' }}>
       {children}
     </div>
   );
@@ -95,6 +100,7 @@ function RailItem({
   onClick: () => void;
   expanded: boolean;
 }) {
+  const { isRtl } = useLanguage();
   const Icon = service.icon;
 
   if (!expanded) {
@@ -134,7 +140,10 @@ function RailItem({
       type="button"
       onClick={onClick}
       aria-pressed={isActive}
-      className="relative w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-right transition-all duration-200"
+      className={[
+        'relative w-full flex items-center gap-3 px-2.5 py-2 rounded-xl transition-all duration-200',
+        isRtl ? 'text-right' : 'text-left',
+      ].join(' ')}
       style={{
         background: isActive ? 'var(--surface-2)' : 'transparent',
         color: isActive ? 'var(--foreground)' : 'var(--muted-foreground)',
@@ -146,7 +155,10 @@ function RailItem({
       {isActive && (
         <span
           aria-hidden
-          className="absolute right-1 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-full"
+          className={[
+            'absolute top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-full',
+            isRtl ? 'right-1' : 'left-1',
+          ].join(' ')}
           style={{ background: 'var(--primary)', boxShadow: '0 0 8px 0 var(--primary-glow)' }}
         />
       )}
@@ -167,31 +179,42 @@ function RailItem({
 }
 
 function AskRafeeqRailFooter({ expanded }: { expanded: boolean }) {
+  const { t, isRtl } = useLanguage();
+  const RailChevron = isRtl ? ChevronLeft : ChevronRight;
   return (
     <div className={['pt-3 mt-3 border-t', expanded ? '' : 'w-full flex justify-center'].join(' ')} style={{ borderColor: 'var(--border)' }}>
       {expanded ? (
         <button
           type="button"
-          className="w-full flex items-center gap-3 p-3 rounded-xl transition-all hover:translate-y-[-1px] text-right"
+          className={[
+            'w-full flex items-center gap-3 p-3 rounded-xl transition-all hover:translate-y-[-1px]',
+            isRtl ? 'text-right' : 'text-left',
+          ].join(' ')}
           style={{ background: 'var(--ai-soft)' }}
         >
           <span className="shrink-0 size-9 rounded-lg flex items-center justify-center" style={{ background: 'var(--ai)', color: 'var(--ai-foreground)' }}>
             <Bot className="size-4" />
           </span>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold flex items-center gap-1.5 justify-end" style={{ color: 'var(--foreground)' }}>
+            <p
+              className={[
+                'text-sm font-semibold flex items-center gap-1.5',
+                isRtl ? 'justify-end' : 'justify-start',
+              ].join(' ')}
+              style={{ color: 'var(--foreground)' }}
+            >
               <Sparkles className="size-3" style={{ color: 'var(--ai)' }} />
-              اسأل رفيق
+              {t('askRafeeq.title')}
             </p>
-            <p className="text-[11px] truncate" style={{ color: 'var(--muted-foreground)' }}>مساعدك الذكي</p>
+            <p className="text-[11px] truncate" style={{ color: 'var(--muted-foreground)' }}>{t('askRafeeq.subtitle')}</p>
           </div>
-          <ChevronLeft className="size-3.5 shrink-0" style={{ color: 'var(--muted-strong)' }} />
+          <RailChevron className="size-3.5 shrink-0" style={{ color: 'var(--muted-strong)' }} />
         </button>
       ) : (
         <button
           type="button"
-          title="اسأل رفيق"
-          aria-label="اسأل رفيق"
+          title={t('askRafeeq.title')}
+          aria-label={t('askRafeeq.title')}
           className="size-11 rounded-2xl flex items-center justify-center transition-all duration-200 hover:scale-[1.04]"
           style={{ background: 'var(--ai)', color: 'var(--ai-foreground)', boxShadow: 'var(--shadow-ai-glow)' }}
         >
@@ -205,6 +228,16 @@ function AskRafeeqRailFooter({ expanded }: { expanded: boolean }) {
 function AppContent() {
   const { user, logout } = useAuth();
   const { isDark } = useTheme();
+  const { t, isRtl } = useLanguage();
+
+  const dashboardServices = useMemo<DashboardService[]>(
+    () =>
+      DASHBOARD_SERVICE_DEFS.map((def) => ({
+        ...def,
+        name: t(`services.${def.id}` as TranslationKey),
+      })),
+    [t],
+  );
   const [selectedService, setSelectedService] = useState<string>('live-indicators');
   const [viewMode, setViewMode] = useState<'dashboard' | 'callhelper' | 'admin'>('dashboard');
   const [railExpanded, setRailExpanded] = useState(false);
@@ -267,8 +300,8 @@ function AppContent() {
   }, [viewMode, user]);
 
   const navigableServices = useMemo(
-    () => DASHBOARD_SERVICES.filter((s) => isUiFlagEnabled(user, pageKeyForServiceId(s.id))),
-    [user],
+    () => dashboardServices.filter((s) => isUiFlagEnabled(user, pageKeyForServiceId(s.id))),
+    [user, dashboardServices],
   );
 
   useEffect(() => {
@@ -295,9 +328,9 @@ function AppContent() {
       return <StartPage onStart={() => setPreAuthScreen('login')} />;
     }
     return (
-      <RtlShell>
+      <AppShell>
         <Login onBack={() => setPreAuthScreen('start')} />
-      </RtlShell>
+      </AppShell>
     );
   }
 
@@ -305,7 +338,7 @@ function AppContent() {
   const callHelperEnabled = isUiFlagEnabled(user, 'view_callhelper');
 
   return (
-    <RtlShell>
+    <AppShell>
       <header className="topbar fixed top-0 inset-x-0 z-50 h-14">
         <div className="h-full flex items-center justify-between gap-4 px-4 sm:px-6">
           <div className="flex items-center gap-3 min-w-0">
@@ -315,7 +348,7 @@ function AppContent() {
                 onClick={() => setRailExpanded(!railExpanded)}
                 className="size-9 rounded-full flex items-center justify-center hover:bg-surface-2 transition-colors"
                 style={{ color: 'var(--muted-foreground)' }}
-                aria-label={railExpanded ? 'إخفاء القائمة' : 'إظهار القائمة'}
+                aria-label={railExpanded ? t('nav.hideRail') : t('nav.showRail')}
               >
                 {railExpanded ? <X className="size-4" /> : <Menu className="size-4" />}
               </button>
@@ -325,15 +358,16 @@ function AppContent() {
           </div>
 
           <div className="hidden sm:flex pill-rail">
-            <ViewPill active={viewMode === 'dashboard'} onClick={() => setViewMode('dashboard')} icon={Activity} label="لوحة التحكم" disabled={!dashboardEnabled} />
-            <ViewPill active={viewMode === 'callhelper'} onClick={() => setViewMode('callhelper')} icon={Headphones} label="مساعد المكالمات" disabled={!callHelperEnabled} />
+            <ViewPill active={viewMode === 'dashboard'} onClick={() => setViewMode('dashboard')} icon={Activity} label={t('nav.dashboard')} disabled={!dashboardEnabled} />
+            <ViewPill active={viewMode === 'callhelper'} onClick={() => setViewMode('callhelper')} icon={Headphones} label={t('nav.callHelper')} disabled={!callHelperEnabled} />
             {canShowAdminTab(user) && (
-              <ViewPill active={viewMode === 'admin'} onClick={() => setViewMode('admin')} icon={Shield} label="الأدمن" />
+              <ViewPill active={viewMode === 'admin'} onClick={() => setViewMode('admin')} icon={Shield} label={t('nav.admin')} />
             )}
           </div>
 
           <div className="flex items-center gap-2">
             <AccentPalettePicker />
+            <LanguageToggle />
             <ThemeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -353,19 +387,19 @@ function AppContent() {
                   </Avatar>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56 rounded-xl">
+              <DropdownMenuContent align={isRtl ? 'start' : 'end'} className="w-56 rounded-xl">
                 <div className="px-3 py-2.5 border-b" style={{ borderColor: 'var(--border)' }}>
                   <p className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>{user.name}</p>
                   <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>@{user.username}</p>
                 </div>
                 <DropdownMenuItem onClick={() => setShowUserSettings(true)} className="m-1 rounded-lg cursor-pointer flex items-center gap-2 text-sm">
                   <Settings className="size-3.5" />
-                  إعدادات الحساب
+                  {t('nav.accountSettings')}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={logout} className="m-1 rounded-lg cursor-pointer flex items-center gap-2 text-sm" style={{ color: 'var(--danger)' }}>
                   <LogOut className="size-3.5" />
-                  تسجيل الخروج
+                  {t('nav.logout')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -374,10 +408,10 @@ function AppContent() {
 
         <div className="sm:hidden flex items-center justify-center gap-1 px-4 pb-2">
           <div className="pill-rail">
-            <ViewPill active={viewMode === 'dashboard'} onClick={() => setViewMode('dashboard')} icon={Activity} label="لوحة التحكم" disabled={!dashboardEnabled} />
-            <ViewPill active={viewMode === 'callhelper'} onClick={() => setViewMode('callhelper')} icon={Headphones} label="مساعد المكالمات" disabled={!callHelperEnabled} />
+            <ViewPill active={viewMode === 'dashboard'} onClick={() => setViewMode('dashboard')} icon={Activity} label={t('nav.dashboard')} disabled={!dashboardEnabled} />
+            <ViewPill active={viewMode === 'callhelper'} onClick={() => setViewMode('callhelper')} icon={Headphones} label={t('nav.callHelper')} disabled={!callHelperEnabled} />
             {canShowAdminTab(user) && (
-              <ViewPill active={viewMode === 'admin'} onClick={() => setViewMode('admin')} icon={Shield} label="الأدمن" />
+              <ViewPill active={viewMode === 'admin'} onClick={() => setViewMode('admin')} icon={Shield} label={t('nav.admin')} />
             )}
           </div>
         </div>
@@ -388,7 +422,8 @@ function AppContent() {
           <aside
             className={[
               'sticky top-14 self-start hidden lg:flex flex-col shrink-0',
-              'h-[calc(100vh-3.5rem)] overflow-y-auto border-l',
+              'h-[calc(100vh-3.5rem)] overflow-y-auto',
+              isRtl ? 'border-l' : 'border-r',
               railExpanded ? 'w-60 px-3 py-4' : 'w-[68px] px-3 py-4',
               'transition-[width] duration-300 ease-rafiq',
             ].join(' ')}
@@ -396,13 +431,25 @@ function AppContent() {
           >
             <nav className={['flex-1 flex flex-col', railExpanded ? 'gap-1' : 'gap-1.5 items-center'].join(' ')}>
               {railExpanded && (
-                <p className="px-2 pt-1 pb-2 text-[10px] font-semibold tracking-[0.18em] uppercase text-right" style={{ color: 'var(--muted-strong)' }}>
-                  الخدمات
+                <p
+                  className={[
+                    'px-2 pt-1 pb-2 text-[10px] font-semibold tracking-[0.18em] uppercase',
+                    isRtl ? 'text-right' : 'text-left',
+                  ].join(' ')}
+                  style={{ color: 'var(--muted-strong)' }}
+                >
+                  {t('nav.services')}
                 </p>
               )}
               {navigableServices.length === 0 && railExpanded ? (
-                <p className="text-xs text-right px-2 py-3 rounded-xl border border-dashed" style={{ color: 'var(--muted-foreground)', borderColor: 'var(--border)' }}>
-                  لا توجد صفحات مفعّلة في القائمة.
+                <p
+                  className={[
+                    'text-xs px-2 py-3 rounded-xl border border-dashed',
+                    isRtl ? 'text-right' : 'text-left',
+                  ].join(' ')}
+                  style={{ color: 'var(--muted-foreground)', borderColor: 'var(--border)' }}
+                >
+                  {t('nav.noPagesEnabled')}
                 </p>
               ) : null}
               {navigableServices.map((s) => (
@@ -423,12 +470,21 @@ function AppContent() {
         {viewMode === 'dashboard' && railExpanded && (
           <div className="lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={() => setRailExpanded(false)}>
             <aside
-              className="absolute top-14 right-0 bottom-0 w-72 p-3 overflow-y-auto"
+              className={[
+                'absolute top-14 bottom-0 w-72 p-3 overflow-y-auto',
+                isRtl ? 'right-0' : 'left-0',
+              ].join(' ')}
               style={{ background: 'var(--surface)' }}
               onClick={(e) => e.stopPropagation()}
             >
-              <p className="px-2 pt-1 pb-2 text-[10px] font-semibold tracking-[0.18em] uppercase text-right" style={{ color: 'var(--muted-strong)' }}>
-                الخدمات
+              <p
+                className={[
+                  'px-2 pt-1 pb-2 text-[10px] font-semibold tracking-[0.18em] uppercase',
+                  isRtl ? 'text-right' : 'text-left',
+                ].join(' ')}
+                style={{ color: 'var(--muted-strong)' }}
+              >
+                {t('nav.services')}
               </p>
               <div className="flex flex-col gap-1">
                 {navigableServices.map((s) => (
@@ -477,19 +533,21 @@ function AppContent() {
         </main>
       </div>
       <UserSettingsDialog open={showUserSettings} onOpenChange={setShowUserSettings} />
-    </RtlShell>
+    </AppShell>
   );
 }
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <AdvancedSettingsProvider>
-          <AppContent />
-          <Toaster />
-        </AdvancedSettingsProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <LanguageProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <AdvancedSettingsProvider>
+            <AppContent />
+            <Toaster />
+          </AdvancedSettingsProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </LanguageProvider>
   );
 }

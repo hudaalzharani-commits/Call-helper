@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from './ui/dialog';
 import { useAuth } from '../contexts/AuthContext';
+import { useI18nLayout } from '../hooks/useI18nLayout';
 import { toast } from 'sonner';
 
 interface UserSettingsDialogProps {
@@ -21,6 +22,7 @@ interface UserSettingsDialogProps {
 
 export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogProps) {
   const { user, updateUserAvatar, updateUserPassword } = useAuth();
+  const { t } = useI18nLayout();
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [showPasswords, setShowPasswords] = useState({
     old: false,
@@ -45,13 +47,13 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
 
     // Check file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
-      toast.error('حجم الصورة يجب أن لا يتجاوز 2 ميجابايت');
+      toast.error(t('userSettings.imageTooLarge'));
       return;
     }
 
     // Check file type
     if (!file.type.startsWith('image/')) {
-      toast.error('يرجى اختيار صورة صالحة');
+      toast.error(t('userSettings.invalidImage'));
       return;
     }
 
@@ -60,7 +62,7 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
     reader.onloadend = () => {
       const base64String = reader.result as string;
       updateUserAvatar(base64String);
-      toast.success('تم تحديث الصورة الشخصية بنجاح');
+      toast.success(t('userSettings.avatarUpdated'));
     };
     reader.readAsDataURL(file);
   };
@@ -73,22 +75,22 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
 
     // Validation
     if (!oldPassword || !newPassword || !confirmPassword) {
-      toast.error('يرجى ملء جميع الحقول');
+      toast.error(t('userSettings.fillAllFields'));
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      toast.error('كلمة المرور الجديدة غير متطابقة');
+      toast.error(t('userSettings.passwordMismatch'));
       return;
     }
 
     if (newPassword.length < 6) {
-      toast.error('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+      toast.error(t('userSettings.passwordMinLength'));
       return;
     }
 
     if (oldPassword === newPassword) {
-      toast.error('كلمة المرور الجديدة يجب أن تكون مختلفة');
+      toast.error(t('userSettings.passwordSame'));
       return;
     }
 
@@ -96,7 +98,7 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
     const success = await updateUserPassword(oldPassword, newPassword);
 
     if (success) {
-      toast.success('تم تغيير كلمة المرور بنجاح');
+      toast.success(t('userSettings.passwordChanged'));
       setPasswordForm({
         oldPassword: '',
         newPassword: '',
@@ -104,13 +106,13 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
       });
       setIsChangingPassword(false);
     } else {
-      toast.error('كلمة المرور الحالية غير صحيحة');
+      toast.error(t('userSettings.wrongPassword'));
     }
   };
 
   const handleRemoveAvatar = () => {
     updateUserAvatar(undefined as any);
-    toast.success('تم حذف الصورة الشخصية');
+    toast.success(t('userSettings.avatarRemoved'));
   };
 
   // Reset password form when dialog closes
@@ -137,9 +139,9 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="glass-panel border-2 border-border sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-foreground">إعدادات الحساب</DialogTitle>
+          <DialogTitle className="text-2xl font-bold text-foreground">{t('userSettings.title')}</DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            قم بإدارة إعدادات حسابك الشخصي
+            {t('userSettings.description')}
           </DialogDescription>
         </DialogHeader>
 
@@ -176,9 +178,9 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
 
               <div className="flex-1 space-y-3">
                 <div>
-                  <h3 className="text-base font-bold text-foreground mb-1">الصورة الشخصية</h3>
+                  <h3 className="text-base font-bold text-foreground mb-1">{t('userSettings.avatar')}</h3>
                   <p className="text-xs text-muted-foreground">
-                    قم برفع صورة شخصية بحجم لا يتجاوز 2 ميجابايت
+                    {t('userSettings.avatarHint')}
                   </p>
                 </div>
 
@@ -189,7 +191,7 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
                     className="bg-primary text-primary-foreground hover:bg-primary-hover text-primary-foreground"
                   >
                     <Upload className="size-3.5 ml-2" />
-                    تحميل صورة
+                    {t('userSettings.uploadPhoto')}
                   </Button>
                   {user.avatar && (
                     <Button
@@ -198,22 +200,22 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
                       onClick={handleRemoveAvatar}
                     >
                       <X className="size-3.5 ml-2" />
-                      حذف
+                      {t('userSettings.removePhoto')}
                     </Button>
                   )}
                 </div>
 
                 <div className="pt-3 border-t border-border space-y-1.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">الاسم:</span>
+                    <span className="text-xs text-muted-foreground">{t('userSettings.name')}:</span>
                     <span className="text-xs font-medium text-foreground">{user.name}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">البريد الإلكتروني:</span>
+                    <span className="text-xs text-muted-foreground">{t('userSettings.email')}:</span>
                     <span className="text-xs font-medium text-foreground">{user.email}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">اسم المستخدم:</span>
+                    <span className="text-xs text-muted-foreground">{t('userSettings.username')}:</span>
                     <span className="text-xs font-medium text-foreground">@{user.username}</span>
                   </div>
                 </div>
@@ -225,9 +227,9 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
           <div className="glass-card border border-border p-5 rounded-xl">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-base font-bold text-foreground mb-1">تغيير كلمة المرور</h3>
+                <h3 className="text-base font-bold text-foreground mb-1">{t('userSettings.changePassword')}</h3>
                 <p className="text-xs text-muted-foreground">
-                  قم بتحديث كلمة المرور الخاصة بك
+                  {t('userSettings.changePasswordHint')}
                 </p>
               </div>
               {!isChangingPassword && (
@@ -237,7 +239,7 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
                   className="bg-primary text-primary-foreground hover:bg-primary-hover text-primary-foreground"
                 >
                   <Lock className="size-3.5 ml-2" />
-                  تغيير
+                  {t('userSettings.change')}
                 </Button>
               )}
             </div>
@@ -246,13 +248,13 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
               <div className="space-y-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="old-password" className="text-foreground text-xs">
-                    كلمة المرور الحالية
+                    {t('userSettings.currentPassword')}
                   </Label>
                   <div className="relative">
                     <Input
                       id="old-password"
                       type={showPasswords.old ? 'text' : 'password'}
-                      placeholder="أدخل كلمة المرور الحالية"
+                      placeholder={t('userSettings.currentPasswordPlaceholder')}
                       value={passwordForm.oldPassword}
                       onChange={(e) =>
                         setPasswordForm({ ...passwordForm, oldPassword: e.target.value })
@@ -271,13 +273,13 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
 
                 <div className="space-y-1.5">
                   <Label htmlFor="new-password" className="text-foreground text-xs">
-                    كلمة المرور الجديدة
+                    {t('userSettings.newPassword')}
                   </Label>
                   <div className="relative">
                     <Input
                       id="new-password"
                       type={showPasswords.new ? 'text' : 'password'}
-                      placeholder="أدخل كلمة المرور الجديدة"
+                      placeholder={t('userSettings.newPasswordPlaceholder')}
                       value={passwordForm.newPassword}
                       onChange={(e) =>
                         setPasswordForm({ ...passwordForm, newPassword: e.target.value })
@@ -296,13 +298,13 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
 
                 <div className="space-y-1.5">
                   <Label htmlFor="confirm-password" className="text-foreground text-xs">
-                    تأكيد كلمة المرور الجديدة
+                    {t('userSettings.confirmPassword')}
                   </Label>
                   <div className="relative">
                     <Input
                       id="confirm-password"
                       type={showPasswords.confirm ? 'text' : 'password'}
-                      placeholder="أعد إدخال كلمة المرور الجديدة"
+                      placeholder={t('userSettings.confirmPasswordPlaceholder')}
                       value={passwordForm.confirmPassword}
                       onChange={(e) =>
                         setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })
@@ -328,7 +330,7 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
                     className="bg-primary text-primary-foreground hover:bg-primary-hover text-primary-foreground"
                   >
                     <Check className="size-3.5 ml-2" />
-                    حفظ التغييرات
+                    {t('userSettings.save')}
                   </Button>
                   <Button
                     size="sm"
@@ -343,7 +345,7 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
                     }}
                   >
                     <X className="size-3.5 ml-2" />
-                    إلغاء
+                    {t('actions.cancel')}
                   </Button>
                 </div>
               </div>
@@ -355,11 +357,11 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
             <div className="flex items-start gap-3">
               <Lock className="size-4 text-primary flex-shrink-0 mt-0.5" />
               <div>
-                <h4 className="font-medium text-foreground text-sm mb-1">نصائح الأمان</h4>
+                <h4 className="font-medium text-foreground text-sm mb-1">{t('userSettings.securityTips')}</h4>
                 <ul className="text-xs text-muted-foreground space-y-0.5">
-                  <li>• استخدم كلمة مرور قوية تحتوي على أحرف وأرقام ورموز</li>
-                  <li>• لا تشارك كلمة المرور مع أي شخص</li>
-                  <li>• قم بتغيير كلمة المرور بشكل دوري</li>
+                  <li>• {t('userSettings.tipStrong')}</li>
+                  <li>• {t('userSettings.tipShare')}</li>
+                  <li>• {t('userSettings.tipRotate')}</li>
                 </ul>
               </div>
             </div>

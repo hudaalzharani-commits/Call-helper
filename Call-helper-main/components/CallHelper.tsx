@@ -88,6 +88,8 @@ import { generateAIResponse, simulateAIProcessing } from "../utils/mockAIRespons
 
 // ============ NEW: Import Gray Area Wizard ============
 import { GrayAreaWizard, type FlowPath } from "./GrayAreaWizard";
+import { useLanguage } from "../contexts/LanguageContext";
+import { tEntity } from "../i18n/translations";
 
 export function CallHelper({
   isDarkMode,
@@ -99,6 +101,7 @@ export function CallHelper({
   callHelperLaunch?: { seed: string; nonce: number } | null;
   onConsumeCallHelperLaunch?: () => void;
 }) {
+  const { t } = useLanguage();
   const ENABLE_AI = import.meta.env.VITE_ENABLE_AI === "true";
   const USER_TYPE_OPTIONS = [
     'وكيل خارجي',
@@ -869,7 +872,7 @@ export function CallHelper({
     <div className="space-y-6">
       {/* Hero Header */}
       <div className="glass-card rounded-3xl p-6 sm:p-8 text-center shadow-lg border-2 border-border">
-        <h1 className="text-2xl sm:text-4xl font-black gradient-text">Smart Call Helper</h1>
+        <h1 className="text-2xl sm:text-4xl font-black gradient-text">{t("callHelper.title")}</h1>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
@@ -878,19 +881,19 @@ export function CallHelper({
           <div className="bg-surface-2 border-b border-border p-4 sm:p-6 border-b">
             <h2 className="text-lg sm:text-xl font-bold text-foreground flex items-center gap-2">
               <MessageCircle className="size-5 sm:size-6 text-primary" />
-              بيانات البلاغ
+              {t("callHelper.form.title")}
             </h2>
           </div>
           <CardContent className="p-4 sm:p-6 lg:p-8 space-y-5">
             {/* Customer Name */}
             <div className="space-y-2">
               <Label htmlFor="customerName" className="text-right block text-foreground font-semibold text-sm">
-                اسم العميل
+                {t("callHelper.form.customerName")}
               </Label>
               <Input
                 id="customerName"
                 type="text"
-                placeholder="أدخل اسم العميل..."
+                placeholder={t("callHelper.form.customerNamePlaceholder")}
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
                 className="text-right glass-panel border focus:border-primary rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground transition-all"
@@ -900,19 +903,19 @@ export function CallHelper({
             {/* Entity Type */}
             <div className="space-y-2">
               <Label htmlFor="entityType" className="text-right block text-foreground font-semibold text-sm">
-                مقدم الخدمة
+                {t("callHelper.form.entityType")}
               </Label>
               <Select value={entityType} onValueChange={setEntityType} dir="rtl">
                 <SelectTrigger
                   id="entityType"
                   className="text-right glass-panel border focus:border-primary rounded-xl px-4 py-3 [&>span]:text-right text-foreground"
                 >
-                  <SelectValue placeholder="اختر نوع المستخدم..." />
+                  <SelectValue placeholder={t("callHelper.form.entityPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent className="glass-card" dir="rtl">
                   {USER_TYPE_OPTIONS.map((option) => (
                     <SelectItem key={option} value={option} className="text-right cursor-pointer rounded-lg">
-                      {option}
+                      {tEntity(t, option)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -922,11 +925,11 @@ export function CallHelper({
             {/* Problem Summary */}
             <div className="space-y-2">
               <Label htmlFor="problemSummary" className="text-right block text-foreground font-semibold text-sm">
-                وصف المشكلة
+                {t("callHelper.form.problemSummary")}
               </Label>
               <Textarea
                 id="problemSummary"
-                placeholder="اكتب وصف تفصيلي للمشكلة..."
+                placeholder={t("callHelper.form.problemPlaceholder")}
                 value={problemSummary}
                 onChange={(e) => setProblemSummary(e.target.value)}
                 className="text-right glass-panel border focus:border-primary rounded-xl px-4 py-3 min-h-[100px] text-foreground placeholder:text-muted-foreground resize-none transition-all"
@@ -948,7 +951,7 @@ export function CallHelper({
               )}
               <div className="relative flex items-center justify-center gap-2.5 text-white font-bold text-sm">
                 <Wand2 className={`size-4 ${isGenerating ? "animate-spin" : ""}`} />
-                <span>{isGenerating ? "جاري التحليل..." : "تحليل الحالة"}</span>
+                <span>{isGenerating ? t("callHelper.form.generating") : t("callHelper.form.generate")}</span>
               </div>
             </button>
 
@@ -963,7 +966,7 @@ export function CallHelper({
           <div className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 dark:from-blue-500/5 dark:to-indigo-500/5 p-4 sm:p-6 border-b">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <h2 className="text-lg sm:text-xl font-bold text-foreground">الصيغة المولدة</h2>
+                <h2 className="text-lg sm:text-xl font-bold text-foreground">{t("callHelper.output.title")}</h2>
                 {generatedText && !isLowConfidence && (
                   <TooltipProvider delayDuration={200}>
                     <Tooltip>
@@ -981,7 +984,7 @@ export function CallHelper({
                       >
                         <div className="space-y-2 text-right">
                           <p className="text-xs font-semibold text-foreground">
-                            سبب اختيار هذه الصيغة
+                            {t("callHelper.output.whyTitle")}
                           </p>
                           {matchedProblem?.why?.trim() ? (
                             <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
@@ -989,7 +992,7 @@ export function CallHelper({
                             </p>
                           ) : (
                             <p className="text-xs text-muted-foreground">
-                              لا يوجد نص في حقل «لماذا» لهذه الحالة في قاعدة البيانات. يمكن إضافته من لوحة إدارة الحالات.
+                              {t("callHelper.output.whyEmpty")}
                             </p>
                           )}
                           <button
@@ -1005,7 +1008,7 @@ export function CallHelper({
                             className="w-full px-3 py-2 text-xs bg-primary text-primary-foreground text-white rounded-lg hover:opacity-95 transition-all font-medium shadow-md flex items-center justify-center gap-1.5"
                           >
                             <Info className="size-3" />
-                            المزيد من التفاصيل
+                            {t("callHelper.output.moreDetails")}
                           </button>
                         </div>
                       </TooltipContent>
@@ -1015,7 +1018,7 @@ export function CallHelper({
               </div>
               {isAlternativeFormat && (
                 <Badge className="bg-primary text-primary-foreground text-white border-0 shadow-md text-xs">
-                  صيغة بديلة
+                  {t("callHelper.output.alternativeBadge")}
                 </Badge>
               )}
             </div>

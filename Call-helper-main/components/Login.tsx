@@ -3,8 +3,10 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { LogIn, Loader2, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { Logo } from './Logo';
 import { ThemeToggle } from './ThemeToggle';
+import { LanguageToggle } from './LanguageToggle';
 
 interface LoginProps {
   onBack?: () => void;
@@ -12,6 +14,7 @@ interface LoginProps {
 
 export function Login({ onBack }: LoginProps) {
   const { login } = useAuth();
+  const { t } = useLanguage();
   const [emailOrUsername, setEmailOrUsername] = useState('');
   const [password, setPassword]               = useState('');
   const [showPassword, setShowPassword]       = useState(false);
@@ -25,10 +28,10 @@ export function Login({ onBack }: LoginProps) {
     try {
       const success = await login(emailOrUsername, password);
       if (!success) {
-        setError('البريد الإلكتروني أو اسم المستخدم أو كلمة المرور غير صحيحة');
+        setError(t('login.invalidCredentials'));
       }
     } catch {
-      setError('حدث خطأ أثناء تسجيل الدخول');
+      setError(t('login.error'));
     } finally {
       setIsLoading(false);
     }
@@ -39,7 +42,8 @@ export function Login({ onBack }: LoginProps) {
       className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden"
       style={{ background: 'var(--background)' }}
     >
-      <div className="absolute top-6 left-6 z-20">
+      <div className="absolute top-6 left-6 z-20 flex items-center gap-2">
+        <LanguageToggle />
         <ThemeToggle />
       </div>
 
@@ -49,10 +53,10 @@ export function Login({ onBack }: LoginProps) {
           onClick={onBack}
           className="absolute bottom-6 left-6 z-20 flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm transition-colors hover:bg-[var(--surface-2)]"
           style={{ color: 'var(--muted-foreground)' }}
-          aria-label="العودة لصفحة البداية"
+          aria-label={t('login.backAria')}
         >
           <ArrowLeft className="size-4 shrink-0" aria-hidden />
-          <span>العودة</span>
+          <span>{t('login.back')}</span>
         </button>
       )}
 
@@ -91,7 +95,7 @@ export function Login({ onBack }: LoginProps) {
         <div className="flex flex-col items-center mb-10">
           <Logo size="large" />
           <p className="mt-5 text-sm tracking-wide" style={{ color: 'var(--muted-foreground)' }}>
-            سجّل الدخول إلى لوحة التحكم
+            {t('login.subtitle')}
           </p>
         </div>
 
@@ -105,12 +109,12 @@ export function Login({ onBack }: LoginProps) {
                 className="block text-xs font-semibold tracking-[0.08em] uppercase"
                 style={{ color: 'var(--muted-strong)' }}
               >
-                اسم المستخدم أو البريد
+                {t('login.usernameLabel')}
               </label>
               <Input
                 id="emailOrUsername"
                 type="text"
-                placeholder="مثال: admin"
+                placeholder={t('login.usernamePlaceholder')}
                 className="h-11 rounded-xl text-right"
                 value={emailOrUsername}
                 onChange={(e) => setEmailOrUsername(e.target.value)}
@@ -127,7 +131,7 @@ export function Login({ onBack }: LoginProps) {
                 className="block text-xs font-semibold tracking-[0.08em] uppercase"
                 style={{ color: 'var(--muted-strong)' }}
               >
-                كلمة المرور
+                {t('login.passwordLabel')}
               </label>
               <div className="relative">
                 <Input
@@ -147,7 +151,7 @@ export function Login({ onBack }: LoginProps) {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute left-3 top-1/2 -translate-y-1/2 hover:text-foreground transition-colors"
                   style={{ color: 'var(--muted-foreground)' }}
-                  aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                  aria-label={showPassword ? t('login.hidePassword') : t('login.showPassword')}
                 >
                   {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
@@ -182,12 +186,12 @@ export function Login({ onBack }: LoginProps) {
               {isLoading ? (
                 <>
                   <Loader2 className="size-4 ml-2 animate-spin" />
-                  جاري تسجيل الدخول…
+                  {t('login.submitting')}
                 </>
               ) : (
                 <>
                   <LogIn className="size-4 ml-2" />
-                  تسجيل الدخول
+                  {t('login.submit')}
                 </>
               )}
             </Button>
@@ -197,7 +201,7 @@ export function Login({ onBack }: LoginProps) {
 
         {/* Footer */}
         <p className="mt-6 text-center text-xs" style={{ color: 'var(--muted-strong)' }}>
-          رفيق · مساعد المكالمات · v1.0
+          {t('login.footer')}
         </p>
       </div>
     </div>

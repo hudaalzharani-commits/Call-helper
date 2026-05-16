@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+﻿import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -84,6 +84,14 @@ import { generateAIResponse, simulateAIProcessing } from "../utils/mockAIRespons
 // ============ NEW: Import Gray Area Wizard ============
 import { GrayAreaWizard, type FlowPath } from "./GrayAreaWizard";
 
+import { useI18nLayout } from "../hooks/useI18nLayout";
+import {
+  ENTITY_KEYS,
+  entityForApi,
+  entityKeyFromValue,
+  tEntity,
+} from "../i18n/translations";
+
 export function CallHelper({
   isDarkMode,
   callHelperLaunch,
@@ -94,14 +102,23 @@ export function CallHelper({
   callHelperLaunch?: { seed: string; nonce: number } | null;
   onConsumeCallHelperLaunch?: () => void;
 }) {
+  const { t, dir, textAlign, textAlignBlock, justifyEnd, locale } = useI18nLayout();
   const ENABLE_AI = import.meta.env.VITE_ENABLE_AI === "true";
-  const USER_TYPE_OPTIONS = [
-    'وكيل خارجي',
-    'شركة عمرة',
-    'مقدم خدمة سكن',
-    'مكتب شؤون',
-    'منظم تابع',
-  ] as const;
+
+  const reportTemplate = (
+    key:
+      | "callHelper.templates.primary"
+      | "callHelper.templates.alternative"
+      | "callHelper.templates.flowDirectAnswer"
+      | "callHelper.templates.flowEscalation"
+      | "callHelper.templates.flowForceSolution"
+      | "callHelper.templates.flowContinue"
+      | "callHelper.templates.grayDirectAnswer"
+      | "callHelper.templates.grayForceSolution"
+      | "callHelper.templates.grayEscalation"
+      | "callHelper.templates.grayContinue",
+    params: Record<string, string>,
+  ) => t(key, params);
 
   // =========================
   // Real call logging (for analytics)
@@ -132,7 +149,7 @@ export function CallHelper({
         },
         body: JSON.stringify({
           customerName,
-          entityType,
+          entityType: apiEntityType,
           problemType: selectedProblemType || "general",
           problemSummary,
           // Category at log time enables the daily frequency bucket (used by the admin-only dashboard section). Empty string normalized to null.
@@ -166,6 +183,9 @@ export function CallHelper({
   };
   const [customerName, setCustomerName] = useState("");
   const [entityType, setEntityType] = useState("");
+  const entitySelectValue = entityKeyFromValue(entityType);
+  const entityLabel = (value: string) => tEntity(t, value);
+  const apiEntityType = entityForApi(entityType);
   const [problemDescription, setProblemDescription] = useState("");
   const [problemSummary, setProblemSummary] = useState("");
 
@@ -302,7 +322,7 @@ export function CallHelper({
     const caseFreshnessWeight = getScoringWeightValue('caseFreshness', 0);
     const caseMetadataMatchWeight = getScoringWeightValue('caseMetadataMatch', 0);
     const decayRateDays = Math.max(1, Number(scoringSettings.decayRateDays || 30));
-    const userTypeHint = entityType || '';
+    const userTypeHint = apiEntityType || '';
     const includeDebugBreakdown = Boolean(isAdmin);
 
     return {
@@ -426,7 +446,7 @@ export function CallHelper({
         const formattedText = getFormattedResponse(
           searchResult.problem,
           customerName,
-          entityType
+          apiEntityType
         );
         
         setGeneratedText(formattedText);
@@ -460,9 +480,11 @@ export function CallHelper({
         // No match found - generate generic response
         console.log('❌ No match found, using generic response');
         
-      const entityTypeArabic = entityType;
-
-        const generated = `السلام عليكم ورحمة الله وبركاته،\n\nتم استقبال بلاغ من العميل: ${customerName}\nنوع الجهة: ${entityTypeArabic}\n\nوصف المشكلة:\n${problemSummary}\n\nتم تسجيل البلاغ في النظام وسيتم المتابعة مع الفريق المختص.\n\nشكراً لتواصلكم معنا.`;
+        const generated = reportTemplate("callHelper.templates.primary", {
+          customerName,
+          entityType: entityLabel(entityType),
+          problemSummary,
+        });
 
         setGeneratedText(generated);
         void logCallToBackend({
@@ -479,10 +501,11 @@ export function CallHelper({
     } catch (error) {
       console.error('❌ Error during knowledge base search:', error);
       
-      // Fallback to generic response on error
-      const entityTypeArabic = entityType;
-
-      const generated = `السلام عليكم ورحمة الله وبركاته،\n\nتم استقبال بلاغ من العميل: ${customerName}\nنوع الجهة: ${entityTypeArabic}\n\nوصف المشكلة:\n${problemSummary}\n\nتم تسجيل البلاغ في النظام وسيتم المتابعة مع الفريق المختص.\n\nشكراً لتواصلكم معنا.`;
+      const generated = reportTemplate("callHelper.templates.primary", {
+        customerName,
+        entityType: entityLabel(entityType),
+        problemSummary,
+      });
 
       setGeneratedText(generated);
       void logCallToBackend({
@@ -510,9 +533,11 @@ export function CallHelper({
         : confidenceScore;
 
     setTimeout(() => {
-      const entityTypeArabic = entityType;
-
-      const alternativeGenerated = `مرحباً،\n\nنفيدكم باستلام بلاغكم بخصوص:\nاسم المبلغ: ${customerName}\nطبيعة الجهة: ${entityTypeArabic}\n\nتفاصيل البلاغ:\n${problemSummary}\n\nسيتم دراسة الموضوع والرد عليكم في أقرب وقت.\n\nمع التقدير،`;
+      const alternativeGenerated = reportTemplate("callHelper.templates.alternative", {
+        customerName,
+        entityType: entityLabel(entityType),
+        problemSummary,
+      });
 
       setGeneratedText(alternativeGenerated);
       void logCallToBackend({
@@ -601,11 +626,11 @@ export function CallHelper({
     const mockAdvancedOptions = {
       problemType: typeId,
       availableActions: [
-        "إجراء فوري",
-        "تصعيد للإدارة",
-        "متابعة لاحقة"
+        t("callHelper.actions.immediate"),
+        t("callHelper.actions.escalate"),
+        t("callHelper.actions.followUp"),
       ],
-      suggestedPriority: "عالية"
+      suggestedPriority: t("common.priority.highShort"),
     };
     setAdvancedOptions(mockAdvancedOptions);
 
@@ -711,7 +736,7 @@ export function CallHelper({
     }
 
     const contextRoutes = getRoutesForContext({
-      entityType,
+      entityType: apiEntityType,
       category: resolvedCategory,
     });
     return contextRoutes.map((route) => route.id);
@@ -740,12 +765,14 @@ export function CallHelper({
   const advancedCategoryScopeBanner = useMemo(() => {
     if (targetedRouteIds === undefined || !advancedCategoryScope) return null;
     return {
-      title: `وضع متقدم مخصّص للفئة: ${advancedCategoryScope.category}`,
+      title: t("callHelper.advanced.categoryScope", {
+        category: advancedCategoryScope.category,
+      }),
       subtitle: advancedCategoryScope.fromKb
-        ? 'المصدر: فئة من قاعدة المعرفة بعد المطابقة مع وصف المشكلة'
-        : 'المصدر: استنتاج من كلمات وصف المشكلة (يطابق أسماء فئات المسارات في الإعدادات المتقدمة)',
+        ? t("callHelper.advanced.sourceKb")
+        : t("callHelper.advanced.sourceInferred"),
     };
-  }, [targetedRouteIds, advancedCategoryScope]);
+  }, [targetedRouteIds, advancedCategoryScope, t]);
 
   const advancedScopedEmptyMessage = useMemo(() => {
     if (
@@ -756,9 +783,13 @@ export function CallHelper({
       return null;
     }
     return advancedCategoryScope.fromKb
-      ? `لا يوجد مسار مفعّل مطابق لفئة «${advancedCategoryScope.category}» من المعرفة. في الإعدادات المتقدمة: فعّل المسار، وإمّا أضف نفس الفئة في «فئات المسار» أو سمّ المسار بما يطابقها (بما فيه المفرد/الجمع)، وتأكد أن «أنواع الجهات» على المسار إما فارغة أو تطابق «مقدم الخدمة».`
-      : `لا يوجد مسار مفعّل مرتبط بالفئة «${advancedCategoryScope.category}» المستنتجة من الوصف. عيّن «فئات المسار» أو اسماً للمسار يطابقها، وراعِ تطابق «أنواع الجهات» مع مقدم الخدمة إن وُجدت.`;
-  }, [targetedRouteIds, advancedCategoryScope]);
+      ? t("callHelper.advanced.noRouteKb", {
+          category: advancedCategoryScope.category,
+        })
+      : t("callHelper.advanced.noRouteInferred", {
+          category: advancedCategoryScope.category,
+        });
+  }, [targetedRouteIds, advancedCategoryScope, t]);
 
   const liveRoutingMode = !generatedText
     ? null
@@ -774,6 +805,23 @@ export function CallHelper({
    * Handle Advanced Mode toggle
    * TODO: Connect to decision tree backend when enabled
    */
+  const displayScoreLabel = () => {
+    if (descriptionMatchPercentage > 40) {
+      if (descriptionMatchPercentage >= 90) return t("callHelper.match.excellent");
+      if (descriptionMatchPercentage >= 80) return t("callHelper.match.good");
+      return t("callHelper.match.fair");
+    }
+    if (confidenceScore >= 90) return t("callHelper.match.accuracyExcellent");
+    if (confidenceScore >= 80) return t("callHelper.match.accuracyGood");
+    return t("callHelper.match.accuracyFair");
+  };
+
+  const priorityLabel = (priority: string | undefined) => {
+    if (priority === "high") return t("common.priority.high");
+    if (priority === "medium") return t("common.priority.medium");
+    return t("common.priority.low");
+  };
+
   const handleAdvancedModeToggle = () => {
     const newState = activeButton === "advanced" ? null : "advanced";
     setActiveButton(newState);
@@ -786,10 +834,10 @@ export function CallHelper({
   };
 
   return (
-    <div className="space-y-6">
+    <div dir="rtl" className="space-y-6">
       {/* Hero Header */}
       <div className="glass-card rounded-3xl p-6 sm:p-8 text-center shadow-lg border-2 border-border">
-        <h1 className="text-2xl sm:text-4xl font-black gradient-text">Smart Call Helper</h1>
+        <h1 className="text-2xl sm:text-4xl font-black gradient-text">{t("callHelper.title")}</h1>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
@@ -798,41 +846,41 @@ export function CallHelper({
           <div className="bg-gradient-to-r from-cyan-500/10 to-blue-500/10 dark:from-cyan-500/5 dark:to-blue-500/5 p-4 sm:p-6 border-b">
             <h2 className="text-lg sm:text-xl font-bold text-foreground flex items-center gap-2">
               <MessageCircle className="size-5 sm:size-6 text-primary" />
-              بيانات البلاغ
+              {t("callHelper.form.title")}
             </h2>
           </div>
           <CardContent className="p-4 sm:p-6 lg:p-8 space-y-5">
             {/* Customer Name */}
             <div className="space-y-2">
-              <Label htmlFor="customerName" className="text-right block text-foreground font-semibold text-sm">
-                اسم العميل
+              <Label htmlFor="customerName" className={`${textAlignBlock} text-foreground font-semibold text-sm`}>
+                {t("callHelper.form.customerName")}
               </Label>
               <Input
                 id="customerName"
                 type="text"
-                placeholder="أدخل اسم العميل..."
+                placeholder={t("callHelper.form.customerNamePlaceholder")}
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
-                className="text-right glass-panel border focus:border-primary rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground transition-all"
+                className={`${textAlign} glass-panel border focus:border-primary rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground transition-all`}
               />
             </div>
 
             {/* Entity Type */}
             <div className="space-y-2">
-              <Label htmlFor="entityType" className="text-right block text-foreground font-semibold text-sm">
-                مقدم الخدمة
+              <Label htmlFor="entityType" className={`${textAlignBlock} text-foreground font-semibold text-sm`}>
+                {t("callHelper.form.entityType")}
               </Label>
-              <Select value={entityType} onValueChange={setEntityType} dir="rtl">
+              <Select value={entitySelectValue || entityType} onValueChange={setEntityType} dir="rtl">
                 <SelectTrigger
                   id="entityType"
-                  className="text-right glass-panel border focus:border-primary rounded-xl px-4 py-3 [&>span]:text-right text-foreground"
+                  className={`${textAlign} glass-panel border focus:border-primary rounded-xl px-4 py-3 [&>span]:${textAlign} text-foreground`}
                 >
-                  <SelectValue placeholder="اختر نوع المستخدم..." />
+                  <SelectValue placeholder={t("callHelper.form.entityPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent className="glass-card" dir="rtl">
-                  {USER_TYPE_OPTIONS.map((option) => (
-                    <SelectItem key={option} value={option} className="text-right cursor-pointer rounded-lg">
-                      {option}
+                  {ENTITY_KEYS.map((key) => (
+                    <SelectItem key={key} value={key} className={`${textAlign} cursor-pointer rounded-lg`}>
+                      {tEntity(t, key)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -841,15 +889,15 @@ export function CallHelper({
 
             {/* Problem Summary */}
             <div className="space-y-2">
-              <Label htmlFor="problemSummary" className="text-right block text-foreground font-semibold text-sm">
-                وصف المشكلة
+              <Label htmlFor="problemSummary" className={`${textAlignBlock} text-foreground font-semibold text-sm`}>
+                {t("callHelper.form.problemSummary")}
               </Label>
               <Textarea
                 id="problemSummary"
-                placeholder="اكتب وصف تفصيلي للمشكلة..."
+                placeholder={t("callHelper.form.problemPlaceholder")}
                 value={problemSummary}
                 onChange={(e) => setProblemSummary(e.target.value)}
-                className="text-right glass-panel border focus:border-primary rounded-xl px-4 py-3 min-h-[100px] text-foreground placeholder:text-muted-foreground resize-none transition-all"
+                className={`${textAlign} glass-panel border focus:border-primary rounded-xl px-4 py-3 min-h-[100px] text-foreground placeholder:text-muted-foreground resize-none transition-all`}
               />
             </div>
 
@@ -868,7 +916,7 @@ export function CallHelper({
               )}
               <div className="relative flex items-center justify-center gap-2.5 text-white font-bold text-sm">
                 <Wand2 className={`size-4 ${isGenerating ? "animate-spin" : ""}`} />
-                <span>{isGenerating ? "جاري التوليد..." : "توليد الصيغة"}</span>
+                <span>{isGenerating ? t("callHelper.form.generating") : t("callHelper.form.generate")}</span>
               </div>
             </button>
           </CardContent>
@@ -879,7 +927,7 @@ export function CallHelper({
           <div className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 dark:from-blue-500/5 dark:to-indigo-500/5 p-4 sm:p-6 border-b">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <h2 className="text-lg sm:text-xl font-bold text-foreground">الصيغة المولدة</h2>
+                <h2 className="text-lg sm:text-xl font-bold text-foreground">{t("callHelper.output.title")}</h2>
                 {generatedText && !isLowConfidence && (
                   <TooltipProvider delayDuration={200}>
                     <Tooltip>
@@ -895,9 +943,9 @@ export function CallHelper({
                         className="glass-card border p-3 max-w-sm"
                         dir="rtl"
                       >
-                        <div className="space-y-2 text-right">
+                        <div className={`space-y-2 ${textAlign}`}>
                           <p className="text-xs font-semibold text-foreground">
-                            سبب اختيار هذه الصيغة
+                            {t("callHelper.output.whyTitle")}
                           </p>
                           {matchedProblem?.why?.trim() ? (
                             <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
@@ -905,7 +953,7 @@ export function CallHelper({
                             </p>
                           ) : (
                             <p className="text-xs text-muted-foreground">
-                              لا يوجد نص في حقل «لماذا» لهذه الحالة في قاعدة البيانات. يمكن إضافته من لوحة إدارة الحالات.
+                              {t("callHelper.output.whyEmpty")}
                             </p>
                           )}
                           <button
@@ -921,7 +969,7 @@ export function CallHelper({
                             className="w-full px-3 py-2 text-xs bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-lg hover:from-cyan-600 hover:to-blue-700 transition-all font-medium shadow-md flex items-center justify-center gap-1.5"
                           >
                             <Info className="size-3" />
-                            المزيد من التفاصيل
+                            {t("callHelper.output.moreDetails")}
                           </button>
                         </div>
                       </TooltipContent>
@@ -931,7 +979,7 @@ export function CallHelper({
               </div>
               {isAlternativeFormat && (
                 <Badge className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white border-0 shadow-md text-xs">
-                  صيغة بديلة
+                  {t("callHelper.output.alternativeBadge")}
                 </Badge>
               )}
             </div>
@@ -940,14 +988,14 @@ export function CallHelper({
             {/* ============ GRAY AREA WARNING (shows when confidence < 40%) ============ */}
             {isLowConfidence && (
               <div className="glass-panel border-2 border-orange-500/50 dark:border-orange-400/50 rounded-xl p-4 space-y-3 bg-orange-50/50 dark:bg-orange-950/20">
-                <div className="flex items-start gap-3 text-right">
+                <div className={`flex items-start gap-3 ${textAlign}`}>
                   <AlertTriangle className="size-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
                   <div className="flex-1 space-y-2">
                     <p className="text-sm font-semibold text-orange-900 dark:text-orange-300">
-                      الوصف غير واضح بما يكفي
+                      {t("callHelper.grayArea.unclearTitle")}
                     </p>
                     <p className="text-xs text-orange-800 dark:text-orange-400">
-                      ساعدنا بتحديد نوع المشكلة للحصول على نتائج أفضل وأكثر دقة
+                      {t("callHelper.grayArea.unclearHint")}
                     </p>
                   </div>
                 </div>
@@ -956,7 +1004,7 @@ export function CallHelper({
                   className="w-full py-3 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold flex items-center justify-center gap-2 shadow-lg transition-all"
                 >
                   <ListFilter className="size-4" />
-                  <span>حدد نوع المشكلة</span>
+                  <span>{t("callHelper.grayArea.selectType")}</span>
                 </button>
               </div>
             )}
@@ -981,7 +1029,7 @@ export function CallHelper({
                     : 'border-yellow-500/50 bg-yellow-50/50 dark:bg-yellow-950/20'
                 )
               }`}>
-                <div className="flex items-center justify-between text-right">
+                <div className={`flex items-center justify-between ${textAlign}`}>
                   <div className="flex items-center gap-2">
                     <div className={`size-2 rounded-full animate-pulse ${
                       descriptionMatchPercentage > 40 ? (
@@ -1013,25 +1061,13 @@ export function CallHelper({
                           : 'text-yellow-700 dark:text-yellow-400'
                       )
                     }`}>
-                      {descriptionMatchPercentage > 40 ? (
-                        descriptionMatchPercentage >= 90 
-                          ? 'تطابق ممتاز' 
-                          : descriptionMatchPercentage >= 80 
-                          ? 'تطابق جيد'
-                          : 'تطابق متوسط'
-                      ) : (
-                        confidenceScore >= 90
-                          ? 'دقة ممتازة'
-                          : confidenceScore >= 80
-                          ? 'دقة جيدة'
-                          : 'دقة متوسطة'
-                      )}
+                      {displayScoreLabel()}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                     {isMatchedResponse && descriptionMatchPercentage > 40 && (
                       <Badge className="bg-primary/10 text-primary border-0 text-[10px]">
-                        رد جاهز
+                        {t("callHelper.match.readyResponse")}
                       </Badge>
                     )}
                     <span className={`font-bold text-sm ${
@@ -1058,13 +1094,13 @@ export function CallHelper({
                     <TooltipProvider delayDuration={100}>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <p className="text-[10px] text-muted-foreground text-right cursor-help truncate">
-                            مطابق مع: {matchedProblem.description}
+                          <p className={`text-[10px] text-muted-foreground ${textAlign} cursor-help truncate`}>
+                            {t("callHelper.match.matchedWith")} {matchedProblem.description}
                           </p>
                         </TooltipTrigger>
                         <TooltipContent side="bottom" className="glass-card border max-w-sm" dir="rtl">
-                          <div className="space-y-1 text-right">
-                            <p className="text-xs font-semibold text-foreground">المشكلة المسجلة:</p>
+                          <div className={`space-y-1 ${textAlign}`}>
+                            <p className="text-xs font-semibold text-foreground">{t("callHelper.match.registeredProblem")}</p>
                             <p className="text-xs text-muted-foreground">{matchedProblem.description}</p>
                             <div className="flex items-center gap-2 pt-1">
                               <Badge className="bg-primary/10 text-primary border-0 text-[10px]">
@@ -1077,7 +1113,7 @@ export function CallHelper({
                                   ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400'
                                   : 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400'
                               }`}>
-                                {matchedProblem.priority === 'high' ? 'أولوية عالية' : matchedProblem.priority === 'medium' ? 'أولوية متوسطة' : 'أولوية منخفضة'}
+                                {priorityLabel(matchedProblem.priority)}
                               </span>
                             </div>
                           </div>
@@ -1087,8 +1123,8 @@ export function CallHelper({
                   </div>
                 )}
                 {isAnswerMaskedUntilFullScore && (
-                  <p className="text-[11px] text-amber-800 dark:text-amber-200 mt-3 text-right font-medium border-t border-current/10 pt-2 leading-relaxed">
-                    آخر سكور معروض: {Math.round(displayedScore)}٪ — النص الكامل للصيغة يظهر فقط عند الوصول إلى 100٪ (مثلاً بعد إكمال المسار أو عند تطابق كامل).
+                  <p className={`text-[11px] text-amber-800 dark:text-amber-200 mt-3 ${textAlign} font-medium border-t border-current/10 pt-2 leading-relaxed`}>
+                    {t("callHelper.match.maskedHint", { score: Math.round(displayedScore) })}
                   </p>
                 )}
               </div>
@@ -1123,8 +1159,8 @@ export function CallHelper({
               <Textarea
                 value={generatedText}
                 readOnly
-                placeholder="سيتم عرض الصيغة المولدة هنا..."
-                className={`text-right glass-panel border rounded-xl px-4 py-3 min-h-[240px] resize-none text-foreground placeholder:text-muted-foreground transition-all ${
+                placeholder={t("callHelper.output.placeholder")}
+                className={`${textAlign} glass-panel border rounded-xl px-4 py-3 min-h-[240px] resize-none text-foreground placeholder:text-muted-foreground transition-all ${
                   isLowConfidence || isAnswerMaskedUntilFullScore ? "blur-sm select-none" : ""
                 }`}
               />
@@ -1132,7 +1168,7 @@ export function CallHelper({
                 <div className="absolute inset-0 flex items-center justify-center bg-background/5 rounded-xl">
                   <div className="text-center space-y-2">
                     <AlertTriangle className="size-8 text-orange-500 mx-auto" />
-                    <p className="text-sm font-semibold text-muted-foreground">حدد نوع المشكلة أولاً</p>
+                    <p className="text-sm font-semibold text-muted-foreground">{t("callHelper.grayArea.selectFirst")}</p>
                   </div>
                 </div>
               )}
@@ -1141,10 +1177,10 @@ export function CallHelper({
                   <div className="text-center space-y-2 max-w-sm">
                     <AlertTriangle className="size-8 text-amber-600 mx-auto" />
                     <p className="text-sm font-semibold text-foreground">
-                      الإفادة الكاملة عند سكور 100٪
+                      {t("callHelper.masked.overlayTitle")}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      السكور الحالي {Math.round(displayedScore)}٪ — أكمل المسار أو حسّن الوصف حتى يصل إلى 100٪ لعرض النص كاملاً.
+                      {t("callHelper.masked.overlayHint", { score: Math.round(displayedScore) })}
                     </p>
                   </div>
                 </div>
@@ -1160,7 +1196,7 @@ export function CallHelper({
                   disabled={Math.round(displayedScore) < 100}
                   title={
                     Math.round(displayedScore) < 100
-                      ? "النسخ متاح عند وصول السكور إلى 100٪"
+                      ? t("callHelper.buttons.copyDisabled")
                       : undefined
                   }
                   className={`w-full py-3 rounded-xl transition-all duration-300 font-semibold flex items-center justify-center gap-2 shadow-md text-sm ${
@@ -1174,12 +1210,12 @@ export function CallHelper({
                   {isCopied ? (
                     <>
                       <CheckCircle2 className="size-4" />
-                      <span>تم النسخ بنجاح!</span>
+                      <span>{t("callHelper.buttons.copySuccess")}</span>
                     </>
                   ) : (
                     <>
                       <Copy className="size-4" />
-                      <span>نسخ النص</span>
+                      <span>{t("callHelper.buttons.copy")}</span>
                     </>
                   )}
                 </button>
@@ -1203,11 +1239,11 @@ export function CallHelper({
                             className="w-full max-w-xs py-3 rounded-xl transition-all duration-300 font-semibold flex items-center justify-center gap-2 shadow-md glass-panel hover:bg-accent/50 border"
                           >
                             <ThumbsUp className="size-5 text-emerald-600 dark:text-emerald-400" />
-                            <span className="text-sm text-emerald-700 dark:text-emerald-300">أفدتك؟</span>
+                            <span className="text-sm text-emerald-700 dark:text-emerald-300">{t("callHelper.feedback.helped")}</span>
                           </button>
                         </TooltipTrigger>
                         <TooltipContent side="top" className="border-2 border-border bg-gray-900 dark:bg-gray-100 shadow-xl">
-                          <p className="text-xs text-gray-100 dark:text-gray-900 font-medium">يفتح صفحة «علّم رفيق من تجربتك» مع تعبئة تلقائية من هذه المكالمة</p>
+                          <p className="text-xs text-gray-100 dark:text-gray-900 font-medium">{t("callHelper.feedback.teachTooltipFull")}</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
@@ -1228,7 +1264,7 @@ export function CallHelper({
                       }`}
                     >
                       <RefreshCcw className={`size-4 ${activeButton === "retry" ? "rotate-180" : ""} transition-transform ${activeButton === "retry" ? "" : "text-cyan-600 dark:text-cyan-400"}`} />
-                      <span className={`text-[10px] sm:text-xs ${activeButton === "retry" ? "" : "text-cyan-700 dark:text-cyan-300"}`}>صيغة أخرى</span>
+                      <span className={`text-[10px] sm:text-xs ${activeButton === "retry" ? "" : "text-cyan-700 dark:text-cyan-300"}`}>{t("callHelper.buttons.alternative")}</span>
                     </button>
 
                     {/* ============ ADVANCED MODE BUTTON ============ */}
@@ -1247,16 +1283,16 @@ export function CallHelper({
                               <div className="absolute -top-1 -right-1 size-3 bg-cyan-500 rounded-full border-2 border-background" />
                             )}
                             <Sliders className={`size-4 ${activeButton === "advanced" ? "rotate-12" : ""} transition-transform ${activeButton === "advanced" ? "" : "text-blue-600 dark:text-blue-400"}`} />
-                            <span className={`text-[10px] sm:text-xs ${activeButton === "advanced" ? "" : "text-blue-700 dark:text-blue-300"}`}>وضع متقدم</span>
+                            <span className={`text-[10px] sm:text-xs ${activeButton === "advanced" ? "" : "text-blue-700 dark:text-blue-300"}`}>{t("callHelper.buttons.advancedMode")}</span>
                           </button>
                         </TooltipTrigger>
                         <TooltipContent side="top" className="border-2 border-border bg-gray-900 dark:bg-gray-100 max-w-xs shadow-xl" dir="rtl">
-                          <div className="text-right space-y-1">
-                            <p className="text-xs font-semibold text-gray-100 dark:text-gray-900">الوضع المتقدم</p>
+                          <div className={`${textAlign} space-y-1`}>
+                            <p className="text-xs font-semibold text-gray-100 dark:text-gray-900">{t("callHelper.advancedMode.title")}</p>
                             <p className="text-[10px] text-gray-300 dark:text-gray-700">
                               {isAdvancedModeEnabled 
-                                ? "يتم عرض خيارات متقدمة بناءً على نوع المشكلة المحدد"
-                                : "سيتم تفعيله تلقائياً عند تحديد نوع المشكلة أو يمكنك تفعيله يدوياً"
+                                ? t("callHelper.advancedMode.enabledHint")
+                                : t("callHelper.advancedMode.disabledHint")
                               }
                             </p>
                           </div>
@@ -1272,11 +1308,11 @@ export function CallHelper({
                             className="py-2.5 sm:py-3 rounded-xl transition-all duration-300 font-semibold flex flex-col items-center justify-center gap-1 shadow-md glass-panel hover:bg-accent/50 border"
                           >
                             <ThumbsUp className="size-4 text-emerald-600 dark:text-emerald-400" />
-                            <span className="text-[10px] sm:text-xs text-emerald-700 dark:text-emerald-300">أفدتك؟</span>
+                            <span className="text-[10px] sm:text-xs text-emerald-700 dark:text-emerald-300">{t("callHelper.feedback.helped")}</span>
                           </button>
                         </TooltipTrigger>
                         <TooltipContent side="top" className="border-2 border-border bg-gray-900 dark:bg-gray-100 shadow-xl">
-                          <p className="text-xs text-gray-100 dark:text-gray-900 font-medium">يفتح صفحة «علّم رفيق من تجربتك» مع تعبئة تلقائية</p>
+                          <p className="text-xs text-gray-100 dark:text-gray-900 font-medium">{t("callHelper.feedback.teachTooltipAuto")}</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
@@ -1289,9 +1325,9 @@ export function CallHelper({
                   <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
                     {selectedProblemType && (
                       <div className="flex items-center justify-between text-xs glass-panel rounded-lg p-3 border">
-                        <span className="text-muted-foreground">نوع المشكلة المحدد:</span>
+                        <span className="text-muted-foreground">{t("callHelper.advancedMode.selectedType")}</span>
                         <Badge className="bg-primary/10 text-primary border-0">
-                          {grayAreaSettings.questions.find(q => q.id === selectedProblemType)?.title || PROBLEM_TYPES.find(t => t.id === selectedProblemType)?.name || 'عام'}
+                          {grayAreaSettings.questions.find(q => q.id === selectedProblemType)?.title || PROBLEM_TYPES.find(pt => pt.id === selectedProblemType)?.name || t("callHelper.advancedMode.general")}
                         </Badge>
                       </div>
                     )}
@@ -1322,10 +1358,8 @@ export function CallHelper({
                         });
                         
                         // Generate response based on final action
-                        // Common variables
-                        const entityTypeArabic = entityType;
                         const problemTypeName = selectedProblemType 
-                          ? (PROBLEM_TYPES.find(t => t.id === selectedProblemType)?.name || '')
+                          ? (PROBLEM_TYPES.find(pt => pt.id === selectedProblemType)?.name || '')
                           : '';
                         const routeNames = result.completedSteps
                           .map((completedStep) => {
@@ -1339,8 +1373,14 @@ export function CallHelper({
                           .map((completedStep) => completedStep.selectedSubCondition?.name || '')
                           .filter(Boolean);
                         if (result.finalAction === 'direct_answer') {
-                          const directAnswerText = lastSubCondition.actionDetails || lastSubCondition.name || 'تم تقديم الإجابة المباشرة';
-                          const newGeneratedText = `السلام عليكم ورحمة الله وبركاته،\n\nتم استقبال بلاغ من العميل: ${customerName}\nنوع الجهة: ${entityTypeArabic}\nنوع المشكلة: ${problemTypeName}\n\nالحالة: ${lastSubCondition.name}\n\n💡 توجيهات الحل:\n${directAnswerText}\n\nشكراً لتواصلكم معنا.`;
+                          const directAnswerText = lastSubCondition.actionDetails || lastSubCondition.name || t("callHelper.templates.defaultDirectAnswer");
+                          const newGeneratedText = reportTemplate("callHelper.templates.flowDirectAnswer", {
+                            customerName,
+                            entityType: entityLabel(entityType),
+                            problemType: problemTypeName,
+                            condition: lastSubCondition.name,
+                            solution: directAnswerText,
+                          });
                           setGeneratedText(newGeneratedText);
                           setIsMatchedResponse(false);
                           setMatchedProblem(null);
@@ -1379,7 +1419,7 @@ export function CallHelper({
                           const matchedText = getFormattedResponse(
                             enhancedSearchResult.problem,
                             customerName,
-                            entityType
+                            apiEntityType
                           );
                           setGeneratedText(matchedText);
                           setDescriptionMatchPercentage(enhancedSearchResult.matchPercentage);
@@ -1422,8 +1462,14 @@ export function CallHelper({
                         setDescriptionMatchPercentage(0);
                         
                         if (result.finalAction === 'escalation') {
-                          const escalationText = lastSubCondition.actionDetails || 'يرجى تصعيد المشكلة للقسم المختص';
-                          const newGeneratedText = `السلام عليكم ورحمة الله وبركاته،\n\nتم استقبال بلاغ من العميل: ${customerName}\nنوع الجهة: ${entityTypeArabic}\nنوع المشكلة: ${problemTypeName}\n\nالحالة: ${lastSubCondition.name}\n\n⚠️ تصعيد:\\n${escalationText}\\n\nشكراً لتواصلكم معنا.`;
+                          const escalationText = lastSubCondition.actionDetails || t("callHelper.templates.defaultEscalation");
+                          const newGeneratedText = reportTemplate("callHelper.templates.flowEscalation", {
+                            customerName,
+                            entityType: entityLabel(entityType),
+                            problemType: problemTypeName,
+                            condition: lastSubCondition.name,
+                            solution: escalationText,
+                          });
                           setGeneratedText(newGeneratedText);
                           void logCallToBackend({
                             generatedResponse: newGeneratedText,
@@ -1432,8 +1478,14 @@ export function CallHelper({
                             finalDisplayScore: 100,
                           });
                         } else if (result.finalAction === 'force_solution') {
-                          const solutionText = lastSubCondition.actionDetails || 'الحل المقترح';
-                          const newGeneratedText = `السلام عليكم ورحمة الله وبركاته،\n\nتم استقبال بلاغ من العميل: ${customerName}\nنوع الجهة: ${entityTypeArabic}\nنوع المشكلة: ${problemTypeName}\n\nالحالة: ${lastSubCondition.name}\n\n💡 الحل:\\n${solutionText}\\n\nشكراً لتواصلكم معنا.`;
+                          const solutionText = lastSubCondition.actionDetails || t("callHelper.templates.defaultSolution");
+                          const newGeneratedText = reportTemplate("callHelper.templates.flowForceSolution", {
+                            customerName,
+                            entityType: entityLabel(entityType),
+                            problemType: problemTypeName,
+                            condition: lastSubCondition.name,
+                            solution: solutionText,
+                          });
                           setGeneratedText(newGeneratedText);
                           void logCallToBackend({
                             generatedResponse: newGeneratedText,
@@ -1442,14 +1494,13 @@ export function CallHelper({
                             finalDisplayScore: 100,
                           });
                         } else {
-                          // Continue action - generate success message
-                          const entityTypeArabic = entityType;
-                          const problemTypeName = selectedProblemType 
-                            ? (PROBLEM_TYPES.find(t => t.id === selectedProblemType)?.name || '')
-                            : '';
-                          
-                          const continueMessage = `السلام عليكم ورحمة الله وبركاته،\n\nتم استقبال بلاغ من العميل: ${customerName}\nنوع الجهة: ${entityTypeArabic}\nنوع المشكلة: ${problemTypeName}\n\nالحالة: ${lastSubCondition.name}\n\n✅ تمت معالجة جميع الخطوات بنجاح.\n\nشكراً لتواصلكم معنا.`;
-                          
+                          const continueMessage = reportTemplate("callHelper.templates.flowContinue", {
+                            customerName,
+                            entityType: entityLabel(entityType),
+                            problemType: problemTypeName,
+                            condition: lastSubCondition.name,
+                            solution: "",
+                          });
                           setGeneratedText(continueMessage);
                           void logCallToBackend({
                             generatedResponse: continueMessage,
@@ -1509,15 +1560,19 @@ export function CallHelper({
             await simulateAIProcessing();
           }
           
-          // Generate response based on flow path
-          const entityTypeArabic = entityType;
           const problemTypeName = flowPath.questionTitle;
           const routeNames = flowPath.selectedSteps.map((item) => item.route.name).filter(Boolean);
           const stepNames = flowPath.selectedSteps.map((item) => item.step.name).filter(Boolean);
           const subConditionNames = flowPath.selectedSteps.map((item) => item.subCondition.name).filter(Boolean);
           if (flowPath.finalAction === 'direct_answer') {
-            const directAnswerText = flowPath.finalStepDescription || 'تم تقديم الإجابة المباشرة';
-            const generatedResponse = `السلام عليكم ورحمة الله وبركاته،\n\nعزيزي/عزيزتي ${customerName}،\n\nتم استلام بلاغكم بخصوص: ${problemTypeName}\nنوع الجهة: ${entityTypeArabic}\n\n💡 توجيهات الحل:\n${directAnswerText}\n\nتفاصيل المشكلة:\n${problemSummary}\n\nتمت المعالجة بنجاح.\n\nمع تحياتنا،`;
+            const directAnswerText = flowPath.finalStepDescription || t("callHelper.templates.defaultDirectAnswer");
+            const generatedResponse = reportTemplate("callHelper.templates.grayDirectAnswer", {
+              customerName,
+              entityType: entityLabel(entityType),
+              problemType: problemTypeName,
+              solution: directAnswerText,
+              problemSummary,
+            });
             setGeneratedText(generatedResponse);
             setIsMatchedResponse(false);
             setMatchedProblem(null);
@@ -1557,7 +1612,7 @@ export function CallHelper({
             const matchedText = getFormattedResponse(
               enhancedSearchResult.problem,
               customerName,
-              entityType
+              apiEntityType
             );
             setGeneratedText(matchedText);
             setDescriptionMatchPercentage(enhancedSearchResult.matchPercentage);
@@ -1605,37 +1660,23 @@ export function CallHelper({
             .map(s => `${s.route.name} > ${s.step.name} > ${s.subCondition.name}`)
             .join('\\n');
           
-          let generatedResponse = '';
-          
-          if (flowPath.finalAction === 'force_solution') {
-            generatedResponse = `السلام عليكم ورحمة الله وبركاته،\\n\\nعزيزي/عزيزتي ${customerName}،\\n\\nتم استلام بلاغكم بخصوص: ${problemTypeName}\\nنوع الجهة: ${entityTypeArabic}\\n\\n`;
-            
-            if (flowPath.finalStepDescription) {
-              generatedResponse += `✅ ${flowPath.finalStepDescription}\\n\\n`;
-            }
-            
-            generatedResponse += `تفاصيل المشكلة:\\n${problemSummary}\\n\\nتم معالجة طلبكم بنجاح. في حال وجود أي استفسار، لا تترددوا بالتواصل معنا.\\n\\nمع تحياتنا،`;
-            
-          } else if (flowPath.finalAction === 'escalation') {
-            generatedResponse = `السلام عليكم ورحمة الله وبركاته،\\n\\nعزيزي/عزيزتي ${customerName}،\\n\\nتم استلام بلاغكم بخصوص: ${problemTypeName}\\nنوع الجهة: ${entityTypeArabic}\\n\\n`;
-            
-            if (flowPath.finalStepDescription) {
-              generatedResponse += `⚠️ ${flowPath.finalStepDescription}\\n\\n`;
-            }
-            
-            generatedResponse += `تفاصيل المشكلة:\\n${problemSummary}\\n\\nتم تصعيد طلبكم للإدارة المختصة وسيتم التواصل معكم في أقرب وقت ممكن.\\n\\nنعتذر عن أي إزعاج، ونقدر تفهمكم.\\n\\nمع تحياتنا،`;
-            
+          let generatedResponse = "";
+          const grayBase = {
+            customerName,
+            entityType: entityLabel(entityType),
+            problemType: problemTypeName,
+            problemSummary,
+            solution: flowPath.finalStepDescription || "",
+          };
+
+          if (flowPath.finalAction === "force_solution") {
+            generatedResponse = reportTemplate("callHelper.templates.grayForceSolution", grayBase);
+          } else if (flowPath.finalAction === "escalation") {
+            generatedResponse = reportTemplate("callHelper.templates.grayEscalation", grayBase);
           } else {
-            // continue action
-            generatedResponse = `السلام عليكم ورحمة الله وبركاته،\\n\\nعزيزي/عزيزتي ${customerName}،\\n\\nتم استلام بلاغكم بخصوص: ${problemTypeName}\\nنوع الجهة: ${entityTypeArabic}\\n\\n`;
-            
-            if (flowPath.finalStepDescription) {
-              generatedResponse += `${flowPath.finalStepDescription}\\n\\n`;
-            }
-            
-            generatedResponse += `تفاصيل المشكلة:\\n${problemSummary}\\n\\nتمت المعالجة بنجاح.\\n\\nمع تحياتنا،`;
+            generatedResponse = reportTemplate("callHelper.templates.grayContinue", grayBase);
           }
-          
+
           setGeneratedText(generatedResponse);
           void logCallToBackend({
             generatedResponse,
@@ -1670,11 +1711,11 @@ export function CallHelper({
         <div className={isDarkMode ? 'dark' : ''}>
           <DialogContent className="glass-card max-w-md shadow-2xl" dir="rtl">
             <DialogHeader>
-              <DialogTitle className="sr-only">سبب اختيار الصيغة</DialogTitle>
+              <DialogTitle className="sr-only">{t("callHelper.why.dialogTitle")}</DialogTitle>
             </DialogHeader>
-            <div className="text-right pt-0">
+            <div className={`${textAlign} pt-0`}>
               <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-                {matchedProblem?.why?.trim() || "لا يوجد سبب محفوظ في حقل why لهذه الحالة."}
+                {matchedProblem?.why?.trim() || t("callHelper.why.noReason")}
               </p>
             </div>
           </DialogContent>
@@ -1686,14 +1727,14 @@ export function CallHelper({
         <div className={isDarkMode ? 'dark' : ''}>
           <DialogContent className="border-2 border-border max-w-2xl h-[600px] flex flex-col shadow-2xl bg-background dark:bg-gray-900" dir="rtl">
             <DialogHeader className="border-b border-border pb-4 bg-background dark:bg-gray-900">
-              <DialogTitle className="text-right flex items-center gap-3 justify-end text-lg">
-                <span className="text-foreground">محادثة رفيق</span>
+              <DialogTitle className={`${textAlign} flex items-center gap-3 ${justifyEnd} text-lg`}>
+                <span className="text-foreground">{t("callHelper.rafeeq.chatTitle")}</span>
                 <div className="p-3 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl shadow-lg border-2 border-cyan-300 dark:border-cyan-400">
                   <Bot className="size-6 text-white" />
                 </div>
               </DialogTitle>
-              <DialogDescription className="text-right text-muted-foreground text-sm">
-                مساعدك الذكي للإجابة على استفساراتك
+              <DialogDescription className={`${textAlign} text-muted-foreground text-sm`}>
+                {t("callHelper.rafeeq.chatDescription")}
               </DialogDescription>
             </DialogHeader>
 
@@ -1704,25 +1745,25 @@ export function CallHelper({
                     <Bot className="size-10 text-white" />
                   </div>
                   <div className="space-y-2">
-                    <h3 className="text-xl font-bold text-foreground">مرحباً بك!</h3>
-                    <p className="text-sm text-muted-foreground">اضغط للبدء في المحادثة مع رفيق</p>
+                    <h3 className="text-xl font-bold text-foreground">{t("callHelper.rafeeq.welcome")}</h3>
+                    <p className="text-sm text-muted-foreground">{t("callHelper.rafeeq.welcomeHint")}</p>
                   </div>
                   <button
                     onClick={() => setIsRafeeqActive(true)}
                     className="px-8 py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl font-bold hover:from-cyan-600 hover:to-blue-700 transition-all flex items-center gap-3 mx-auto shadow-lg"
                   >
                     <Bot className="size-5" />
-                    <span>تشغيل رفيق</span>
+                    <span>{t("callHelper.rafeeq.start")}</span>
                   </button>
                 </div>
               </div>
             ) : (
               <div className="flex-1 flex flex-col min-h-0 bg-background dark:bg-gray-900">
                 <div className="flex-1 overflow-y-auto p-4 space-y-4 rounded-2xl mb-4 bg-gray-50 dark:bg-gray-800 border border-border">
-                  <div className="flex items-start gap-3 justify-end">
+                  <div className={`flex items-start gap-3 ${justifyEnd}`}>
                     <div className="p-4 rounded-2xl max-w-[80%] shadow-md bg-white dark:bg-gray-700 border border-border">
                       <p className="text-sm text-foreground">
-                        مرحباً! أنا رفيق، مساعدك الذكي. كيف يمكنني مساعدتك؟
+                        {t("callHelper.rafeeq.greeting")}
                       </p>
                     </div>
                     <div className="p-2 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex-shrink-0 shadow-lg">
@@ -1745,7 +1786,7 @@ export function CallHelper({
                   </button>
                   <Input
                     type="text"
-                    placeholder="اكتب رسالتك هنا..."
+                    placeholder={t("callHelper.rafeeq.placeholder")}
                     value={chatMessage}
                     onChange={(e) => setChatMessage(e.target.value)}
                     onKeyPress={(e) => {
@@ -1753,7 +1794,7 @@ export function CallHelper({
                         setChatMessage("");
                       }
                     }}
-                    className="flex-1 border rounded-xl px-4 py-3 text-right text-foreground placeholder:text-muted-foreground bg-white dark:bg-gray-700 dark:border-gray-600"
+                    className={`flex-1 border rounded-xl px-4 py-3 ${textAlign} text-foreground placeholder:text-muted-foreground bg-white dark:bg-gray-700 dark:border-gray-600`}
                   />
                 </div>
               </div>

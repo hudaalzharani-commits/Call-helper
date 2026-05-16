@@ -6,6 +6,7 @@ import { Button } from '../ui/button';
 import { toast } from 'sonner';
 import { formatAppDateTime } from '../../utils/dateDisplay';
 import { useAuth } from '../../contexts/AuthContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import {
   Table,
   TableBody,
@@ -26,6 +27,7 @@ interface ArchivedCase {
 }
 
 export function ArchivePage() {
+  const { t } = useLanguage();
   const { isAdmin } = useAuth();
   const [archivedCases, setArchivedCases] = useState<ArchivedCase[]>([]);
   const [loadingArchivedCases, setLoadingArchivedCases] = useState(true);
@@ -50,7 +52,7 @@ export function ArchivePage() {
       setArchivedCases(data.data || []);
     } catch (error) {
       console.error('Error fetching archived cases:', error);
-      toast.error('فشل في تحميل الحالات المؤرشفة');
+      toast.error(t('admin.archive.loadFailed'));
     } finally {
       setLoadingArchivedCases(false);
     }
@@ -81,19 +83,19 @@ export function ArchivePage() {
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(typeof body.message === 'string' ? body.message : 'فشل إعادة الحالة');
+        throw new Error(typeof body.message === 'string' ? body.message : t('admin.archive.restoreFailed'));
       }
-      toast.success('تم إعادة الحالة إلى قاعدة البيانات');
+      toast.success(t('admin.archive.restoreSuccess'));
       await fetchArchivedCases();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'فشل إعادة الحالة');
+      toast.error(e instanceof Error ? e.message : t('admin.archive.restoreFailed'));
     } finally {
       setBusyCaseId(null);
     }
   };
 
   const handleDelete = async (id: string, caseId: string) => {
-    if (!window.confirm(`حذف الحالة «${caseId}» نهائياً من قاعدة البيانات؟ لا يمكن التراجع.`)) {
+    if (!window.confirm(t('admin.archive.deleteConfirm', { caseId }))) {
       return;
     }
     setBusyCaseId(id);
@@ -104,12 +106,12 @@ export function ArchivePage() {
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(typeof body.message === 'string' ? body.message : 'فشل حذف الحالة');
+        throw new Error(typeof body.message === 'string' ? body.message : t('admin.archive.deleteFailed'));
       }
-      toast.success('تم حذف الحالة');
+      toast.success(t('admin.archive.deleteSuccess'));
       await fetchArchivedCases();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'فشل حذف الحالة');
+      toast.error(e instanceof Error ? e.message : t('admin.archive.deleteFailed'));
     } finally {
       setBusyCaseId(null);
     }
@@ -122,17 +124,17 @@ export function ArchivePage() {
           <div className="p-2 bg-primary rounded-xl">
             <Archive className="size-6 text-white" />
           </div>
-          Archive
+          {t('admin.archive.title')}
         </h2>
-        <p className="text-muted-foreground">الحالات المؤرشفة من النظام</p>
+        <p className="text-muted-foreground">{t('admin.archive.subtitle')}</p>
       </div>
 
       {/* Archived Cases */}
       <Card className="glass-panel border-2 border-border p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-foreground">الحالات المؤرشفة</h3>
+          <h3 className="text-lg font-bold text-foreground">{t('admin.archive.cardTitle')}</h3>
           <Badge className="bg-primary/10 text-primary border-0">
-            {archivedCases.length} حالة
+            {t('admin.archive.caseCount', { count: archivedCases.length })}
           </Badge>
         </div>
         <div className="overflow-x-auto">
@@ -144,15 +146,15 @@ export function ArchivePage() {
                 <TableHead className="text-right text-foreground">UserType</TableHead>
                 <TableHead className="text-right text-foreground">Category</TableHead>
                 <TableHead className="text-right text-foreground">SubCategory</TableHead>
-                <TableHead className="text-right text-foreground">تاريخ الأرشفة</TableHead>
-                <TableHead className="text-right text-foreground w-[1%] whitespace-nowrap">الإجراءات</TableHead>
+                <TableHead className="text-right text-foreground">{t('admin.archive.colArchivedAt')}</TableHead>
+                <TableHead className="text-right text-foreground w-[1%] whitespace-nowrap">{t('admin.archive.colActions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loadingArchivedCases ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
-                    جاري تحميل الحالات المؤرشفة...
+                    {t('admin.archive.loading')}
                   </TableCell>
                 </TableRow>
               ) : archivedCases.length === 0 ? (
@@ -178,11 +180,11 @@ export function ArchivePage() {
                           size="sm"
                           className="gap-1"
                           disabled={busyCaseId === item._id}
-                          title="إعادة الحالة إلى قاعدة البيانات (إلغاء الأرشفة)"
+                          title={t('admin.archive.restoreTitle')}
                           onClick={() => handleRestore(item._id)}
                         >
                           <RotateCcw className="size-3.5 shrink-0" />
-                          إعادة
+                          {t('admin.archive.restore')}
                         </Button>
                         {isAdmin ? (
                           <Button
@@ -191,11 +193,11 @@ export function ArchivePage() {
                             size="sm"
                             className="gap-1"
                             disabled={busyCaseId === item._id}
-                            title="حذف نهائي من قاعدة البيانات"
+                            title={t('admin.archive.deleteTitle')}
                             onClick={() => handleDelete(item._id, item.caseId)}
                           >
                             <Trash2 className="size-3.5 shrink-0" />
-                            حذف
+                            {t('admin.archive.delete')}
                           </Button>
                         ) : null}
                       </div>

@@ -53,6 +53,8 @@ import {
 } from '../services/operationalIssueService';
 import { useAuth } from '../contexts/AuthContext';
 import { isGranularCreateEnabled } from '../utils/uiVisibility';
+import { useI18nLayout } from '../hooks/useI18nLayout';
+import { tCategory } from '../i18n/translations';
 import {
   loadCategoryRedlines,
   relatedKnowledgeArticles,
@@ -422,6 +424,7 @@ function HubIssueCard({
   openRowId,
   setOpenRowId,
 }: HubIssueCardProps) {
+  const { t } = useI18nLayout();
   const [whyOpen, setWhyOpen] = useState(false);
   const count = Number((issue.metadata?.count as number) ?? 0);
   const pctRaw = issue.metadata?.percentage;
@@ -745,6 +748,7 @@ function HubIssueCard({
 
 export function CommonIssues() {
   const { user } = useAuth();
+  const { t } = useI18nLayout();
   const canCreateIssue = isGranularCreateEnabled(user, 'action_common_issue_create');
   const [issues, setIssues] = useState<Issue[]>([]);
   const [filteredIssues, setFilteredIssues] = useState<Issue[]>([]);
@@ -801,10 +805,10 @@ export function CommonIssues() {
       setIssues([]);
       const msg =
         error instanceof Error && error.message === 'No authentication token found'
-          ? 'يجب تسجيل الدخول لعرض البيانات'
+          ? t('commonIssues.loginRequired')
           : error instanceof Error
             ? error.message
-            : 'تعذّر تحميل البيانات';
+            : t('commonIssues.loadFailed');
       setLoadError(msg);
       toast.error(msg);
     } finally {
@@ -821,8 +825,8 @@ export function CommonIssues() {
     issues.forEach(i => {
       if (i.category) set.add(i.category);
     });
-    return Array.from(set).sort((a, b) => kbCategoryLabel(a).localeCompare(kbCategoryLabel(b), 'ar'));
-  }, [issues]);
+    return Array.from(set).sort((a, b) => tCategory(t, a).localeCompare(tCategory(t, b), 'ar'));
+  }, [issues, t]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -859,13 +863,13 @@ export function CommonIssues() {
 
   const handleCreateIssue = async () => {
     if (!formData.title.trim() || !formData.description.trim() || !formData.category.trim()) {
-      toast.error('يرجى تعبئة العنوان والوصف والفئة');
+      toast.error(t('commonIssues.fillRequired'));
       return;
     }
     try {
       const { description, solution } = splitDescriptionSolution(formData.description.trim());
       if (!description) {
-        toast.error('يرجى إدخال وصف أو محتوى');
+        toast.error(t('commonIssues.enterDescription'));
         return;
       }
       await createKnowledgeArticle({
@@ -877,13 +881,13 @@ export function CommonIssues() {
         confidence: formData.priority === 'high' ? 82 : formData.priority === 'low' ? 40 : 60,
         isPublished: true,
       });
-      toast.success('تمت الإضافة إلى سجل المعرفة');
+      toast.success(t('commonIssues.addedToKb'));
       setIsCreateDialogOpen(false);
       resetCreateForm();
       await loadAll();
     } catch (error) {
       console.error('Error creating issue:', error);
-      toast.error(error instanceof Error ? error.message : 'فشل الإضافة');
+      toast.error(error instanceof Error ? error.message : t('commonIssues.addFailed'));
     }
   };
 
@@ -915,7 +919,7 @@ export function CommonIssues() {
     a.download = `المشاكل_العامة_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success('تم تصدير CSV');
+    toast.success(t('commonIssues.exportSuccess'));
   };
 
   const { buckets, issueSection } = useMemo(
@@ -969,7 +973,7 @@ export function CommonIssues() {
             <AlertCircle className="size-8 text-primary" />
           </div>
           <div>
-            <h1 className="text-foreground">المشاكل العامة</h1>
+            <h1 className="text-foreground">{t('commonIssues.title')}</h1>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 justify-end">
@@ -980,7 +984,7 @@ export function CommonIssues() {
               onClick={() => setIsCreateDialogOpen(true)}
             >
               <Plus className="size-4 ml-2" />
-              إضافة مشكلة عامة
+              {t('commonIssues.addDialog')}
             </Button>
           ) : null}
           <Button type="button" variant="outline" size="sm" disabled={isLoading} onClick={exportCsv}>
@@ -995,7 +999,7 @@ export function CommonIssues() {
             onClick={() => loadAll()}
           >
             <RefreshCw className={`size-4 ml-1 ${isLoading ? 'animate-spin' : ''}`} />
-            تحديث
+            {t('actions.refresh')}
           </Button>
         </div>
       </div>
@@ -1013,17 +1017,17 @@ export function CommonIssues() {
             <span className="inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-1">
               <span aria-hidden>🔥</span>
               <span className="font-medium text-foreground tabular-nums">{hubStrip.topLine}</span>
-              <span className="text-[11px] opacity-75">أعلى تكرارًا في القائمة الحالية</span>
+              <span className="text-[11px] opacity-75">{t('commonIssues.topRepeat')}</span>
             </span>
             <span className="inline-flex items-center justify-center gap-2 whitespace-nowrap">
               <span aria-hidden>⚠️</span>
               <span className="font-medium text-foreground tabular-nums">{hubStrip.operationalCount}</span>
-              <span>مشاكل نشطة</span>
+              <span>{t('commonIssues.hubActive')}</span>
             </span>
             <span className="inline-flex max-w-full flex-wrap items-center justify-center gap-2">
               <span aria-hidden>🟢</span>
               <span className="font-medium text-foreground tabular-nums">{hubStrip.solvedToday}</span>
-              <span>أُغلقت اليوم</span>
+              <span>{t('commonIssues.hubClosedToday')}</span>
             </span>
           </div>
         </div>
@@ -1035,7 +1039,7 @@ export function CommonIssues() {
             <div className="relative">
               <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 size-4 text-gray-400" />
               <Input
-                placeholder="بحث في التصنيف أو الوصف..."
+                placeholder={t('commonIssues.searchPlaceholder')}
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 className="pr-10 text-right"
@@ -1043,13 +1047,13 @@ export function CommonIssues() {
             </div>
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
               <SelectTrigger className="text-right">
-                <SelectValue placeholder="التصنيف" />
+                <SelectValue placeholder={t('commonIssues.category')} />
               </SelectTrigger>
               <SelectContent dir="rtl">
-                <SelectItem value="all">جميع التصنيفات</SelectItem>
+                <SelectItem value="all">{t('commonIssues.allCategories')}</SelectItem>
                 {categoryFilterOptions.map(cat => (
                   <SelectItem key={cat} value={cat}>
-                    {kbCategoryLabel(cat)}
+                    {tCategory(t, cat)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -1062,14 +1066,14 @@ export function CommonIssues() {
         {isLoading ? (
           <Card className="border-dashed">
             <CardContent className="p-10 text-center">
-              <p className="text-muted-foreground">جاري التحميل...</p>
+              <p className="text-muted-foreground">{t('commonIssues.loading')}</p>
             </CardContent>
           </Card>
         ) : flatOrderedIssues.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="p-10 text-center">
               <AlertCircle className="size-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">لا توجد بيانات مطابقة</p>
+              <p className="text-muted-foreground">{t('commonIssues.empty')}</p>
             </CardContent>
           </Card>
         ) : (
@@ -1103,17 +1107,17 @@ export function CommonIssues() {
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
             disabled={currentPage === 1}
           >
-            السابق
+            {t('commonIssues.prevPage')}
           </Button>
           <span className="text-sm text-muted-foreground">
-            صفحة {currentPage} من {totalPages}
+            {t('commonIssues.pageOf', { current: currentPage, total: totalPages })}
           </span>
           <Button
             variant="outline"
             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
             disabled={currentPage === totalPages}
           >
-            التالي
+            {t('commonIssues.nextPage')}
           </Button>
         </div>
       )}

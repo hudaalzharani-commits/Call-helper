@@ -34,6 +34,7 @@ import {
   displayCallLogUser,
   type BackendCallLog,
 } from "../../services/callLogsService";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 const PAGE_SIZE = 20;
 
@@ -76,6 +77,7 @@ function inDateRange(createdAt: string, range: string): boolean {
 }
 
 export function LogsPage() {
+  const { t, dir } = useLanguage();
   const [logs, setLogs] = useState<BackendCallLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +95,7 @@ export function LogsPage() {
       setPage(1);
     } catch (e) {
       setLogs([]);
-      setError(e instanceof Error ? e.message : "تعذر تحميل السجلات");
+      setError(e instanceof Error ? e.message : t('admin.logs.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -157,15 +159,15 @@ export function LogsPage() {
   };
 
   return (
-    <div className="space-y-6" dir="rtl">
+    <div className="space-y-6" dir={dir}>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-foreground mb-2 flex items-center gap-2">
             <Phone className="size-7 text-primary" />
-            سجلات المكالمات (Call Logs)
+            {t('admin.logs.title')}
           </h2>
           <p className="text-muted-foreground">
-            عرض سجلات المكالمات المحفوظة في قاعدة البيانات (للمشرفين)
+            {t('admin.logs.subtitle')}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -181,7 +183,7 @@ export function LogsPage() {
             ) : (
               <RefreshCw className="size-4 ml-2" />
             )}
-            تحديث
+            {t('admin.logs.refresh')}
           </Button>
           <Button
             type="button"
@@ -190,7 +192,7 @@ export function LogsPage() {
             disabled={loading || filtered.length === 0}
           >
             <Download className="size-4 ml-2" />
-            تصدير JSON
+            {t('admin.logs.exportJson')}
           </Button>
         </div>
       </div>
@@ -213,7 +215,7 @@ export function LogsPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-foreground">{stats.total}</p>
-              <p className="text-xs text-muted-foreground">إجمالي السجلات</p>
+              <p className="text-xs text-muted-foreground">{t('admin.logs.totalRecords')}</p>
             </div>
           </div>
         </Card>
@@ -224,7 +226,7 @@ export function LogsPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-foreground">{stats.resolved}</p>
-              <p className="text-xs text-muted-foreground">تم الحل</p>
+              <p className="text-xs text-muted-foreground">{t('admin.logs.resolved')}</p>
             </div>
           </div>
         </Card>
@@ -235,7 +237,7 @@ export function LogsPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-foreground">{stats.pending}</p>
-              <p className="text-xs text-muted-foreground">قيد المعالجة</p>
+              <p className="text-xs text-muted-foreground">{t('admin.logs.pending')}</p>
             </div>
           </div>
         </Card>
@@ -246,7 +248,7 @@ export function LogsPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-foreground">{stats.escalated}</p>
-              <p className="text-xs text-muted-foreground">تصعيد</p>
+              <p className="text-xs text-muted-foreground">{t('admin.logs.escalated')}</p>
             </div>
           </div>
         </Card>
@@ -264,7 +266,7 @@ export function LogsPage() {
                   setSearch(e.target.value);
                   setPage(1);
                 }}
-                placeholder="ابحث في الملخص، العميل، النوع، المستخدم..."
+                placeholder={t('admin.logs.searchPlaceholder')}
                 className="glass-card border-2 border-border pr-10"
               />
             </div>
@@ -278,14 +280,14 @@ export function LogsPage() {
           >
             <SelectTrigger className="glass-card border-2 border-border w-full sm:w-[200px]">
               <Filter className="size-4 ml-2" />
-              <SelectValue placeholder="تصفية حسب الحالة" />
+              <SelectValue placeholder={t('admin.logs.filterStatus')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">جميع الحالات</SelectItem>
-              <SelectItem value="pending">قيد المعالجة</SelectItem>
-              <SelectItem value="resolved">تم الحل</SelectItem>
-              <SelectItem value="escalated">تصعيد</SelectItem>
-              <SelectItem value="closed">مغلق</SelectItem>
+              <SelectItem value="all">{t('admin.logs.allStatuses')}</SelectItem>
+              <SelectItem value="pending">{t('admin.logs.pending')}</SelectItem>
+              <SelectItem value="resolved">{t('admin.logs.resolved')}</SelectItem>
+              <SelectItem value="escalated">{t('admin.logs.escalated')}</SelectItem>
+              <SelectItem value="closed">{t('admin.logs.statusClosed')}</SelectItem>
             </SelectContent>
           </Select>
           <Select
@@ -299,10 +301,10 @@ export function LogsPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">كل الفترات</SelectItem>
-              <SelectItem value="today">اليوم</SelectItem>
-              <SelectItem value="week">آخر 7 أيام</SelectItem>
-              <SelectItem value="month">آخر 30 يوماً</SelectItem>
+              <SelectItem value="all">{t('admin.logs.allPeriods')}</SelectItem>
+              <SelectItem value="today">{t('admin.logs.today')}</SelectItem>
+              <SelectItem value="week">{t('admin.logs.last7Days')}</SelectItem>
+              <SelectItem value="month">{t('admin.logs.last30Days')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -313,7 +315,7 @@ export function LogsPage() {
         {loading ? (
           <div className="flex items-center justify-center py-16 gap-3 text-muted-foreground">
             <Loader2 className="size-8 animate-spin" />
-            <span>جاري تحميل سجلات المكالمات...</span>
+            <span>{t('admin.logs.loading')}</span>
           </div>
         ) : (
           <>
@@ -322,28 +324,28 @@ export function LogsPage() {
                 <TableHeader>
                   <TableRow className="border-b border-border hover:bg-transparent">
                     <TableHead className="text-right text-foreground whitespace-nowrap">
-                      الوقت
+                      {t('admin.logs.colTime')}
                     </TableHead>
                     <TableHead className="text-right text-foreground whitespace-nowrap">
-                      المستخدم
+                      {t('admin.logs.colUser')}
                     </TableHead>
                     <TableHead className="text-right text-foreground whitespace-nowrap">
-                      العميل
+                      {t('admin.logs.colCustomer')}
                     </TableHead>
                     <TableHead className="text-right text-foreground whitespace-nowrap">
-                      الجهة
+                      {t('admin.logs.colEntity')}
                     </TableHead>
                     <TableHead className="text-right text-foreground whitespace-nowrap">
-                      نوع المشكلة
+                      {t('admin.logs.colProblemType')}
                     </TableHead>
                     <TableHead className="text-right text-foreground min-w-[200px]">
-                      الملخص
+                      {t('admin.logs.colSummary')}
                     </TableHead>
                     <TableHead className="text-right text-foreground whitespace-nowrap">
-                      تطابق
+                      {t('admin.logs.colMatch')}
                     </TableHead>
                     <TableHead className="text-right text-foreground whitespace-nowrap">
-                      المدة (ث)
+                      {t('admin.logs.colDuration')}
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -354,7 +356,7 @@ export function LogsPage() {
                         colSpan={8}
                         className="text-center text-muted-foreground py-12"
                       >
-                        لا توجد سجلات مطابقة للفلتر الحالي.
+                        {t('admin.logs.empty')}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -396,10 +398,14 @@ export function LogsPage() {
 
             <div className="flex items-center justify-between mt-6 pt-6 border-t border-border flex-wrap gap-3">
               <p className="text-sm text-muted-foreground">
-                عرض {(safePage - 1) * PAGE_SIZE + 1}-
-                {Math.min(safePage * PAGE_SIZE, filtered.length)} من {filtered.length}{" "}
-                سجل
-                {filtered.length !== logs.length && ` (من أصل ${logs.length})`}
+                {t('admin.logs.showing', {
+                  from: (safePage - 1) * PAGE_SIZE + 1,
+                  to: Math.min(safePage * PAGE_SIZE, filtered.length),
+                  total: filtered.length,
+                })}
+                {filtered.length !== logs.length
+                  ? t('admin.logs.showingOf', { total: logs.length })
+                  : ''}
               </p>
               <div className="flex gap-2">
                 <Button
@@ -408,7 +414,7 @@ export function LogsPage() {
                   disabled={safePage <= 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                 >
-                  السابق
+                  {t('admin.logs.prev')}
                 </Button>
                 <Button
                   variant="outline"
@@ -416,7 +422,7 @@ export function LogsPage() {
                   disabled={safePage >= totalPages}
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 >
-                  التالي
+                  {t('admin.logs.next')}
                 </Button>
               </div>
             </div>

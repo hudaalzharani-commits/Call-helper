@@ -47,6 +47,7 @@ import {
 import { DashboardChartDefs, dashAreaAccentFillId } from '../dashboard/DashboardChartDefs';
 import { DashboardChartFrame } from '../dashboard/DashboardChartFrame';
 import { DashboardKpiCard } from '../dashboard/DashboardKpiCard';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { useDashboardChartColors } from '../../hooks/useDashboardChartColors';
 import {
   DASH_CARTESIAN_MARGIN,
@@ -63,6 +64,7 @@ import {
 const ADMIN_ACTIVITY_CHART_ID = 'admin-activity';
 
 export function DashboardPage() {
+  const { t } = useLanguage();
   const chartColors = useDashboardChartColors();
   const [summary, setSummary] = useState<SummaryStats | null>(null);
   const [users, setUsers] = useState<UserStats | null>(null);
@@ -127,32 +129,31 @@ export function DashboardPage() {
   return (
     <div className="dashboard-cosmos dashboard-cosmos--admin space-y-5">
       <div>
-        <h2 className="dash-page-title mb-2">لوحة التحكم</h2>
-        <p className="text-muted-foreground">نظرة شاملة على أداء النظام</p>
+        <p className="text-muted-foreground">{t('admin.dashboard.subtitle')}</p>
       </div>
 
       {(isLoading || error) && (
         <Card className="glass-panel border-2 border-border p-4">
           <div className="text-right text-sm">
-            {isLoading && <p className="text-muted-foreground">جاري تحميل بيانات لوحة التحكم...</p>}
-            {error && <p className="text-red-600 dark:text-red-400">تعذر تحميل البيانات: {error}</p>}
+            {isLoading && <p className="text-muted-foreground">{t('admin.dashboard.loading')}</p>}
+            {error && <p className="text-red-600 dark:text-red-400">{t('admin.dashboard.loadError', { error })}</p>}
           </div>
         </Card>
       )}
 
       {/* Summary Cards */}
       <div>
-        <h3 className="text-lg font-semibold text-foreground mb-4">ملخص سريع</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-4">{t('admin.dashboard.summaryCards')}</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <DashboardKpiCard
-            label="إجمالي المستخدمين"
+            label={t('admin.dashboard.totalUsers')}
             value={String(users?.totalUsers ?? 0)}
-            change={users ? `${users.activeUsers} نشط` : undefined}
+            change={users ? `${users.activeUsers} ${t('admin.dashboard.active')}` : undefined}
             trend="neutral"
           />
 
           <DashboardKpiCard
-            label="المكالمات اليوم"
+            label={t('admin.dashboard.callsToday')}
             value={String(summary?.callsToday ?? 0)}
             change={
               typeof summary?.trends?.calls === 'number'
@@ -169,16 +170,16 @@ export function DashboardPage() {
           />
 
           <DashboardKpiCard
-            label="المشاكل المفتوحة"
+            label={t('admin.dashboard.openIssues')}
             value={String(summary?.pendingCalls ?? 0)}
-            change={summary ? `${summary.activeCalls} نشط` : undefined}
+            change={summary ? `${summary.activeCalls} ${t('admin.dashboard.active')}` : undefined}
             trend="neutral"
           />
 
           <DashboardKpiCard
-            label="معدل الحل"
+            label={t('admin.dashboard.resolutionRate')}
             value={`${summary?.resolutionRate ?? 0}%`}
-            change={summary ? `${summary.resolvedCalls} محلولة` : undefined}
+            change={summary ? `${summary.resolvedCalls} ${t('admin.dashboard.resolved')}` : undefined}
             trend="up"
           />
         </div>
@@ -186,14 +187,14 @@ export function DashboardPage() {
 
       {/* Graphs */}
       <div>
-        <h3 className="text-lg font-semibold text-foreground mb-4">المخططات</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-4">{t('admin.dashboard.graphs')}</h3>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Performance Over Time */}
           <Card className="dash-chart-card p-0 overflow-hidden border-0">
             <div className="dash-chart-card__header">
             <h4 className="dash-chart-card__title mb-0">
               <BarChart3 className="size-5 text-primary" />
-              الأداء خلال الأسبوع
+              {t('admin.dashboard.performanceWeek')}
             </h4>
             </div>
             <div className="dash-chart-canvas">
@@ -214,7 +215,7 @@ export function DashboardPage() {
                   dataKey="users"
                   stroke={DASH_CHART.primary}
                   strokeWidth={2}
-                  name="المستخدمين"
+                  name={t('admin.dashboard.chartUsers')}
                   dot={{ fill: DASH_CHART.primary, r: 4 }}
                 />
                 <Line
@@ -222,7 +223,7 @@ export function DashboardPage() {
                   dataKey="calls"
                   stroke={DASH_CHART.accent}
                   strokeWidth={2}
-                  name="المكالمات"
+                  name={t('admin.dashboard.chartCalls')}
                   dot={{ fill: DASH_CHART.accent, r: 4 }}
                 />
               </LineChart>
@@ -235,7 +236,7 @@ export function DashboardPage() {
             <div className="dash-chart-card__header">
             <h4 className="dash-chart-card__title mb-0">
               <Activity className="size-5 text-primary" />
-              النشاط على مدار اليوم
+              {t('admin.dashboard.activityDay')}
             </h4>
             </div>
             <div className="dash-chart-canvas">
@@ -261,7 +262,7 @@ export function DashboardPage() {
                   stroke={chartColors.accent}
                   fill={`url(#${dashAreaAccentFillId(ADMIN_ACTIVITY_CHART_ID)})`}
                   strokeWidth={2}
-                  name="النشاط"
+                  name={t('admin.dashboard.chartActivity')}
                 />
               </AreaChart>
             </DashboardChartFrame>
@@ -273,7 +274,7 @@ export function DashboardPage() {
             <div className="dash-chart-card__header">
             <h4 className="dash-chart-card__title mb-0">
               <AlertCircle className="size-5 text-primary" />
-              توزيع المشاكل
+              {t('admin.dashboard.issueDistribution')}
             </h4>
             </div>
             <div className="dash-chart-canvas">
@@ -288,7 +289,7 @@ export function DashboardPage() {
                 <YAxis width={DASH_Y_AXIS_WIDTH} {...DASH_Y_AXIS_SPACER} />
                 <YAxis tick={dashAxisTick} tickLine={dashAxisLine} {...DASH_Y_AXIS_RTL} />
                 <Tooltip contentStyle={dashTooltipStyle} />
-                <Bar dataKey="value" radius={DASH_CHART.barRadius} name="عدد المشاكل">
+                <Bar dataKey="value" radius={DASH_CHART.barRadius} name={t('admin.dashboard.chartIssueCount')}>
                   {issueDistributionData.map((_, index) => (
                     <Cell key={`issue-bar-${index}`} fill={dashBarFill(index, chartColors)} />
                   ))}
@@ -303,7 +304,7 @@ export function DashboardPage() {
             <div className="dash-chart-card__header">
               <h4 className="dash-chart-card__title mb-0">
                 <Database className="size-5 text-primary" />
-                حالة النظام
+                {t('admin.dashboard.systemStatus')}
               </h4>
             </div>
             <div className="dash-chart-canvas">
@@ -312,7 +313,7 @@ export function DashboardPage() {
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="size-4 text-green-500" />
-                    <span className="text-muted-foreground">استخدام المعالج</span>
+                    <span className="text-muted-foreground">{t('admin.dashboard.cpuUsage')}</span>
                   </div>
                   <span className="text-foreground font-semibold">42%</span>
                 </div>
@@ -325,7 +326,7 @@ export function DashboardPage() {
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="size-4 text-primary" />
-                    <span className="text-muted-foreground">استخدام الذاكرة</span>
+                    <span className="text-muted-foreground">{t('admin.dashboard.memoryUsage')}</span>
                   </div>
                   <span className="text-foreground font-semibold">68%</span>
                 </div>
@@ -338,7 +339,7 @@ export function DashboardPage() {
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
                     <AlertCircle className="size-4 text-amber-500" />
-                    <span className="text-muted-foreground">استخدام المساحة</span>
+                    <span className="text-muted-foreground">{t('admin.dashboard.diskUsage')}</span>
                   </div>
                   <span className="text-foreground font-semibold">85%</span>
                 </div>
@@ -351,7 +352,7 @@ export function DashboardPage() {
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="size-4 text-purple-500" />
-                    <span className="text-muted-foreground">الأداء العام</span>
+                    <span className="text-muted-foreground">{t('admin.dashboard.overallPerformance')}</span>
                   </div>
                   <span className="text-foreground font-semibold">92%</span>
                 </div>
@@ -367,7 +368,7 @@ export function DashboardPage() {
 
       {/* Quick Actions */}
       <div>
-        <h3 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-4">{t('admin.dashboard.quickActions')}</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Button 
             className="glass-panel border-2 border-border h-auto py-6 flex-col gap-3 hover:scale-[1.02] transition-all hover:bg-accent/50 text-foreground"
@@ -377,8 +378,8 @@ export function DashboardPage() {
               <Plus className="size-6 text-white" />
             </div>
             <div className="text-center">
-              <p className="font-semibold">إضافة مستخدم</p>
-              <p className="text-xs text-muted-foreground">إنشاء حساب جديد</p>
+              <p className="font-semibold">{t('admin.dashboard.addUser')}</p>
+              <p className="text-xs text-muted-foreground">{t('admin.dashboard.addUserDesc')}</p>
             </div>
           </Button>
 
@@ -390,8 +391,8 @@ export function DashboardPage() {
               <FileText className="size-6 text-white" />
             </div>
             <div className="text-center">
-              <p className="font-semibold">إنشاء تقرير</p>
-              <p className="text-xs text-muted-foreground">توليد تقرير جديد</p>
+              <p className="font-semibold">{t('admin.dashboard.createReport')}</p>
+              <p className="text-xs text-muted-foreground">{t('admin.dashboard.createReportDesc')}</p>
             </div>
           </Button>
 
@@ -403,8 +404,8 @@ export function DashboardPage() {
               <Download className="size-6 text-white" />
             </div>
             <div className="text-center">
-              <p className="font-semibold">تصدير البيانات</p>
-              <p className="text-xs text-muted-foreground">تحميل ملف Excel</p>
+              <p className="font-semibold">{t('admin.dashboard.exportData')}</p>
+              <p className="text-xs text-muted-foreground">{t('admin.dashboard.exportDataDesc')}</p>
             </div>
           </Button>
 
@@ -416,8 +417,8 @@ export function DashboardPage() {
               <Settings className="size-6 text-white" />
             </div>
             <div className="text-center">
-              <p className="font-semibold">الإعدادات</p>
-              <p className="text-xs text-muted-foreground">تخصيص النظام</p>
+              <p className="font-semibold">{t('admin.dashboard.settings')}</p>
+              <p className="text-xs text-muted-foreground">{t('admin.dashboard.settingsDesc')}</p>
             </div>
           </Button>
 
@@ -429,8 +430,8 @@ export function DashboardPage() {
               <Upload className="size-6 text-white" />
             </div>
             <div className="text-center">
-              <p className="font-semibold">استيراد بيانات</p>
-              <p className="text-xs text-muted-foreground">رفع ملف CSV</p>
+              <p className="font-semibold">{t('admin.dashboard.importData')}</p>
+              <p className="text-xs text-muted-foreground">{t('admin.dashboard.importDataDesc')}</p>
             </div>
           </Button>
 
@@ -442,8 +443,8 @@ export function DashboardPage() {
               <Database className="size-6 text-white" />
             </div>
             <div className="text-center">
-              <p className="font-semibold">نسخ احتياطي</p>
-              <p className="text-xs text-muted-foreground">إنشاء نسخة جديدة</p>
+              <p className="font-semibold">{t('admin.dashboard.backup')}</p>
+              <p className="text-xs text-muted-foreground">{t('admin.dashboard.backupDesc')}</p>
             </div>
           </Button>
 
@@ -455,8 +456,8 @@ export function DashboardPage() {
               <Trash2 className="size-6 text-white" />
             </div>
             <div className="text-center">
-              <p className="font-semibold">حذف البيانات</p>
-              <p className="text-xs text-muted-foreground">تنظيف قديمة</p>
+              <p className="font-semibold">{t('admin.dashboard.deleteData')}</p>
+              <p className="text-xs text-muted-foreground">{t('admin.dashboard.deleteDataDesc')}</p>
             </div>
           </Button>
 
@@ -468,8 +469,8 @@ export function DashboardPage() {
               <RefreshCw className="size-6 text-white" />
             </div>
             <div className="text-center">
-              <p className="font-semibold">إعادة التشغيل</p>
-              <p className="text-xs text-muted-foreground">تحديث الخدمات</p>
+              <p className="font-semibold">{t('admin.dashboard.restart')}</p>
+              <p className="text-xs text-muted-foreground">{t('admin.dashboard.restartDesc')}</p>
             </div>
           </Button>
         </div>

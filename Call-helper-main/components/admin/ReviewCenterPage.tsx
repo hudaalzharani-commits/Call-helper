@@ -39,6 +39,7 @@ import {
   DialogFooter,
 } from '../ui/dialog';
 import { toast } from 'sonner';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { formatAppDateTime } from '../../utils/dateDisplay';
 
 // ====================================================================
@@ -352,6 +353,7 @@ const MOCK_HISTORY: HistoryItem[] = [
 // ====================================================================
 
 export function ReviewCenterPage() {
+  const { t, dir } = useLanguage();
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>(MOCK_REVIEW_ITEMS);
   const [history] = useState<HistoryItem[]>(MOCK_HISTORY);
   const [selectedItem, setSelectedItem] = useState<ReviewItem | null>(null);
@@ -497,15 +499,15 @@ export function ReviewCenterPage() {
     switch (actionType) {
       case 'approve':
         statusUpdate = 'approved';
-        toastMessage = 'تم قبول الاقتراح بنجاح';
+        toastMessage = t('admin.review.toastApproved');
         break;
       case 'modify':
         statusUpdate = 'modified';
-        toastMessage = 'تم قبول الاقتراح مع التعديلات';
+        toastMessage = t('admin.review.toastModified');
         break;
       case 'reject':
         statusUpdate = 'rejected';
-        toastMessage = 'تم رفض الاقتراح';
+        toastMessage = t('admin.review.toastRejected');
         break;
     }
 
@@ -546,8 +548,8 @@ export function ReviewCenterPage() {
       )
     );
 
-    toast.info('تم وضع علامة "يحتاج بيانات أكثر"', {
-      description: 'سيستمر النظام في جمع البيانات',
+    toast.info(t('admin.review.toastNeedData'), {
+      description: t('admin.review.toastNeedDataDesc'),
     });
   };
 
@@ -572,13 +574,13 @@ export function ReviewCenterPage() {
             <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl">
               <Shield className="size-6 text-white" />
             </div>
-            Review Center
+            {t('admin.review.title')}
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            مراجعة ما تعلّمه النظام قبل التطبيق
+            {t('admin.review.subtitleLearn')}
           </p>
           <p className="mt-3 text-sm font-medium text-amber-800 dark:text-amber-300 bg-amber-500/15 border border-amber-500/35 rounded-lg px-3 py-2 max-w-2xl">
-            هذه الصفحة لا تعمل حالياً — الواجهة للعرض فقط ولم يُربَط المحتوى أو الإجراءات بالخادم بعد.
+            {t('admin.review.demoNote')}
           </p>
         </div>
 
@@ -633,12 +635,12 @@ export function ReviewCenterPage() {
                         }`}
                       >
                         {item.status === 'approved'
-                          ? '✓ مقبول'
+                          ? t('admin.review.statusApproved')
                           : item.status === 'modified'
-                          ? '✓ معدّل'
+                          ? t('admin.review.statusModified')
                           : item.status === 'rejected'
-                          ? '✗ مرفوض'
-                          : '⏸ يحتاج بيانات'}
+                          ? t('admin.review.statusRejected')
+                          : t('admin.review.statusNeedData')}
                       </Badge>
                     )}
                   </div>
@@ -1027,22 +1029,20 @@ export function ReviewCenterPage() {
 
       {/* Action Confirmation Dialog */}
       <Dialog open={showActionDialog} onOpenChange={setShowActionDialog}>
-        <DialogContent className="glass-card border-2 max-w-xl" dir="rtl">
+        <DialogContent className="glass-card border-2 max-w-xl" dir={dir}>
           <DialogHeader>
             <DialogTitle className="text-right flex items-center gap-2">
               {actionType === 'approve' && <CheckCircle className="size-5 text-emerald-500" />}
               {actionType === 'modify' && <Edit3 className="size-5 text-blue-500" />}
               {actionType === 'reject' && <XCircle className="size-5 text-red-500" />}
-              {actionType === 'approve' && 'تأكيد القبول والتطبيق'}
-              {actionType === 'modify' && 'تأكيد القبول مع التعديل'}
-              {actionType === 'reject' && 'تأكيد الرفض'}
+              {actionType === 'approve' && t('admin.review.confirmApprove')}
+              {actionType === 'modify' && t('admin.review.confirmModify')}
+              {actionType === 'reject' && t('admin.review.confirmReject')}
             </DialogTitle>
             <DialogDescription className="text-right">
-              {actionType === 'approve' &&
-                'سيتم تطبيق هذا الاقتراح مباشرة على النظام. هل أنت متأكد؟'}
-              {actionType === 'modify' &&
-                'سيتم تطبيق التعديلات التي أدخلتها. يرجى المراجعة قبل التأكيد.'}
-              {actionType === 'reject' && 'لن يتم تطبيق هذا الاقتراح. هل أنت متأكد؟'}
+              {actionType === 'approve' && t('admin.review.confirmApproveDesc')}
+              {actionType === 'modify' && t('admin.review.confirmModifyDesc')}
+              {actionType === 'reject' && t('admin.review.confirmRejectDesc')}
             </DialogDescription>
           </DialogHeader>
 
@@ -1054,7 +1054,7 @@ export function ReviewCenterPage() {
                   value={modifiedValue}
                   onChange={(e) => setModifiedValue(e.target.value)}
                   className="glass-card border-2 border-border text-right min-h-24"
-                  dir="rtl"
+                  dir={dir}
                 />
                 <div className="glass-card p-2 rounded-md border border-border">
                   <p className="text-xs text-muted-foreground mb-1">القيمة الأصلية:</p>
@@ -1070,7 +1070,7 @@ export function ReviewCenterPage() {
                 onChange={(e) => setActionComment(e.target.value)}
                 placeholder="أضف ملاحظاتك هنا..."
                 className="glass-card border-2 border-border text-right"
-                dir="rtl"
+                dir={dir}
               />
             </div>
 
@@ -1093,7 +1093,7 @@ export function ReviewCenterPage() {
 
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setShowActionDialog(false)}>
-              إلغاء
+              {t('admin.review.cancel')}
             </Button>
             <Button
               onClick={handleConfirmAction}
@@ -1108,7 +1108,7 @@ export function ReviewCenterPage() {
               {actionType === 'approve' && <CheckCircle className="size-4 ml-2" />}
               {actionType === 'modify' && <Edit3 className="size-4 ml-2" />}
               {actionType === 'reject' && <XCircle className="size-4 ml-2" />}
-              تأكيد
+              {t('admin.review.confirmBtn')}
             </Button>
           </DialogFooter>
         </DialogContent>
