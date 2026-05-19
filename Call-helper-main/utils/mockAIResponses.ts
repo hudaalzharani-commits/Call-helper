@@ -327,11 +327,12 @@ function generateGenericEscalation(flowPath: string, clientData: ClientData): st
 /**
  * Simulate AI processing delay (for realistic UX)
  * 
- * Moderate delay (~350–700ms) when ENABLE_AI is on.
+ * TODO: Remove this when connecting to real AI API
  */
 export function simulateAIProcessing(): Promise<void> {
   return new Promise(resolve => {
-    const delay = 350 + Math.random() * 350;
+    // Random delay between 1-2 seconds to simulate AI thinking
+    const delay = 1000 + Math.random() * 1000;
     setTimeout(resolve, delay);
   });
 }

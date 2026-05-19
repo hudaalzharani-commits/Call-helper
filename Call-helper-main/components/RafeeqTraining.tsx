@@ -319,9 +319,14 @@ export function RafeeqTraining() {
                   <div className="flex-1 text-right">
                     <div className="flex items-start justify-between gap-4 mb-3">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-3">
+                        <div className="flex items-center gap-2 mb-3 flex-wrap justify-end">
                           {getStatusBadge(entry.status)}
                           <Badge variant="outline">{entry.category}</Badge>
+                          {entry.relatedCaseId ? (
+                            <Badge variant="secondary" className="font-mono text-xs">
+                              {entry.relatedCaseId}
+                            </Badge>
+                          ) : null}
                         </div>
                         
                         <div className="space-y-4">

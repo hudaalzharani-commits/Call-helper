@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { ArrowRight, Brain, Lightbulb, Paperclip, Send, Gem } from 'lucide-react';
+import { ArrowRight, Paperclip, Send, Gem } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -7,6 +7,12 @@ import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { createTrainingEntry } from '../services/trainingEntriesService';
 import { useI18nLayout } from '../hooks/useI18nLayout';
+import {
+  entityForApi,
+  entityKeyFromValue,
+  tEntity,
+  type EntityKey,
+} from '../i18n/translations';
 import {
   stripTrainingAttachmentFooter,
   scenarioTextMentionsAttachmentLine,
@@ -18,12 +24,17 @@ type PrefillPayload = {
   entityType?: string;
   problemDetails?: string;
   correctInfo?: string;
+  caseId?: string;
 };
 
 export function TeachRafeeqExperience() {
   const { t } = useI18nLayout();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [entityType, setEntityType] = useState('');
+  const [caseId, setCaseId] = useState('');
+  /** مُعبّأ من مساعد المكالمات — للعرض فقط */
+  const [caseIdLocked, setCaseIdLocked] = useState(false);
+  /** مفتاح نوع الجهة — نفس خيارات مساعد المكالمات (يُعبّأ تلقائياً ولا يُعدَّل) */
+  const [entityKey, setEntityKey] = useState<EntityKey | ''>('');
   const [problemDetails, setProblemDetails] = useState('');
   const [correctInfo, setCorrectInfo] = useState('');
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
@@ -34,7 +45,14 @@ export function TeachRafeeqExperience() {
       const raw = sessionStorage.getItem(PREFILL_KEY);
       if (!raw) return;
       const p = JSON.parse(raw) as PrefillPayload;
-      if (typeof p.entityType === 'string') setEntityType(p.entityType);
+      if (typeof p.caseId === 'string' && p.caseId.trim()) {
+        setCaseId(p.caseId.trim());
+        setCaseIdLocked(true);
+      }
+      if (typeof p.entityType === 'string') {
+        const key = entityKeyFromValue(p.entityType);
+        if (key) setEntityKey(key);
+      }
       if (typeof p.problemDetails === 'string') setProblemDetails(p.problemDetails);
       if (typeof p.correctInfo === 'string') setCorrectInfo(p.correctInfo);
       sessionStorage.removeItem(PREFILL_KEY);
@@ -52,7 +70,7 @@ export function TeachRafeeqExperience() {
   };
 
   const handleSubmit = async () => {
-    const cat = entityType.trim();
+    const cat = entityKey ? entityForApi(entityKey) : '';
     const rawProblem = problemDetails.trim();
     const correct = correctInfo.trim();
     if (!cat || !rawProblem || !correct) {
@@ -74,11 +92,14 @@ export function TeachRafeeqExperience() {
           scenario,
           correctResponse: correct,
           alternativeResponses: [],
+          relatedCaseId: caseId.trim() || undefined,
         },
         attachmentFile,
       );
       toast.success(t('teach.submitSuccess'));
-      setEntityType('');
+      setCaseId('');
+      setCaseIdLocked(false);
+      setEntityKey('');
       setProblemDetails('');
       setCorrectInfo('');
       setAttachmentFile(null);
@@ -113,26 +134,48 @@ export function TeachRafeeqExperience() {
           <span>العودة لمساعد المكالمات</span>
           <ArrowRight className="size-4 shrink-0" aria-hidden />
         </button>
-        <header className="flex items-center justify-center gap-3 text-foreground">
-          <div className="relative flex size-11 shrink-0 items-center justify-center">
-            <Lightbulb className="size-11 text-[var(--ai)] drop-shadow-sm" strokeWidth={1.5} />
-            <Brain className="absolute size-[1.35rem] text-primary" strokeWidth={2} />
-          </div>
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl font-display">{t('teach.title')}</h1>
+        <header className="w-full text-foreground">
+          <h1 className="text-right text-xl font-bold tracking-tight sm:text-2xl font-display">
+            {t('teach.title')}
+          </h1>
         </header>
 
         <div className="panel-elevated p-6" dir="rtl">
           <div className="space-y-5">
             <div className="space-y-2">
+              <Label htmlFor="erf-case-id" className="text-right text-sm font-medium">
+                {t('teach.caseId')}
+              </Label>
+              <Input
+                id="erf-case-id"
+                value={caseId}
+                onChange={
+                  caseIdLocked ? undefined : (e) => setCaseId(e.target.value)
+                }
+                readOnly={caseIdLocked}
+                disabled={caseIdLocked}
+                aria-readonly={caseIdLocked}
+                placeholder={caseIdLocked ? undefined : t('teach.caseIdPlaceholder')}
+                className={`text-right h-11 rounded-xl font-mono text-sm ${
+                  caseIdLocked
+                    ? 'bg-muted/60 cursor-default opacity-100'
+                    : ''
+                }`}
+              />
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="erf-entity" className="text-right text-sm font-medium">
-                نوع الجهة:
+                {t('teach.entityType')}
               </Label>
               <Input
                 id="erf-entity"
-                value={entityType}
-                onChange={(e) => setEntityType(e.target.value)}
-                className="text-right h-11 rounded-xl"
-                placeholder="أدخل الجهة اللي كانت عندها المشكلة أو الاستفسار، عشان أربط المعلومة بسياقها الصحيح."
+                value={entityKey ? tEntity(t, entityKey) : ''}
+                readOnly
+                disabled
+                aria-readonly
+                className="text-right h-11 rounded-xl bg-muted/60 cursor-default opacity-100"
+                placeholder={t('callHelper.form.entityPlaceholder')}
               />
             </div>
 

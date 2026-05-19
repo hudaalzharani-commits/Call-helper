@@ -7,6 +7,9 @@ import { Switch } from '../ui/switch';
 import { toast } from 'sonner';
 import { useI18nLayout } from '../../hooks/useI18nLayout';
 import { formatAppDateTime } from '../../utils/dateDisplay';
+import { getApiBaseUrl } from '../../utils/apiBase';
+
+const API = getApiBaseUrl();
 
 interface Case {
   _id: string;
@@ -42,12 +45,13 @@ const USER_TYPE_CASE_PREFIX: Record<string, string> = {
   حج: 'HJ'
 };
 
+/** رموز CaseID: CH-{UM|HJ}-{subtype}-{###} */
 const SUBTYPE_CASE_CODE: Record<string, string> = {
   'وكيل خارجي': 'EA',
   'شركة عمرة': 'UC',
   'مقدم خدمة سكن': 'HP',
-  'مكتب شؤون': 'AO',
-  'منظم تابع': 'SO'
+  'مكتب شؤون': 'HM',
+  'منظم تابع': 'SO',
 };
 
 export function DatabasePage() {
@@ -102,7 +106,7 @@ export function DatabasePage() {
   const handleActiveToggle = async (id: string, nextIsActive: boolean) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/cases/${id}/active`, {
+      const response = await fetch(`${API}/cases/${id}/active`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -135,7 +139,7 @@ export function DatabasePage() {
       setLoading(true);
       const token = localStorage.getItem('token');
       
-      const response = await fetch('http://localhost:5000/api/cases?archived=false&includeInactive=true', {
+      const response = await fetch(`${API}/cases?archived=false&includeInactive=true`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -148,7 +152,7 @@ export function DatabasePage() {
       const data = await response.json();
       setCases(data.data || []);
 
-      const usageResponse = await fetch('http://localhost:5000/api/cases/usage-counts', {
+      const usageResponse = await fetch(`${API}/cases/usage-counts`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -282,7 +286,7 @@ export function DatabasePage() {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/cases', {
+      const response = await fetch(`${API}/cases`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -334,7 +338,7 @@ export function DatabasePage() {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/cases/${editingCase._id}`, {
+      const response = await fetch(`${API}/cases/${editingCase._id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -365,7 +369,7 @@ export function DatabasePage() {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/cases/${id}`, {
+      const response = await fetch(`${API}/cases/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -396,7 +400,7 @@ export function DatabasePage() {
     setArchivingId(id);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/cases/${id}/archive`, {
+      const response = await fetch(`${API}/cases/${id}/archive`, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -567,7 +571,7 @@ export function DatabasePage() {
               <p className="text-xs text-red-500 mt-1">{errors.caseId}</p>
             )}
             <p className="text-xs text-muted-foreground mt-1">
-              Auto-generated unique ID based on Service Type + UserType (e.g., CH-UM-EA-001 / CH-HJ-HP-001)
+              Auto-generated unique ID based on Service Type + UserType (e.g., CH-UM-EA-001 / CH-HJ-HM-001)
             </p>
           </div>
 

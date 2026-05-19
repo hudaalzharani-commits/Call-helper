@@ -8,6 +8,8 @@ const trainingEntrySchema = new mongoose.Schema(
     correctResponse: { type: String, required: true },
     alternativeResponses: [{ type: String }],
     category: { type: String, required: true, trim: true },
+    /** رقم الحالة في قاعدة المعرفة (مثل CH-HJ-HP-001) لتسهيل المتابعة */
+    relatedCaseId: { type: String, default: '', trim: true },
     submittedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     status: { type: String, enum: ENTRY_STATUSES, default: 'pending' },
     reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },

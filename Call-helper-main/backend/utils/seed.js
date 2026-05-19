@@ -23,12 +23,7 @@ const seedDatabase = async () => {
       password: 'admin123',
       name: 'مدير النظام',
       email: 'admin@rafeeq.com',
-      role: 'admin',
-      accountStatus: 'active',
-      isActive: true,
-      permAdminPanel: true,
-      permContentCreate: true,
-      uiVisibility: {},
+      role: 'admin'
     });
     await admin.save();
     console.log('✅ Created admin user');
@@ -37,32 +32,12 @@ const seedDatabase = async () => {
     const user = new User({
       username: 'user',
       password: 'user123',
-      name: 'مستخدم عادي',
+      name: 'موظف خدمة العملاء',
       email: 'user@rafeeq.com',
-      role: 'user',
-      accountStatus: 'active',
-      isActive: true,
-      permAdminPanel: false,
-      permContentCreate: false,
-      uiVisibility: {},
+      role: 'user'
     });
     await user.save();
     console.log('✅ Created regular user');
-
-    const support = new User({
-      username: 'support',
-      password: 'support123',
-      name: 'موظف خدمة عملاء',
-      email: 'support@rafeeq.com',
-      role: 'customer_service',
-      accountStatus: 'active',
-      isActive: true,
-      permAdminPanel: false,
-      permContentCreate: false,
-      uiVisibility: {},
-    });
-    await support.save();
-    console.log('✅ Created customer_service user');
 
     // Create sample knowledge base articles
     const articles = [

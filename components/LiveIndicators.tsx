@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Calendar,
   TrendingUp,
@@ -175,7 +175,7 @@ export function LiveIndicators() {
           getSummaryStats(),
           getTimeSeriesData(rangeKeys),
           getHourlyActivity(rangeKeys),
-          getDistributionStats(),
+          getDistributionStats(rangeKeys),
         ]);
 
         if (cancelled) return;

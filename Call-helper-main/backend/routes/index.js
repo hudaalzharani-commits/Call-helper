@@ -14,7 +14,6 @@ import Case from '../models/Case.js';
 import OperationalUpdate from '../models/OperationalUpdate.js';
 import TrainingEntry from '../models/TrainingEntry.js';
 import { authenticate, authorize } from '../middleware/auth.js';
-import { mergeUiVisibility } from '../utils/userUiVisibility.js';
 import { generateAIResponse } from '../services/aiService.js';
 import { analyzeConfidence } from '../services/confidenceService.js';
 import {
@@ -25,6 +24,7 @@ import {
   getFrequentIssueThreshold,
   normalizeFrequentIssueThreshold,
 } from '../utils/frequentIssueThreshold.js';
+import { sanitizeCallLogBody } from '../utils/sanitizeCallLogBody.js';
 import {
   detectAndUpdateIssue,
   expireStaleIssues,
@@ -33,6 +33,7 @@ import {
   resolveIssue,
   OPERATIONAL_ISSUE_CONSTANTS,
 } from '../services/operationalIssueService.js';
+import { mergeUiVisibility, canDeleteConfirmedBriefing } from '../utils/userUiVisibility.js';
 
 const router = express.Router();
 const SCORING_SETTINGS_KEY = 'advanced_scoring_settings';
@@ -489,7 +490,7 @@ router.get('/users/me', authenticate, async (req, res) => {
 router.post('/calls', authenticate, async (req, res) => {
   try {
     const callLog = new CallLog({
-      ...req.body,
+      ...sanitizeCallLogBody(req.body),
       user: req.user._id
     });
     await callLog.save();
@@ -675,6 +676,46 @@ router.get('/admin/system-logs', authenticate, authorize('admin'), async (req, r
   }
 });
 
+// Update call log (same session — إضافة مسار الوضع المتقدم بعد التوليد الأول)
+router.patch('/calls/:id', authenticate, async (req, res) => {
+  try {
+    const call = await CallLog.findById(req.params.id);
+    if (!call) {
+      return res.status(404).json({ success: false, message: 'Call log not found' });
+    }
+    const isOwner = call.user.toString() === req.user._id.toString();
+    if (!isOwner && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    }
+
+    const allowed = [
+      'generatedResponse',
+      'flowResult',
+      'advancedFlowSummary',
+      'status',
+      'finalDisplayScore',
+      'category',
+      'matchedCase',
+      'matchedCaseCode',
+      'matchedAt',
+      'problemType',
+    ];
+    const patchBody = sanitizeCallLogBody(req.body);
+    for (const key of allowed) {
+      if (Object.prototype.hasOwnProperty.call(patchBody, key)) {
+        call[key] = patchBody[key];
+      }
+    }
+    call.updatedAt = new Date();
+    await call.save();
+
+    res.json({ success: true, data: call });
+  } catch (error) {
+    console.error('❌ PATCH /calls/:id error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Delete call log
 router.delete('/calls/:id', authenticate, async (req, res) => {
   try {
@@ -684,8 +725,13 @@ router.delete('/calls/:id', authenticate, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Call log not found' });
     }
     
-    // Only allow users to delete their own calls, or admins to delete any
-    if (call.user.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    const isOwner = call.user.toString() === req.user._id.toString();
+    const mayDelete =
+      isOwner ||
+      req.user.role === 'admin' ||
+      canDeleteConfirmedBriefing(req.user);
+
+    if (!mayDelete) {
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
     
@@ -1140,6 +1186,25 @@ router.post('/analyze-confidence', authenticate, async (req, res) => {
 });
 
 // Cases routes (for fuzzy matching reference cases)
+// Record a page view from the unified knowledge registry (not call matching).
+router.post('/cases/:id/view', authenticate, async (req, res) => {
+  try {
+    const updated = await Case.findByIdAndUpdate(
+      req.params.id,
+      { $inc: { viewCount: 1 } },
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ success: false, message: 'Case not found' });
+    }
+
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Search endpoint - available to all authenticated users
 router.get('/cases', authenticate, async (req, res) => {
   try {
@@ -1460,6 +1525,7 @@ router.post('/training-entries', authenticate, trainingEntriesMultipart, async (
       correctResponse: (req.body.correctResponse || '').toString(),
       alternativeResponses,
       category: (req.body.category || 'عام').toString().trim(),
+      relatedCaseId: (req.body.relatedCaseId || '').toString().trim(),
       submittedBy: req.user._id,
       status: 'pending',
       attachmentUrl,
@@ -1479,7 +1545,7 @@ router.put('/training-entries/:id', authenticate, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Training entry not found' });
     }
     const owner = entry.submittedBy.toString() === req.user._id.toString();
-    const privileged = ['admin', 'moderator', 'customer_service'].includes(req.user.role);
+    const privileged = ['admin', 'moderator'].includes(req.user.role);
     if (!owner && !privileged) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
@@ -1491,6 +1557,9 @@ router.put('/training-entries/:id', authenticate, async (req, res) => {
     if (req.body.correctResponse !== undefined) update.correctResponse = req.body.correctResponse;
     if (req.body.alternativeResponses !== undefined) update.alternativeResponses = req.body.alternativeResponses;
     if (req.body.category !== undefined) update.category = req.body.category;
+    if (req.body.relatedCaseId !== undefined) {
+      update.relatedCaseId = req.body.relatedCaseId.toString().trim();
+    }
     if (privileged) {
       if (req.body.status !== undefined) update.status = req.body.status;
       if (req.body.notes !== undefined) update.notes = req.body.notes;
@@ -1509,7 +1578,7 @@ router.put('/training-entries/:id', authenticate, async (req, res) => {
   }
 });
 
-router.post('/training-entries/:id/review', authenticate, authorize('admin', 'moderator', 'customer_service'), async (req, res) => {
+router.post('/training-entries/:id/review', authenticate, authorize('admin', 'moderator'), async (req, res) => {
   try {
     const { status, notes } = req.body;
     if (!['approved', 'rejected'].includes(status)) {
@@ -1544,7 +1613,7 @@ router.delete('/training-entries/:id', authenticate, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Training entry not found' });
     }
     const owner = entry.submittedBy.toString() === req.user._id.toString();
-    const privileged = ['admin', 'moderator', 'customer_service'].includes(req.user.role);
+    const privileged = ['admin', 'moderator'].includes(req.user.role);
     if (!owner && !privileged) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }

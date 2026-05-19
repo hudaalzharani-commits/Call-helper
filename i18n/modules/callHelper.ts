@@ -135,12 +135,12 @@ export const callHelperEn = {
       entityPlaceholder: 'Select user type...',
       problemSummary: 'Problem description',
       problemPlaceholder: 'Describe the problem in detail...',
-      generate: 'Generate wording',
+      generate: 'Case Analysis',
       generating: 'Generating...',
     },
     output: {
-      title: 'Generated wording',
-      placeholder: 'Generated wording will appear here...',
+      title: 'Generated Response',
+      placeholder: 'Generated response will appear here',
       alternativeBadge: 'Alternative wording',
       whyTitle: 'Why this wording was chosen',
       whyEmpty:

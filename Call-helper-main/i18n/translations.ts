@@ -128,8 +128,9 @@ const shellAr = {
       tags: 'الوسوم:',
     },
     tooltips: {
-      matchCount: 'مرات التطابق',
-      repeatCount: 'عدد التكرار في المكالمات',
+      pageViews: 'عدد مرات فتح السجل من صفحة سجل المعرفة',
+      matchCount: 'مرات التطابق في المكالمات (ليست مشاهدات)',
+      repeatCount: 'عدد التكرار في المكالمات (ليست مشاهدات)',
     },
   },
 };
@@ -256,8 +257,9 @@ const shellEn = {
       tags: 'Tags:',
     },
     tooltips: {
-      matchCount: 'Match count',
-      repeatCount: 'Repeat count in calls',
+      pageViews: 'Times opened from the knowledge registry page',
+      matchCount: 'Call match count (not page views)',
+      repeatCount: 'Call repeat count (not page views)',
     },
   },
 };
@@ -298,7 +300,7 @@ export function tCategory(
   t: (key: TranslationKey, params?: TranslateParams) => string,
   cat: string,
 ): string {
-  const key = `common.categories.${cat}`;
+  const key = `categories.${cat}`;
   const label = t(key);
   return label === key ? cat : label;
 }
@@ -348,11 +350,22 @@ export function entityForApi(value: string): string {
   return key ? AR_BY_ENTITY_KEY[key] : value;
 }
 
+/**
+ * يطابق نموذج قاعدة البيانات (Service Type): عمرة ↔ وكيل/شركة عمرة، حج ↔ سكن/شؤون/منظم تابع.
+ * يُستخدم لفلترة مسارات الوضع المتقدم دون أن يختار المستخدم يدوياً.
+ */
+export function pilgrimageScopeFromEntityType(value: string): 'umrah' | 'hajj' {
+  const key = entityKeyFromValue(value);
+  if (key === 'housing' || key === 'affairs' || key === 'subOrganizer') return 'hajj';
+  return 'umrah';
+}
+
 export function tEntity(
   t: (key: TranslationKey, params?: TranslateParams) => string,
   value: string,
 ): string {
   const key = entityKeyFromValue(value) || value;
-  const label = t(`common.entities.${key}`);
-  return label === `common.entities.${key}` ? value : label;
+  const path = `entities.${key}`;
+  const label = t(path);
+  return label === path ? value : label;
 }

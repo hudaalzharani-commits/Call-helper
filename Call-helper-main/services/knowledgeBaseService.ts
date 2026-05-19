@@ -142,6 +142,15 @@ export async function recordKnowledgeView(id: string): Promise<BackendKnowledgeA
   return authedFetch<BackendKnowledgeArticle>(`/api/knowledge/${id}/view`, { method: "POST" });
 }
 
+export async function recordReferenceCaseView(
+  caseDbId: string,
+): Promise<BackendReferenceCase> {
+  return authedFetch<BackendReferenceCase>(
+    `/api/cases/${encodeURIComponent(caseDbId)}/view`,
+    { method: "POST" },
+  );
+}
+
 export async function recordKnowledgeFeedback(id: string, helpful: boolean): Promise<BackendKnowledgeArticle> {
   return authedFetch<BackendKnowledgeArticle>(`/api/knowledge/${id}/feedback`, {
     method: "POST",
@@ -164,6 +173,7 @@ export interface BackendReferenceCase {
   why?: string;
   priority?: string;
   matchCount?: number;
+  viewCount?: number;
   isArchived?: boolean;
   isActive?: boolean;
   createdAt?: string;

@@ -35,5 +35,8 @@ password.txt
 # Vite
 .vite/
 
+# Nested duplicate clone (breaks paths / styles if used by mistake)
+Call-helper-main/
+
 # coverage
 coverage/

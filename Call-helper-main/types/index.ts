@@ -91,6 +91,8 @@ export interface TrainingEntry {
   correctResponse: string;
   alternativeResponses?: string[];
   category: string;
+  /** رقم الحالة في قاعدة المعرفة (Case ID) */
+  relatedCaseId?: string;
   submittedBy: string;
   /** معرّف المستخدم في الخادم (للمقارنة مع جلسة الدخول) */
   submitterUserId?: string;
@@ -200,6 +202,7 @@ export interface TrainingFormData {
   correctResponse: string;
   alternativeResponses: string[];
   category: string;
+  relatedCaseId?: string;
 }
 
 export interface UpdateFormData {

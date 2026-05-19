@@ -38,6 +38,7 @@ export interface KnowledgeSearchResult {
         matchedMainKeywords: string[];
         matchedExtraKeywords: string[];
         matchedSynonyms: string[];
+        fuzzyMatchedKeywords: string[];
         matchedUserWordsInCaseText: string[];
       };
     };
@@ -213,6 +214,10 @@ function findBestMatchInCases(
   weights?: MatchingWeightsOptions,
   caseUsageStats: CaseUsageStats = getEmptyCaseUsageStats()
 ): KnowledgeSearchResult {
+  const ARABIC_LIGHT_NLP_STOP_WORDS = new Set([
+    'في', 'من', 'على', 'عن', 'الى', 'إلى', 'مع', 'تم', 'هذا', 'هذه', 'ذلك',
+    'التي', 'الذي', 'هناك', 'بخصوص', 'حول', 'عند', 'او', 'أو', 'لكن', 'ثم',
+  ]);
   const normalizeArabicToken = (token: string): string => {
     if (!token) return '';
     let normalized = token
@@ -222,7 +227,11 @@ function findBestMatchInCases(
       .replace(/ى/g, 'ي')
       .replace(/ؤ/g, 'و')
       .replace(/ئ/g, 'ي')
-      .replace(/ة/g, 'ه');
+      .replace(/[ةۀ]/g, 'ه')
+      .replace(/[گݣ]/g, 'ك')
+      .replace(/[پ]/g, 'ب')
+      .replace(/[چ]/g, 'ج')
+      .replace(/[ڤ]/g, 'ف');
 
     const prefixCandidates = ['وال', 'بال', 'كال', 'فال', 'لل', 'ال', 'و', 'ف', 'ب', 'ك', 'ل'];
     const suffixCandidates = ['يات', 'ات', 'ون', 'ين', 'ان', 'ها', 'هم', 'هن', 'كم', 'كن', 'نا', 'يه', 'ه', 'ة', 'ي', 'ك', 'ت', 'ا', 'و', 'ن'];
@@ -256,6 +265,54 @@ function findBestMatchInCases(
       .filter(Boolean)
       .join(' ');
   };
+  const isEligibleForFuzzyMatch = (token: string): boolean => {
+    if (!token) return false;
+    if (token.length < 4) return false;
+    if (ARABIC_LIGHT_NLP_STOP_WORDS.has(token)) return false;
+    return true;
+  };
+  const getLevenshteinDistanceWithLimit = (
+    source: string,
+    target: string,
+    maxDistance: number = 1
+  ): number => {
+    const sourceLength = source.length;
+    const targetLength = target.length;
+    if (Math.abs(sourceLength - targetLength) > maxDistance) {
+      return maxDistance + 1;
+    }
+    const previous = new Array<number>(targetLength + 1);
+    const current = new Array<number>(targetLength + 1);
+    for (let j = 0; j <= targetLength; j += 1) {
+      previous[j] = j;
+    }
+    for (let i = 1; i <= sourceLength; i += 1) {
+      current[0] = i;
+      let minInRow = current[0];
+      for (let j = 1; j <= targetLength; j += 1) {
+        const cost = source[i - 1] === target[j - 1] ? 0 : 1;
+        current[j] = Math.min(
+          previous[j] + 1,
+          current[j - 1] + 1,
+          previous[j - 1] + cost
+        );
+        if (current[j] < minInRow) minInRow = current[j];
+      }
+      if (minInRow > maxDistance) {
+        return maxDistance + 1;
+      }
+      for (let j = 0; j <= targetLength; j += 1) {
+        previous[j] = current[j];
+      }
+    }
+    return previous[targetLength];
+  };
+  const isLightNlpFuzzyTokenMatch = (left: string, right: string): boolean => {
+    if (!left || !right) return false;
+    if (left === right) return true;
+    if (!isEligibleForFuzzyMatch(left) || !isEligibleForFuzzyMatch(right)) return false;
+    return getLevenshteinDistanceWithLimit(left, right, 1) <= 1;
+  };
 
   const normalizedUserDesc = normalizeForMatching(userDescription);
   const keywordMatchWeight = Math.max(0, Math.min(100, Number(weights?.keywordMatchWeight ?? 100)));
@@ -269,6 +326,7 @@ function findBestMatchInCases(
   const caseMetadataWeightMultiplier = caseMetadataMatchWeight / 100;
   const userWords = normalizedUserDesc.split(' ').filter(Boolean);
   const userWordSet = new Set(userWords);
+  const normalizedUserWordTokenSet = new Set(Array.from(userWordSet).map((word) => normalizeArabicToken(word)));
   const uniqueUserWords = Array.from(userWordSet);
   const normalizedUserDescPadded = ` ${normalizedUserDesc} `;
 
@@ -360,6 +418,7 @@ function findBestMatchInCases(
     // Build searchable text
     const searchableText = normalizeForMatching(allKeywords.join(' '));
     const searchableTextPadded = ` ${searchableText} `;
+    const searchableTextTokens = searchableText.split(' ').filter(Boolean);
 
     const segmentTokenByKnownKeywords = (token: string): string[] | null => {
       if (!token || normalizedSingleTokenKeywords.length === 0) return null;
@@ -394,23 +453,31 @@ function findBestMatchInCases(
       }
     });
 
-    const hasExactKeywordMatch = (keyword: string): boolean => {
+    const getKeywordMatchMode = (keyword: string): 'none' | 'exact' | 'fuzzy' => {
       const normalizedKeyword = normalizeForMatching(keyword);
-      if (!normalizedKeyword) return false;
+      if (!normalizedKeyword) return 'none';
 
       // Phrase keyword: exact phrase match
       if (normalizedKeyword.includes(' ')) {
-        return normalizedUserDescPadded.includes(` ${normalizedKeyword} `);
+        return normalizedUserDescPadded.includes(` ${normalizedKeyword} `) ? 'exact' : 'none';
       }
 
       // Single-token keyword: exact token match
-      return userWordSet.has(normalizedKeyword) || segmentedKeywordMatches.has(normalizedKeyword);
+      const hasExactMatch = (
+        userWordSet.has(normalizedKeyword)
+        || normalizedUserWordTokenSet.has(normalizedKeyword)
+        || segmentedKeywordMatches.has(normalizedKeyword)
+      );
+      if (hasExactMatch) return 'exact';
+
+      const hasFuzzyMatch = uniqueUserWords.some((userWord) => isLightNlpFuzzyTokenMatch(userWord, normalizedKeyword));
+      return hasFuzzyMatch ? 'fuzzy' : 'none';
     };
 
     // Check for negative keywords first (if any match, skip this case)
     let hasNegativeMatch = false;
     negativeKeywords.forEach((negKeyword: string) => {
-      if (negKeyword && hasExactKeywordMatch(negKeyword)) {
+      if (negKeyword && getKeywordMatchMode(negKeyword) !== 'none') {
         hasNegativeMatch = true;
       }
     });
@@ -419,9 +486,32 @@ function findBestMatchInCases(
       return; // Skip this case
     }
 
-    const matchedMainKeywords = mainKeywords.filter((keyword: string) => keyword && hasExactKeywordMatch(keyword));
-    const matchedExtraKeywords = extraKeywords.filter((keyword: string) => keyword && hasExactKeywordMatch(keyword));
-    const matchedSynonyms = synonyms.filter((synonym: string) => synonym && hasExactKeywordMatch(synonym));
+    const matchedMainKeywords: string[] = [];
+    const matchedExtraKeywords: string[] = [];
+    const matchedSynonyms: string[] = [];
+    const fuzzyMatchedKeywordsSet = new Set<string>();
+    mainKeywords.forEach((keyword: string) => {
+      if (!keyword) return;
+      const matchMode = getKeywordMatchMode(keyword);
+      if (matchMode === 'none') return;
+      matchedMainKeywords.push(keyword);
+      if (matchMode === 'fuzzy') fuzzyMatchedKeywordsSet.add(keyword);
+    });
+    extraKeywords.forEach((keyword: string) => {
+      if (!keyword) return;
+      const matchMode = getKeywordMatchMode(keyword);
+      if (matchMode === 'none') return;
+      matchedExtraKeywords.push(keyword);
+      if (matchMode === 'fuzzy') fuzzyMatchedKeywordsSet.add(keyword);
+    });
+    synonyms.forEach((synonym: string) => {
+      if (!synonym) return;
+      const matchMode = getKeywordMatchMode(synonym);
+      if (matchMode === 'none') return;
+      matchedSynonyms.push(synonym);
+      if (matchMode === 'fuzzy') fuzzyMatchedKeywordsSet.add(synonym);
+    });
+    const fuzzyMatchedKeywords = Array.from(fuzzyMatchedKeywordsSet);
 
     matchedMainKeywords.forEach(() => {
       matchedCount += 3; // Main keywords have highest weight
@@ -438,7 +528,10 @@ function findBestMatchInCases(
     // Also check if user description words appear in searchable text
     const matchedUserWordsInCaseText: string[] = [];
     uniqueUserWords.forEach((word) => {
-      if (word.length > 2 && searchableTextPadded.includes(` ${word} `)) {
+      const hasExactWordMatchInSearchableText = searchableTextPadded.includes(` ${word} `);
+      const hasFuzzyWordMatchInSearchableText = isEligibleForFuzzyMatch(word)
+        && searchableTextTokens.some((candidateToken) => isLightNlpFuzzyTokenMatch(word, candidateToken));
+      if (word.length > 2 && (hasExactWordMatchInSearchableText || hasFuzzyWordMatchInSearchableText)) {
         matchedCount += 0.5;
         matchedUserWordsInCaseText.push(word);
       }
@@ -586,6 +679,7 @@ function findBestMatchInCases(
               matchedMainKeywords,
               matchedExtraKeywords,
               matchedSynonyms,
+              fuzzyMatchedKeywords,
               matchedUserWordsInCaseText,
             },
           },
@@ -641,6 +735,7 @@ function findBestMatchInCases(
           matchedMainKeywords: [],
           matchedExtraKeywords: [],
           matchedSynonyms: [],
+          fuzzyMatchedKeywords: [],
           matchedUserWordsInCaseText: [],
         },
       },

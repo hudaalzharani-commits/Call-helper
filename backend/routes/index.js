@@ -24,6 +24,7 @@ import {
   getFrequentIssueThreshold,
   normalizeFrequentIssueThreshold,
 } from '../utils/frequentIssueThreshold.js';
+import { sanitizeCallLogBody } from '../utils/sanitizeCallLogBody.js';
 import {
   detectAndUpdateIssue,
   expireStaleIssues,
@@ -489,7 +490,7 @@ router.get('/users/me', authenticate, async (req, res) => {
 router.post('/calls', authenticate, async (req, res) => {
   try {
     const callLog = new CallLog({
-      ...req.body,
+      ...sanitizeCallLogBody(req.body),
       user: req.user._id
     });
     await callLog.save();
@@ -671,6 +672,45 @@ router.get('/admin/system-logs', authenticate, authorize('admin'), async (req, r
     const logs = await SystemLog.find(q).sort({ createdAt: -1 }).limit(limit).lean();
     res.json({ success: true, data: logs });
   } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.patch('/calls/:id', authenticate, async (req, res) => {
+  try {
+    const call = await CallLog.findById(req.params.id);
+    if (!call) {
+      return res.status(404).json({ success: false, message: 'Call log not found' });
+    }
+    const isOwner = call.user.toString() === req.user._id.toString();
+    if (!isOwner && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    }
+
+    const allowed = [
+      'generatedResponse',
+      'flowResult',
+      'advancedFlowSummary',
+      'status',
+      'finalDisplayScore',
+      'category',
+      'matchedCase',
+      'matchedCaseCode',
+      'matchedAt',
+      'problemType',
+    ];
+    const patchBody = sanitizeCallLogBody(req.body);
+    for (const key of allowed) {
+      if (Object.prototype.hasOwnProperty.call(patchBody, key)) {
+        call[key] = patchBody[key];
+      }
+    }
+    call.updatedAt = new Date();
+    await call.save();
+
+    res.json({ success: true, data: call });
+  } catch (error) {
+    console.error('❌ PATCH /calls/:id error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });

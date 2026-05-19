@@ -54,19 +54,21 @@ call :startMongoService "MongoDB"
 call :startMongoService "MongoDB Server"
 call :startMongoService "MongoDBServer"
 
-REM --- Ensure backend .env exists ---
-if not exist "backend\.env" (
-  if exist "backend\.env.example" (
-    echo [INFO] Creating backend\.env from example
-    copy /Y "backend\.env.example" "backend\.env" >nul
+set "BACKEND_DIR=Call-helper-main\backend"
+
+REM --- Ensure backend .env exists (canonical: Call-helper-main\backend) ---
+if not exist "%BACKEND_DIR%\.env" (
+  if exist "%BACKEND_DIR%\.env.example" (
+    echo [INFO] Creating %BACKEND_DIR%\.env from example
+    copy /Y "%BACKEND_DIR%\.env.example" "%BACKEND_DIR%\.env" >nul
   ) else (
-    echo [INFO] Creating default backend\.env
-    > "backend\.env" echo PORT=5000
-    >>"backend\.env" echo NODE_ENV=development
-    >>"backend\.env" echo FRONTEND_URL=http://localhost:3000
-    >>"backend\.env" echo MONGODB_URI=mongodb://localhost:27017/rafeeq_db
-    >>"backend\.env" echo JWT_SECRET=rafeeq-dev-secret
-    >>"backend\.env" echo JWT_EXPIRE=7d
+    echo [INFO] Creating default %BACKEND_DIR%\.env
+    > "%BACKEND_DIR%\.env" echo PORT=5000
+    >>"%BACKEND_DIR%\.env" echo NODE_ENV=development
+    >>"%BACKEND_DIR%\.env" echo FRONTEND_URL=http://localhost:3000
+    >>"%BACKEND_DIR%\.env" echo MONGODB_URI=mongodb://localhost:27017/rafeeq_db
+    >>"%BACKEND_DIR%\.env" echo JWT_SECRET=rafeeq-dev-secret
+    >>"%BACKEND_DIR%\.env" echo JWT_EXPIRE=7d
   )
 )
 
@@ -87,9 +89,9 @@ if not exist "node_modules" (
   )
 )
 
-if not exist "backend\node_modules" (
+if not exist "%BACKEND_DIR%\node_modules" (
   echo [INFO] Installing backend dependencies - please wait
-  pushd backend
+  pushd "%BACKEND_DIR%"
   call npm install
   popd
   if errorlevel 1 (
@@ -100,9 +102,9 @@ if not exist "backend\node_modules" (
 )
 
 REM --- Seed database once ---
-if not exist "backend\.seeded" (
+if not exist "%BACKEND_DIR%\.seeded" (
   echo [INFO] Seeding database - first run only
-  pushd backend
+  pushd "%BACKEND_DIR%"
   call npm run seed
   popd
   if errorlevel 1 (
@@ -110,10 +112,10 @@ if not exist "backend\.seeded" (
     pause
     exit /b 1
   )
-  echo seeded>"backend\.seeded"
+  echo seeded>"%BACKEND_DIR%\.seeded"
 )
 echo [INFO] Seeding default users
-pushd backend
+pushd "%BACKEND_DIR%"
 call npm run seed:users
 popd
 if errorlevel 1 (
@@ -123,7 +125,7 @@ if errorlevel 1 (
 )
 
 REM --- Start backend + frontend in separate terminals ---
-start "Rafeeq Backend" cmd /k "cd /d %cd%\backend && npm run dev"
+start "Rafeeq Backend" cmd /k "cd /d %cd%\%BACKEND_DIR% && npm run dev"
 start "Rafeeq Frontend" cmd /k "cd /d %cd% && npm run dev"
 
 echo.

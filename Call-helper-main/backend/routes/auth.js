@@ -102,9 +102,8 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // Create user
-    const allowed = ['admin', 'user', 'moderator', 'customer_service'];
-    const nextRole = allowed.includes(role) ? role : 'user';
+    const allowedRoles = ['admin', 'user', 'moderator', 'customer_service'];
+    const nextRole = allowedRoles.includes(role) ? role : 'user';
 
     const user = new User({
       username: username.toLowerCase(),

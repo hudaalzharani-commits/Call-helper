@@ -57,26 +57,22 @@ const callLogSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  /** مسار الوضع المتقدم — Mixed لتفادي رفض direct_answer وحقول إضافية */
   flowResult: {
-    completedSteps: [{
-      stepId: String,
+    type: mongoose.Schema.Types.Mixed,
+    default: null,
+  },
+  advancedFlowSummary: {
+    mode: { type: String, enum: ['advanced', 'gray_area'] },
+    routeNames: [{ type: String }],
+    selections: [{
+      routeName: String,
       stepName: String,
-      selectedSubCondition: {
-        id: String,
-        name: String,
-        action: {
-          type: String,
-          enum: ['continue', 'force_solution', 'escalation']
-        },
-        actionDetails: String
-      }
+      choiceName: String,
     }],
-    finalAction: {
-      type: String,
-      enum: ['continue', 'force_solution', 'escalation']
-    },
-    escalationDetails: String,
-    solutionDetails: String
+    pathLabel: { type: String, default: '' },
+    questionTitle: { type: String, default: null },
+    finalAction: { type: String, default: null },
   },
   generatedResponse: {
     type: String,

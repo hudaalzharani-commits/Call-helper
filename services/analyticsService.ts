@@ -303,11 +303,18 @@ export async function getHourlyActivity(params?: {
 }
 
 /**
- * Get distribution statistics
+ * Get distribution statistics (optional date range, same as Common Issues aggregates).
  */
-export async function getDistributionStats(): Promise<DistributionStats> {
+export async function getDistributionStats(params?: {
+  from?: string;
+  to?: string;
+}): Promise<DistributionStats> {
   try {
-    return await fetchAPI<DistributionStats>('/distribution');
+    const sp = new URLSearchParams();
+    if (params?.from) sp.set('from', params.from);
+    if (params?.to) sp.set('to', params.to);
+    const q = sp.toString();
+    return await fetchAPI<DistributionStats>(`/distribution${q ? `?${q}` : ''}`);
   } catch (error) {
     console.error('❌ Error fetching distribution stats:', error);
     throw error;

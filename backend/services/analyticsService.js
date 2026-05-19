@@ -12,16 +12,64 @@ import KnowledgeBase from '../models/KnowledgeBase.js';
 import { getFrequentIssueThreshold } from '../utils/frequentIssueThreshold.js';
 import {
   ANALYTICS_TZ,
+  calendarDayBounds,
   enumerateCalendarDays,
+  isCalendarDateKey,
   resolveAnalyticsRange,
 } from '../utils/analyticsDateRange.js';
+
+const CONFIRMED_BRIEFING_MIN_SCORE = 80;
+
+function confirmedBriefingCriteria() {
+  return {
+    $or: [
+      { finalDisplayScore: { $gte: CONFIRMED_BRIEFING_MIN_SCORE } },
+      {
+        status: { $in: ['resolved', 'closed'] },
+        $or: [
+          { finalDisplayScore: { $gte: CONFIRMED_BRIEFING_MIN_SCORE } },
+          { finalDisplayScore: null },
+          { finalDisplayScore: { $exists: false } },
+        ],
+      },
+    ],
+  };
+}
+
+function buildCreatedAtRange(from, to) {
+  if (!from && !to) return {};
+  const createdAt = {};
+  if (from) {
+    if (isCalendarDateKey(from)) {
+      createdAt.$gte = calendarDayBounds(from, ANALYTICS_TZ).start;
+    } else {
+      const start = new Date(from);
+      if (!Number.isNaN(start.getTime())) createdAt.$gte = start;
+    }
+  }
+  if (to) {
+    if (isCalendarDateKey(to)) {
+      createdAt.$lte = calendarDayBounds(to, ANALYTICS_TZ).end;
+    } else {
+      const end = new Date(to);
+      if (!Number.isNaN(end.getTime())) {
+        end.setHours(23, 59, 59, 999);
+        createdAt.$lte = end;
+      }
+    }
+  }
+  return Object.keys(createdAt).length ? { createdAt } : {};
+}
 
 /**
  * Get summary statistics
  * @returns {Promise<Object>} Summary stats
  */
-export async function getSummaryStats() {
+export async function getSummaryStats(query = {}) {
   try {
+    const { from, to } = query;
+    const periodFilter = buildCreatedAtRange(from, to);
+
     const now = new Date();
     const todayStart = new Date(now.setHours(0, 0, 0, 0));
     
@@ -95,13 +143,15 @@ export async function getSummaryStats() {
       ? ((resolvedCalls / totalCalls) * 100).toFixed(1)
       : 0;
 
-    // إفادات مؤكدة: بلاغات فيها صيغة مولّدة وسكور العرض النهائي 100٪
+    // إفادات مؤكدة ضمن الفترة المحددة
     const withGenerated = await CallLog.countDocuments({
+      ...periodFilter,
       generatedResponse: { $type: 'string', $regex: /\S/ },
     });
     const confirmedBriefingCount = await CallLog.countDocuments({
+      ...periodFilter,
       generatedResponse: { $type: 'string', $regex: /\S/ },
-      finalDisplayScore: { $gte: 100 },
+      ...confirmedBriefingCriteria(),
     });
     const briefingConfirmationRate =
       withGenerated > 0
@@ -133,6 +183,8 @@ export async function getSummaryStats() {
         avgResolutionTime: Number(avgResolutionTime.toFixed(1)),
         resolutionRate: Number(resolutionRate),
         briefingConfirmationRate,
+        confirmedBriefingCount,
+        briefingsWithGeneratedCount: withGenerated,
         totalUsers,
         activeUsers,
         trends: {
@@ -294,45 +346,41 @@ export async function getHourlyActivity(range = {}) {
 
 /**
  * Get distribution statistics
+ * Optional `from` / `to` (YYYY-MM-DD): same aggregates as Common Issues distribution, scoped to the period.
+ * Without dates: legacy all-time behavior.
+ * @param {{ from?: string, to?: string }} query
  * @returns {Promise<Object>} Distribution stats
  */
-export async function getDistributionStats() {
+export async function getDistributionStats(query = {}) {
   try {
-    // Calls by category
+    const { from, to } = query;
+    const periodFilter = buildCreatedAtRange(from, to);
+    const hasPeriod = Object.keys(periodFilter).length > 0;
+    const matchStages = hasPeriod ? [{ $match: periodFilter }] : [];
+
     const categoryStats = await CallLog.aggregate([
-      {
-        $group: {
-          _id: '$category',
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $sort: { count: -1 }
-      },
-      {
-        $limit: 10
-      }
+      ...matchStages,
+      { $group: { _id: '$category', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 10 },
     ]);
-    
-    const totalCalls = await CallLog.countDocuments();
-    
-    const topCategories = categoryStats.map(stat => ({
+
+    const totalCalls = await CallLog.countDocuments(hasPeriod ? periodFilter : {});
+
+    const topCategories = categoryStats.map((stat) => ({
       category: stat._id || 'غير محدد',
       count: stat.count,
-      percentage: totalCalls > 0 ? ((stat.count / totalCalls) * 100).toFixed(1) : 0
+      percentage: totalCalls > 0 ? ((stat.count / totalCalls) * 100).toFixed(1) : 0,
     }));
 
     const distinctCategoryAgg = await CallLog.aggregate([
+      ...matchStages,
       { $match: { category: { $nin: [null, ''] } } },
       { $group: { _id: '$category' } },
       { $count: 'n' },
     ]);
     const uniqueCategoryCount = distinctCategoryAgg[0]?.n ?? 0;
 
-    // ============ Frequent issues TODAY ============
-    // Daily buckets per (category, entityType). Only logs that carry both fields
-    // are considered (i.e. matched cases with a clear category). The
-    // threshold is admin-configurable via the Settings collection.
     const bucketDate = CallLog.computeBucketDate(new Date());
     const frequentTodayThreshold = await getFrequentIssueThreshold();
     const frequentTodayAgg = await CallLog.aggregate([
@@ -341,28 +389,24 @@ export async function getDistributionStats() {
           bucketDate,
           category: { $nin: [null, ''] },
           entityType: { $nin: [null, ''] },
-        }
+        },
       },
       {
         $group: {
           _id: { category: '$category', entityType: '$entityType' },
-          count: { $sum: 1 }
-        }
+          count: { $sum: 1 },
+        },
       },
-      {
-        $match: { count: { $gte: frequentTodayThreshold } }
-      },
-      {
-        $sort: { count: -1 }
-      },
+      { $match: { count: { $gte: frequentTodayThreshold } } },
+      { $sort: { count: -1 } },
       {
         $project: {
           _id: 0,
           category: '$_id.category',
           entityType: '$_id.entityType',
           count: 1,
-        }
-      }
+        },
+      },
     ]);
 
     const frequentTodayGroups = frequentTodayAgg.map((group) => ({
@@ -372,46 +416,82 @@ export async function getDistributionStats() {
       threshold: frequentTodayThreshold,
     }));
 
-    // —— Week-over-week category volume (same categories as top 10 all-time + context) ——
-    const now = new Date();
-    const startLast7 = new Date(now);
-    startLast7.setDate(startLast7.getDate() - 7);
-    const startPrev7 = new Date(now);
-    startPrev7.setDate(startPrev7.getDate() - 14);
+    let weekOverWeekByCategory;
+    if (
+      hasPeriod &&
+      periodFilter.createdAt?.$gte &&
+      periodFilter.createdAt?.$lte
+    ) {
+      const curStart = periodFilter.createdAt.$gte;
+      const curEnd = periodFilter.createdAt.$lte;
+      const spanMs = curEnd.getTime() - curStart.getTime();
+      const prevEnd = new Date(curStart.getTime() - 1);
+      const prevStart = new Date(prevEnd.getTime() - spanMs);
+      const currAgg = await CallLog.aggregate([
+        { $match: { createdAt: { $gte: curStart, $lte: curEnd } } },
+        { $group: { _id: '$category', count: { $sum: 1 } } },
+      ]);
+      const prevAgg = await CallLog.aggregate([
+        { $match: { createdAt: { $gte: prevStart, $lte: prevEnd } } },
+        { $group: { _id: '$category', count: { $sum: 1 } } },
+      ]);
+      const currMap = new Map(
+        currAgg.map((x) => [x._id || 'غير محدد', x.count]),
+      );
+      const prevMap = new Map(
+        prevAgg.map((x) => [x._id || 'غير محدد', x.count]),
+      );
+      weekOverWeekByCategory = topCategories.map((tc) => {
+        const last7 = currMap.get(tc.category) || 0;
+        const prev7 = prevMap.get(tc.category) || 0;
+        return {
+          category: tc.category,
+          last7Days: last7,
+          previous7Days: prev7,
+          delta: last7 - prev7,
+        };
+      });
+    } else {
+      const now = new Date();
+      const startLast7 = new Date(now);
+      startLast7.setDate(startLast7.getDate() - 7);
+      const startPrev7 = new Date(now);
+      startPrev7.setDate(startPrev7.getDate() - 14);
 
-    const last7Agg = await CallLog.aggregate([
-      { $match: { createdAt: { $gte: startLast7 } } },
-      { $group: { _id: '$category', count: { $sum: 1 } } },
-    ]);
-    const prev7Agg = await CallLog.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: startPrev7, $lt: startLast7 },
+      const last7Agg = await CallLog.aggregate([
+        { $match: { createdAt: { $gte: startLast7 } } },
+        { $group: { _id: '$category', count: { $sum: 1 } } },
+      ]);
+      const prev7Agg = await CallLog.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: startPrev7, $lt: startLast7 },
+          },
         },
-      },
-      { $group: { _id: '$category', count: { $sum: 1 } } },
-    ]);
+        { $group: { _id: '$category', count: { $sum: 1 } } },
+      ]);
 
-    const last7Map = new Map(
-      last7Agg.map((x) => [x._id || 'غير محدد', x.count]),
-    );
-    const prev7Map = new Map(
-      prev7Agg.map((x) => [x._id || 'غير محدد', x.count]),
-    );
+      const last7Map = new Map(
+        last7Agg.map((x) => [x._id || 'غير محدد', x.count]),
+      );
+      const prev7Map = new Map(
+        prev7Agg.map((x) => [x._id || 'غير محدد', x.count]),
+      );
 
-    const weekOverWeekByCategory = topCategories.map((tc) => {
-      const last7 = last7Map.get(tc.category) || 0;
-      const prev7 = prev7Map.get(tc.category) || 0;
-      return {
-        category: tc.category,
-        last7Days: last7,
-        previous7Days: prev7,
-        delta: last7 - prev7,
-      };
-    });
+      weekOverWeekByCategory = topCategories.map((tc) => {
+        const last7 = last7Map.get(tc.category) || 0;
+        const prev7 = prev7Map.get(tc.category) || 0;
+        return {
+          category: tc.category,
+          last7Days: last7,
+          previous7Days: prev7,
+          delta: last7 - prev7,
+        };
+      });
+    }
 
-    // —— Average resolution duration (hours) per category ——
     const resolutionHoursAgg = await CallLog.aggregate([
+      ...matchStages,
       {
         $match: {
           status: 'resolved',
@@ -475,8 +555,8 @@ export async function getDistributionStats() {
       color: priorityColors[stat._id] || '#6b7280'
     }));
     
-    // Calls by user type/entity
     const entityStats = await CallLog.aggregate([
+      ...matchStages,
       {
         $group: {
           _id: '$entityType',
@@ -583,19 +663,16 @@ export async function getConfirmedBriefingsList(query = {}) {
 
     const match = {
       generatedResponse: { $type: 'string', $regex: /\S/ },
-      finalDisplayScore: { $gte: 100 },
+      ...confirmedBriefingCriteria(),
+      ...buildCreatedAtRange(from, to),
     };
-
-    if (from || to) {
-      match.createdAt = {};
-      if (from) match.createdAt.$gte = new Date(from);
-      if (to) match.createdAt.$lte = new Date(to);
-    }
 
     const rows = await CallLog.find(match)
       .sort({ createdAt: -1 })
       .limit(limit)
-      .select('customerName entityType problemSummary category generatedResponse createdAt')
+      .select(
+        'customerName entityType problemSummary category generatedResponse createdAt flowResult advancedFlowSummary finalDisplayScore status',
+      )
       .lean();
 
     const items = rows.map((r) => ({
@@ -606,6 +683,8 @@ export async function getConfirmedBriefingsList(query = {}) {
       category: r.category ?? null,
       solution: r.generatedResponse ?? '',
       createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : null,
+      finalDisplayScore: r.finalDisplayScore ?? null,
+      status: r.status ?? null,
     }));
 
     return {

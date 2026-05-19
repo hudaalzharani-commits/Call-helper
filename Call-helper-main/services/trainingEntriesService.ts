@@ -50,6 +50,7 @@ export interface BackendTrainingEntry {
   updatedAt?: string;
   attachmentUrl?: string;
   attachmentOriginalName?: string;
+  relatedCaseId?: string;
 }
 
 function displayUser(u: BackendTrainingEntry['submittedBy']): string {
@@ -77,6 +78,10 @@ export function mapTrainingEntry(doc: BackendTrainingEntry): TrainingEntry {
     correctResponse: doc.correctResponse,
     alternativeResponses: doc.alternativeResponses ?? [],
     category: doc.category,
+    relatedCaseId:
+      typeof doc.relatedCaseId === 'string' && doc.relatedCaseId.trim()
+        ? doc.relatedCaseId.trim()
+        : undefined,
     submittedBy: displayUser(doc.submittedBy),
     submitterUserId: submitterId(doc.submittedBy),
     submittedAt: doc.createdAt ? new Date(doc.createdAt) : new Date(),
@@ -116,6 +121,7 @@ export async function createTrainingEntry(
     fd.append('scenario', input.scenario);
     fd.append('correctResponse', input.correctResponse);
     fd.append('category', input.category || 'عام');
+    fd.append('relatedCaseId', (input.relatedCaseId || '').trim());
     fd.append('alternativeResponses', JSON.stringify(input.alternativeResponses || []));
     fd.append('attachment', attachment);
 
@@ -141,6 +147,7 @@ export async function createTrainingEntry(
       correctResponse: input.correctResponse,
       alternativeResponses: input.alternativeResponses || [],
       category: input.category || 'عام',
+      relatedCaseId: (input.relatedCaseId || '').trim(),
     }),
   });
   return mapTrainingEntry(doc);
@@ -154,6 +161,7 @@ export async function updateTrainingEntry(id: string, input: TrainingFormData): 
       correctResponse: input.correctResponse,
       alternativeResponses: input.alternativeResponses || [],
       category: input.category,
+      relatedCaseId: (input.relatedCaseId || '').trim(),
     }),
   });
   return mapTrainingEntry(doc);

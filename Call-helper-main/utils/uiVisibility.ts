@@ -21,13 +21,23 @@ export const UI_VISIBILITY_GRANULAR_CREATE_KEYS = [
   'action_training_example_create',
 ] as const;
 
+/** صلاحيات إجراءات إدارية (افتراضيًا معطّلة إلا إذا فُعّلت صراحةً أو كان الدور admin) */
+export const UI_VISIBILITY_ADMIN_ACTION_KEYS = [
+  'action_delete_confirmed_briefing',
+] as const;
+
 /** قديم: كان يعطّل كل أزرار الإنشاء معاً — ما زال يُقرأ للتوافق مع بيانات قديمة */
 const LEGACY_ACTIONS_ELEVATED_CREATE = 'actions_elevated_create';
 
 export type UiVisibilityPageKey = (typeof UI_VISIBILITY_PAGE_KEYS)[number];
 export type UiVisibilityViewKey = (typeof UI_VISIBILITY_VIEW_KEYS)[number];
 export type UiVisibilityGranularCreateKey = (typeof UI_VISIBILITY_GRANULAR_CREATE_KEYS)[number];
-export type UiVisibilityKey = UiVisibilityPageKey | UiVisibilityViewKey | UiVisibilityGranularCreateKey;
+export type UiVisibilityAdminActionKey = (typeof UI_VISIBILITY_ADMIN_ACTION_KEYS)[number];
+export type UiVisibilityKey =
+  | UiVisibilityPageKey
+  | UiVisibilityViewKey
+  | UiVisibilityGranularCreateKey
+  | UiVisibilityAdminActionKey;
 
 export const UI_VISIBILITY_SURFACE_KEY_LIST: readonly (UiVisibilityPageKey | UiVisibilityViewKey)[] = [
   ...UI_VISIBILITY_PAGE_KEYS,
@@ -37,6 +47,7 @@ export const UI_VISIBILITY_SURFACE_KEY_LIST: readonly (UiVisibilityPageKey | UiV
 export const UI_VISIBILITY_KEY_LIST: readonly UiVisibilityKey[] = [
   ...UI_VISIBILITY_SURFACE_KEY_LIST,
   ...UI_VISIBILITY_GRANULAR_CREATE_KEYS,
+  ...UI_VISIBILITY_ADMIN_ACTION_KEYS,
 ];
 
 export const UI_SURFACE_LABELS_AR: Record<UiVisibilityPageKey | UiVisibilityViewKey, string> = {
@@ -57,10 +68,17 @@ export const GRANULAR_CREATE_LABELS_AR: Record<UiVisibilityGranularCreateKey, st
   action_training_example_create: 'إضافة مثال تدريبي',
 };
 
+export const ADMIN_ACTION_LABELS_AR: Record<UiVisibilityAdminActionKey, string> = {
+  action_delete_confirmed_briefing: 'حذف إفادة مؤكدة (لوحة المؤشرات)',
+};
+
 export const UI_VISIBILITY_LABELS_AR: Record<UiVisibilityKey, string> = {
   ...UI_SURFACE_LABELS_AR,
   ...GRANULAR_CREATE_LABELS_AR,
+  ...ADMIN_ACTION_LABELS_AR,
 };
+
+const ADMIN_ACTION_KEY_SET = new Set<string>(UI_VISIBILITY_ADMIN_ACTION_KEYS);
 
 export type UserWithUiVisibility = PermUserLike & { uiVisibility?: Record<string, boolean> | null };
 
@@ -78,7 +96,11 @@ export function pageKeyForServiceId(serviceId: string): string {
 export function buildVisibilityDraft(raw?: Record<string, boolean> | null): Record<UiVisibilityKey, boolean> {
   const d = {} as Record<UiVisibilityKey, boolean>;
   for (const key of UI_VISIBILITY_KEY_LIST) {
-    d[key] = raw?.[key] !== false;
+    if (ADMIN_ACTION_KEY_SET.has(key)) {
+      d[key] = raw?.[key] === true;
+    } else {
+      d[key] = raw?.[key] !== false;
+    }
   }
   return d;
 }
@@ -86,6 +108,28 @@ export function buildVisibilityDraft(raw?: Record<string, boolean> | null): Reco
 /** تعريفات أربعة أزرار الإنشاء (لحوارات إدارة المستخدمين) */
 export const GRANULAR_CREATE_DEFINITIONS: { key: UiVisibilityGranularCreateKey; label: string }[] =
   UI_VISIBILITY_GRANULAR_CREATE_KEYS.map((key) => ({ key, label: GRANULAR_CREATE_LABELS_AR[key] }));
+
+export const ADMIN_ACTION_DEFINITIONS: { key: UiVisibilityAdminActionKey; label: string }[] =
+  UI_VISIBILITY_ADMIN_ACTION_KEYS.map((key) => ({ key, label: ADMIN_ACTION_LABELS_AR[key] }));
+
+/** أزرار المحتوى + صلاحيات الإجراءات (حوار صلاحيات المستخدم) */
+export const CONTENT_PERMISSION_DEFINITIONS: {
+  key: UiVisibilityGranularCreateKey | UiVisibilityAdminActionKey;
+  label: string;
+  /** true = يُفعَّل صراحةً فقط (افتراض off)، وإلا افتراض on */
+  optIn: boolean;
+}[] = [
+  ...GRANULAR_CREATE_DEFINITIONS.map((d) => ({ ...d, optIn: false })),
+  ...ADMIN_ACTION_DEFINITIONS.map((d) => ({ ...d, optIn: true })),
+];
+
+/** حذف إفادة مؤكدة من لوحة المؤشرات — للمسؤول دائمًا، وللآخرين عند تفعيل الصلاحية صراحةً */
+export function canDeleteConfirmedBriefing(
+  u: UserWithUiVisibility | null | undefined,
+): boolean {
+  if (u?.role === 'admin') return true;
+  return u?.uiVisibility?.action_delete_confirmed_briefing === true;
+}
 
 /** صفحات وتبويبات فقط (بدون أزرار الإنشاء الأربعة) */
 export const UI_SURFACE_DEFINITIONS: { key: UiVisibilityPageKey | UiVisibilityViewKey; label: string }[] =

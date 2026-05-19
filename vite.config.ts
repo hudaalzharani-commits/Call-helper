@@ -1,22 +1,23 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import { fileURLToPath } from 'url'
 
-// المجلد الفعلي للواجهة (يحتوي إدارة المستخدمين، uiVisibility، وربط الـ API).
-// الملفات في جذر المستودع بجانب هذا المجلد نسخة قديمة/مكررة — لا تُستخدم هنا.
-const appRoot = path.resolve(__dirname, 'Call-helper-main');
+const repoDir = path.dirname(fileURLToPath(import.meta.url))
+const appDir = path.resolve(repoDir, 'Call-helper-main')
 
-// https://vitejs.dev/config/
+/** Frontend lives in Call-helper-main/ only. */
 export default defineConfig({
-  root: appRoot,
+  root: appDir,
   plugins: [react()],
   resolve: {
     alias: {
-      '@': appRoot,
+      '@': appDir,
     },
   },
   server: {
     port: 3000,
+    strictPort: true,
     open: true,
     proxy: {
       '/api': {

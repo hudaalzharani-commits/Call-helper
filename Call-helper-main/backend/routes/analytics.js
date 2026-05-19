@@ -17,7 +17,10 @@ const router = express.Router();
 // @access  Private (authenticated users)
 router.get('/summary', authenticate, async (req, res) => {
   try {
-    const result = await getSummaryStats();
+    const result = await getSummaryStats({
+      from: req.query.from,
+      to: req.query.to,
+    });
     res.json(result);
   } catch (error) {
     console.error('❌ Analytics summary error:', error);
@@ -70,7 +73,10 @@ router.get('/hourly', authenticate, async (req, res) => {
 // @access  Private
 router.get('/distribution', authenticate, async (req, res) => {
   try {
-    const result = await getDistributionStats();
+    const result = await getDistributionStats({
+      from: req.query.from,
+      to: req.query.to,
+    });
     res.json(result);
   } catch (error) {
     console.error('❌ Analytics distribution error:', error);

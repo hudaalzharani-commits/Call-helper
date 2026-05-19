@@ -1,6 +1,14 @@
 # Rafeeq Call Helper - رفيق مساعد المكالمات الذكي
 
+**GitHub:** [hudaalzharani-commits/Call-helper](https://github.com/hudaalzharani-commits/Call-helper)
+
 A smart call helper application with a React frontend and Node.js/Express backend using MongoDB.
+
+## النشر (Cloudflare + Railway + MongoDB Atlas)
+
+راجع **[DEPLOY.md](./DEPLOY.md)** — خطوات كاملة للواجهة على Cloudflare Pages والباكند على Railway وقاعدة البيانات على Atlas.
+
+التطبيق الرئيسي داخل مجلد **`Call-helper-main/`**.
 
 ## Prerequisites
 

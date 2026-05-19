@@ -1,3 +1,12 @@
+import { categoryLabelsAlign } from './categoryContextMatch';
+
+export type RouteKeywordTarget = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  categories?: string[];
+};
+
 /**
  * ====================================================================
  * Keyword Matcher - تحليل وصف المشكلة واستخراج Keywords
@@ -31,23 +40,38 @@ export const ROUTE_KEYWORDS: Record<string, string[]> = {
     'تسجيل جديد',
     'اشتراك',
     'عضوية',
+    'تصريح',
+    'التصريح',
+    'تصاريح',
+    'إصدار تصريح',
+    'تصريح تسجيل',
     'username',
     'registration',
     'register',
     'signup',
     'sign up',
+    'permit',
+    'authorization',
   ],
   'الدفع': [
     'دفع',
     'سداد',
     'مدفوعات',
+    'مستحقات',
+    'مستحق',
+    'مستحقات مالية',
+    'مالي',
+    'مالية',
+    'رواتب',
+    'راتب',
+    'تعويض',
+    'مبالغ',
     'فاتورة',
     'رسوم',
     'مبلغ',
     'تحويل',
     'بنك',
     'بطاقة',
-    'فيزا',
     'ماستركارد',
     'payment',
     'pay',
@@ -55,16 +79,17 @@ export const ROUTE_KEYWORDS: Record<string, string[]> = {
     'credit',
     'debit',
     'transfer',
+    'dues',
+    'salary',
   ],
   'التأشيرة': [
     'تأشيرة',
-    'فيزا',
-    'تصريح',
+    'التأشيرة',
+    'تأشيرات',
     'إصدار تأشيرة',
     'طلب تأشيرة',
     'تجديد تأشيرة',
     'visa',
-    'permit',
     'travel document',
   ],
   'العقد': [
@@ -174,8 +199,13 @@ export function matchRoutesFromDescription(
     }
   });
 
-  // ترتيب حسب النتيجة (الأعلى أولاً)
-  results.sort((a, b) => b.matchScore - a.matchScore);
+  // ترتيب: نقاط أعلى أولاً، ثم أطول كلمة مفتاحية مطابقة (أكثر تحديداً)
+  results.sort((a, b) => {
+    if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
+    const maxLen = (keywords: string[]) =>
+      keywords.reduce((m, k) => Math.max(m, k.length), 0);
+    return maxLen(b.matchedKeywords) - maxLen(a.matchedKeywords);
+  });
 
   return results;
 }
@@ -216,6 +246,32 @@ export function getMatchingRoutes(
   
   // تصفية النتائج بحد أدنى
   return matches.filter(match => match.matchScore >= minScore);
+}
+
+/** ربط وصف المشكلة بمعرّفات مسارات الإعدادات (اسم المسار / فئاته ↔ مفاتيح ROUTE_KEYWORDS). */
+export function resolveActiveRouteIdsByKeywords(
+  description: string,
+  routes: RouteKeywordTarget[],
+  minScore = 1,
+): string[] {
+  const matches = matchRoutesFromDescription(description, Object.keys(ROUTE_KEYWORDS)).filter(
+    (m) => m.matchScore >= minScore,
+  );
+  if (matches.length === 0) return [];
+
+  const keys = matches.map((m) => m.routeName);
+  const matched = routes.filter((route) => {
+    if (!route.isActive) return false;
+    const name = (route.name || '').trim();
+    if (keys.some((k) => categoryLabelsAlign(name, k) || name.includes(k) || k.includes(name))) {
+      return true;
+    }
+    return (route.categories || []).some((c) =>
+      keys.some((k) => categoryLabelsAlign((c || '').trim(), k)),
+    );
+  });
+
+  return matched.map((r) => r.id);
 }
 
 /**

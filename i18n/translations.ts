@@ -298,7 +298,7 @@ export function tCategory(
   t: (key: TranslationKey, params?: TranslateParams) => string,
   cat: string,
 ): string {
-  const key = `common.categories.${cat}`;
+  const key = `categories.${cat}`;
   const label = t(key);
   return label === key ? cat : label;
 }
@@ -353,6 +353,7 @@ export function tEntity(
   value: string,
 ): string {
   const key = entityKeyFromValue(value) || value;
-  const label = t(`common.entities.${key}`);
-  return label === `common.entities.${key}` ? value : label;
+  const path = `entities.${key}`;
+  const label = t(path);
+  return label === path ? value : label;
 }

@@ -5,6 +5,8 @@
  * Replaces mock data with actual database statistics
  */
 
+import type { AdvancedFlowSummary } from '../utils/advancedFlowSummary';
+
 // Types
 export interface SummaryStats {
   totalCalls: number;
@@ -16,6 +18,8 @@ export interface SummaryStats {
   resolutionRate: number;
   /** نسبة الإفادات ذات السكور النهائي 100٪ من بين المكالمات التي فيها صيغة مولّدة */
   briefingConfirmationRate?: number;
+  confirmedBriefingCount?: number;
+  briefingsWithGeneratedCount?: number;
   totalUsers: number;
   activeUsers: number;
   trends: {
@@ -82,8 +86,6 @@ export interface ResolutionHoursByCategory {
 
 export interface DistributionStats {
   topCategories: CategoryStat[];
-  /** عدد أنواع المشاكل العامة المميزة (تصنيف فريد لكل نوع) — ليس مجموع التكرارات */
-  uniqueCategoryCount?: number;
   issuesByPriority: PriorityStat[];
   issuesByEntity: EntityStat[];
   frequentTodayGroups?: FrequentTodayGroup[];
@@ -102,7 +104,6 @@ export interface UserStats {
     admin: number;
     moderator: number;
     user: number;
-    customer_service: number;
   };
   usersByStatus: {
     active: number;
@@ -119,10 +120,13 @@ export interface ConfirmedBriefingRow {
   category: string | null;
   solution: string;
   createdAt: string | null;
+  advancedFlowSummary?: AdvancedFlowSummary | null;
+  /** مسار الوضع المتقدم الخام — لاستنتاج المسارات عند غياب الملخص */
+  flowResult?: unknown;
 }
 
-// Configuration
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+// Configuration — نفس مساعد المكالمات: /api عبر بروكسي Vite
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 const API_TIMEOUT = 10000; // 10 seconds
 
 /** AuthContext uses this when logging in without the API — it is not a JWT and causes HTTP 401 on /api/analytics. */
@@ -137,6 +141,8 @@ const EMPTY_SUMMARY: SummaryStats = {
   avgResolutionTime: 0,
   resolutionRate: 0,
   briefingConfirmationRate: 0,
+  confirmedBriefingCount: 0,
+  briefingsWithGeneratedCount: 0,
   totalUsers: 0,
   activeUsers: 0,
   trends: { calls: 0 },
@@ -145,13 +151,12 @@ const EMPTY_SUMMARY: SummaryStats = {
 const EMPTY_USER_STATS: UserStats = {
   totalUsers: 0,
   activeUsers: 0,
-  usersByRole: { admin: 0, moderator: 0, user: 0, customer_service: 0 },
+  usersByRole: { admin: 0, moderator: 0, user: 0 },
   usersByStatus: { active: 0, inactive: 0 },
 };
 
 const EMPTY_DISTRIBUTION: DistributionStats = {
   topCategories: [],
-  uniqueCategoryCount: 0,
   issuesByPriority: [],
   issuesByEntity: [],
   frequentTodayGroups: [],
@@ -172,6 +177,12 @@ function isBackendJwtToken(token: string): boolean {
   if (!token || token === LOCAL_ONLY_TOKEN) return false;
   const parts = token.split('.');
   return parts.length === 3 && parts.every((p) => p.length > 0);
+}
+
+/** في التطوير يقبل الخادم local-auth-token — لا نُرجع إحصائيات فارغة */
+function canFetchAnalytics(token: string): boolean {
+  if (isBackendJwtToken(token)) return true;
+  return import.meta.env.DEV && token === LOCAL_ONLY_TOKEN;
 }
 
 function emptyPayloadForAnalyticsEndpoint<T>(endpoint: string): T {
@@ -207,9 +218,9 @@ async function fetchAPI<T>(endpoint: string): Promise<T> {
     throw new Error('No authentication token found');
   }
 
-  if (!isBackendJwtToken(token)) {
+  if (!canFetchAnalytics(token)) {
     console.warn(
-      '[analytics] Session has no backend JWT (e.g. offline login). Using empty statistics. Log in with the server running to see real data.'
+      '[analytics] No backend session. Log in with the API running to see real data.'
     );
     return emptyPayloadForAnalyticsEndpoint<T>(endpoint);
   }
@@ -252,9 +263,20 @@ async function fetchAPI<T>(endpoint: string): Promise<T> {
 /**
  * Get summary statistics
  */
-export async function getSummaryStats(): Promise<SummaryStats> {
+export async function getSummaryStats(range?: {
+  from?: string;
+  to?: string;
+}): Promise<SummaryStats> {
   try {
-    return await fetchAPI<SummaryStats>('/summary');
+    const q =
+      range?.from && range?.to
+        ? `?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`
+        : range?.from
+          ? `?from=${encodeURIComponent(range.from)}`
+          : range?.to
+            ? `?to=${encodeURIComponent(range.to)}`
+            : '';
+    return await fetchAPI<SummaryStats>(`/summary${q}`);
   } catch (error) {
     console.error('❌ Error fetching summary stats:', error);
     throw error;
@@ -307,11 +329,19 @@ export async function getHourlyActivity(params?: {
 }
 
 /**
- * Get distribution statistics
+ * Get distribution statistics (same fields as Common Issues page).
+ * Pass `from` / `to` (YYYY-MM-DD) to scope CallLog aggregates to the dashboard period.
  */
-export async function getDistributionStats(): Promise<DistributionStats> {
+export async function getDistributionStats(params?: {
+  from?: string;
+  to?: string;
+}): Promise<DistributionStats> {
   try {
-    return await fetchAPI<DistributionStats>('/distribution');
+    const sp = new URLSearchParams();
+    if (params?.from) sp.set('from', params.from);
+    if (params?.to) sp.set('to', params.to);
+    const q = sp.toString();
+    return await fetchAPI<DistributionStats>(`/distribution${q ? `?${q}` : ''}`);
   } catch (error) {
     console.error('❌ Error fetching distribution stats:', error);
     throw error;
@@ -369,9 +399,9 @@ export async function getAllAnalytics(period: string = '7d'): Promise<{
       throw new Error('No authentication token found');
     }
 
-    if (!isBackendJwtToken(token)) {
+    if (!canFetchAnalytics(token)) {
       console.warn(
-        '[analytics] Session has no backend JWT. Using empty combined analytics.'
+        '[analytics] No backend session. Using empty combined analytics.'
       );
       return {
         summary: EMPTY_SUMMARY,

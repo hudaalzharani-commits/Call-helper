@@ -25,7 +25,7 @@ import { useLanguage } from "../../contexts/LanguageContext";
 export function AdminOperationalMonitoringSection() {
   const { t } = useLanguage();
   const { isAdmin } = useAuth();
-  const [isGeneralIssuesOpen, setIsGeneralIssuesOpen] = useState(true);
+  const [isGeneralIssuesOpen, setIsGeneralIssuesOpen] = useState(false);
 
   const [thresholdConfig, setThresholdConfig] = useState<{
     value: number;
@@ -287,9 +287,6 @@ export function AdminOperationalMonitoringSection() {
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0 self-start">
-                <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-[10px]">
-                  {t('admin.operationalMonitoring.adminOnly')}
-                </Badge>
                 {isGeneralIssuesOpen ? (
                   <ChevronUp className="size-5 text-muted-foreground shrink-0" />
                 ) : (

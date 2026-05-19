@@ -32,6 +32,23 @@ const userSchema = new mongoose.Schema({
     enum: ['admin', 'user', 'moderator', 'customer_service'],
     default: 'user'
   },
+  accountStatus: {
+    type: String,
+    enum: ['active', 'inactive', 'suspended'],
+    default: 'active'
+  },
+  permAdminPanel: {
+    type: Boolean,
+    default: true,
+  },
+  permContentCreate: {
+    type: Boolean,
+    default: false,
+  },
+  uiVisibility: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {},
+  },
   avatar: {
     type: String,
     default: null
@@ -39,27 +56,6 @@ const userSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
-  },
-  /** حالة الحساب في لوحة الإدارة (مرتبطة بـ isActive عند الحفظ من الـ API) */
-  accountStatus: {
-    type: String,
-    enum: ['active', 'inactive', 'suspended'],
-    default: 'active'
-  },
-  /** يظهر تبويب لوحة الإدارة فقط عند الدور admin والقيمة true */
-  permAdminPanel: {
-    type: Boolean,
-    default: true,
-  },
-  /** أزرار إنشاء محتوى (مشكلة عامة، مقال، تحديث، تدريب) للمشرف/المسؤول */
-  permContentCreate: {
-    type: Boolean,
-    default: false,
-  },
-  /** أعلام واجهة: إظهار/إخفاء صفحات القائمة، التبويبات، وأزرار الإنشاء (false يخفي صراحةً) */
-  uiVisibility: {
-    type: mongoose.Schema.Types.Mixed,
-    default: {},
   },
   lastLogin: {
     type: Date,

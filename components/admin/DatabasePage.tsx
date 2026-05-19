@@ -46,7 +46,7 @@ const SUBTYPE_CASE_CODE: Record<string, string> = {
   'وكيل خارجي': 'EA',
   'شركة عمرة': 'UC',
   'مقدم خدمة سكن': 'HP',
-  'مكتب شؤون': 'AO',
+  'مكتب شؤون': 'HM',
   'منظم تابع': 'SO'
 };
 

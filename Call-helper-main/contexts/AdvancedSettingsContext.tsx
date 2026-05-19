@@ -51,6 +51,7 @@
 
 import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { categoryLabelsAlign } from '../utils/categoryContextMatch';
+import { routeMatchesPilgrimageScope } from '../utils/pilgrimageRouteScope';
 
 // ====================================================================
 // Types & Interfaces
@@ -65,11 +66,12 @@ import { categoryLabelsAlign } from '../utils/categoryContextMatch';
  *     فارغة = ينطبق على جميع الفئات.
  *   - entityTypes: قائمة أنواع مقدمي الخدمة التي يظهر لهم هذا المسار.
  *     فارغة = ينطبق على جميع الأنواع.
+ *   - pilgrimageScope: «عمرة» | «حج» | «both» (الكل) — عند غيابه يُستنتج من أنواع الجهات أو عمرة.
  *
  * منطق الفلترة:
  *   - إذا كانت إحدى القائمتين تحتوي قيم → يجب أن تتطابق مع سياق الاستدعاء.
  *   - إذا كانت فارغة → لا يوجد قيد على هذا البُعد.
- *   - راجع helper `getRoutesForContext({ entityType, category })`.
+ *   - راجع helper `getRoutesForContext({ entityType, category, pilgrimageScope })`.
  */
 export interface Route {
   id: string;
@@ -80,6 +82,8 @@ export interface Route {
   parentSteps: string[]; // IDs للخطوات التي يرتبط بها هذا الـ Route (من Routes أخرى)
   categories?: string[]; // فئات الحالات المرتبطة بهذا المسار (فارغة = ينطبق على الجميع)
   entityTypes?: string[]; // أنواع مقدمي الخدمة المرتبطة (فارغة = ينطبق على الجميع)
+  /** عند التحديد: يظهر المسار في الوضع المتقدم فقط لهذا السياق (عمرة أو حج) */
+  pilgrimageScope?: 'umrah' | 'hajj' | 'both';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -225,9 +229,9 @@ interface AdvancedSettingsContextType {
   addRoute: (
     name: string,
     parentSteps?: string[],
-    targeting?: { categories?: string[]; entityTypes?: string[] },
+    targeting?: { categories?: string[]; entityTypes?: string[]; pilgrimageScope?: 'umrah' | 'hajj' },
   ) => void;
-  updateRoute: (id: string, updates: Partial<Pick<Route, 'name' | 'parentSteps' | 'categories' | 'entityTypes'>>) => void;
+  updateRoute: (id: string, updates: Partial<Pick<Route, 'name' | 'parentSteps' | 'categories' | 'entityTypes' | 'pilgrimageScope'>>) => void;
   deleteRoute: (id: string) => void;
   toggleRouteActive: (id: string) => void;
   
@@ -268,14 +272,18 @@ interface AdvancedSettingsContextType {
 
   /**
    * 🎯 Route Targeting Helper
-   * يرجع المسارات النشطة المرتبطة بسياق المكالمة (نوع المستخدم + فئة الحالة).
+   * يرجع المسارات النشطة المرتبطة بسياق المكالمة (نوع الجهة + فئة الحالة + سياق عمرة/حج).
    * المنطق:
    *  - إذا حدد المسار categories غير فارغة → يجب أن تتطابق مع category الممرر.
    *  - إذا حدد المسار entityTypes غير فارغة → يجب أن تتطابق مع entityType الممرر.
    *  - المسارات بدون قيود (قائمتان فارغتان) تنطبق على الجميع.
    *  - إذا لم يطابق أي مسار محدد → يتم إرجاع كل المسارات النشطة (fallback آمن).
    */
-  getRoutesForContext: (context: { entityType?: string; category?: string }) => Route[];
+  getRoutesForContext: (context: {
+    entityType?: string;
+    category?: string;
+    pilgrimageScope?: 'umrah' | 'hajj' | 'both';
+  }) => Route[];
   
   // Get Steps by SubCondition Name (for auto-detection)
   getStepsBySubConditionName: (stepId: string, subConditionName: string) => string[];
@@ -480,31 +488,31 @@ const MOCK_GRAY_AREA_SETTINGS: GrayAreaSettings = {
       id: 'technical',
       title: 'مشكلة تقنية',
       isEnabled: true,
-      linkedRouteIds: ['route-1'],
+      linkedRouteIds: [],
     },
     {
       id: 'operational',
       title: 'مشكلة تشغيلية',
       isEnabled: true,
-      linkedRouteIds: ['route-3'],
+      linkedRouteIds: [],
     },
     {
       id: 'financial',
       title: 'مشكلة مالية',
       isEnabled: true,
-      linkedRouteIds: ['route-2'],
+      linkedRouteIds: ['route-2'], // مربوط بمسار الدفع
     },
     {
       id: 'complaint',
       title: 'شكوى',
       isEnabled: true,
-      linkedRouteIds: ['route-2', 'route-3'],
+      linkedRouteIds: [],
     },
     {
       id: 'general_inquiry',
       title: 'استفسار عام',
       isEnabled: true,
-      linkedRouteIds: ['route-1', 'route-2', 'route-3'],
+      linkedRouteIds: [],
     },
   ],
   forceRoutingOnConflict: true,
@@ -512,27 +520,6 @@ const MOCK_GRAY_AREA_SETTINGS: GrayAreaSettings = {
   showActionTags: true,
   showActionDetails: true,
 };
-
-const DEFAULT_GRAY_AREA_ROUTE_LINKS: Record<string, string[]> = {
-  technical: ['route-1'],
-  operational: ['route-3'],
-  financial: ['route-2'],
-  complaint: ['route-2', 'route-3'],
-  general_inquiry: ['route-1', 'route-2', 'route-3'],
-};
-
-/** يملأ مسارات Gray Area الفارغة (بيانات قديمة في localStorage) */
-function mergeGrayAreaRouteLinks(settings: GrayAreaSettings): GrayAreaSettings {
-  return {
-    ...settings,
-    questions: settings.questions.map((q) => {
-      if (q.linkedRouteIds.length > 0) return q;
-      const fallback = DEFAULT_GRAY_AREA_ROUTE_LINKS[q.id];
-      if (!fallback?.length) return q;
-      return { ...q, linkedRouteIds: [...fallback] };
-    }),
-  };
-}
 
 /**
  * Mock Scoring Settings
@@ -727,9 +714,7 @@ export function AdvancedSettingsProvider({ children }: { children: ReactNode }) 
   // State Management
   const [routes, setRoutes] = useState<Route[]>(persistedSettings?.routes || MOCK_ROUTES);
   const [steps, setSteps] = useState<Step[]>(persistedSettings?.steps || MOCK_STEPS);
-  const [grayAreaSettings, setGrayAreaSettings] = useState<GrayAreaSettings>(() =>
-    mergeGrayAreaRouteLinks(persistedSettings?.grayAreaSettings || MOCK_GRAY_AREA_SETTINGS),
-  );
+  const [grayAreaSettings, setGrayAreaSettings] = useState<GrayAreaSettings>(persistedSettings?.grayAreaSettings || MOCK_GRAY_AREA_SETTINGS);
   const [scoringSettings, setScoringSettings] = useState<ScoringSettings>(
     ensureRequiredScoringWeights(persistedSettings?.scoringSettings || MOCK_SCORING_SETTINGS)
   );
@@ -800,8 +785,13 @@ export function AdvancedSettingsProvider({ children }: { children: ReactNode }) 
   const addRoute = (
     name: string,
     parentSteps?: string[],
-    targeting?: { categories?: string[]; entityTypes?: string[] },
+    targeting?: {
+      categories?: string[];
+      entityTypes?: string[];
+      pilgrimageScope?: 'umrah' | 'hajj' | 'both';
+    },
   ) => {
+    const ps = targeting?.pilgrimageScope;
     const newRoute: Route = {
       id: `route-${Date.now()}`,
       name,
@@ -810,6 +800,7 @@ export function AdvancedSettingsProvider({ children }: { children: ReactNode }) 
       parentSteps: parentSteps || [],
       categories: Array.isArray(targeting?.categories) ? targeting.categories.filter(Boolean) : [],
       entityTypes: Array.isArray(targeting?.entityTypes) ? targeting.entityTypes.filter(Boolean) : [],
+      ...(ps === 'umrah' || ps === 'hajj' || ps === 'both' ? { pilgrimageScope: ps } : {}),
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -837,25 +828,35 @@ export function AdvancedSettingsProvider({ children }: { children: ReactNode }) 
   /**
    * Update a route's name and/or parent steps
    */
-  const updateRoute = useCallback((id: string, updates: Partial<Pick<Route, 'name' | 'parentSteps' | 'categories' | 'entityTypes'>>) => {
-    setRoutes(prev => prev.map(route => {
-      if (route.id === id) {
-        return {
+  const updateRoute = useCallback(
+    (
+      id: string,
+      updates: Partial<Pick<Route, 'name' | 'parentSteps' | 'categories' | 'entityTypes' | 'pilgrimageScope'>>,
+    ) => {
+    setRoutes(prev =>
+      prev.map(route => {
+        if (route.id !== id) return route;
+        const merged: Route = {
           ...route,
           ...updates,
           updatedAt: new Date(),
         };
-      }
-      return route;
-    }));
+        if ('pilgrimageScope' in updates && updates.pilgrimageScope === undefined) {
+          const { pilgrimageScope: _omit, ...rest } = merged;
+          return rest as Route;
+        }
+        return merged;
+      }),
+    );
 
     // If name is updated, also update the corresponding step's name
-    if (updates.name) {
+    const nextName = updates.name;
+    if (nextName) {
       setSteps(prev => prev.map(step => {
         if (step.routeId === id) {
           return {
             ...step,
-            name: updates.name,
+            name: nextName,
             updatedAt: new Date(),
           };
         }
@@ -1357,7 +1358,7 @@ export function AdvancedSettingsProvider({ children }: { children: ReactNode }) 
 
   /**
    * 🎯 Get Routes For Context (Targeting)
-   * يفلتر المسارات النشطة حسب نوع الجهة وفئة الحالة المتطابقة.
+   * يفلتر المسارات النشطة حسب نوع الجهة وفئة الحالة وسياق عمرة/حج عند التمرير.
    *
    * مثال:
    *   مستخدم كتب مشكلة تخص "التأشيرة" والسكور 70 (وضع متقدم) →
@@ -1371,10 +1372,26 @@ export function AdvancedSettingsProvider({ children }: { children: ReactNode }) 
    *   - بدون سياق فئة/جهة → يبقى fallback السابق (كل النشطة عند الحاجة).
    */
   const getRoutesForContext = useCallback(
-    ({ entityType, category }: { entityType?: string; category?: string }): Route[] => {
+    ({
+      entityType,
+      category,
+      pilgrimageScope,
+    }: {
+      entityType?: string;
+      category?: string;
+      pilgrimageScope?: 'umrah' | 'hajj' | 'both';
+    }): Route[] => {
       const normalizedEntity = (entityType || '').trim();
       const normalizedCategory = (category || '').trim();
       const activeRoutes = routes.filter(route => route.isActive);
+
+      const matchesPilgrimage = (route: Route): boolean => {
+        const ctx = pilgrimageScope;
+        if (ctx !== 'umrah' && ctx !== 'hajj') {
+          return false;
+        }
+        return routeMatchesPilgrimageScope(route, ctx);
+      };
 
       const matchesEntity = (route: Route): boolean => {
         const list = route.entityTypes;
@@ -1405,9 +1422,12 @@ export function AdvancedSettingsProvider({ children }: { children: ReactNode }) 
         );
       };
 
-      const targeted = activeRoutes.filter(route => matchesEntity(route) && matchesCategory(route));
+      const targeted = activeRoutes.filter(
+        route => matchesEntity(route) && matchesCategory(route) && matchesPilgrimage(route),
+      );
 
-      const hasContext = Boolean(normalizedCategory || normalizedEntity);
+      const hasPilgrimageCtx = pilgrimageScope === 'umrah' || pilgrimageScope === 'hajj';
+      const hasContext = Boolean(normalizedCategory || normalizedEntity || hasPilgrimageCtx);
 
       if (hasContext) {
         // سياق محدد: فقط المسارات المطابقة (بدون fallback لكل المسارات)

@@ -25,8 +25,10 @@ import {
   ChevronUp,
   ClipboardList,
   Flame,
+  MessageSquareText,
   RefreshCw,
   ShieldAlert,
+  X,
 } from 'lucide-react';
 import {
   Card,
@@ -36,6 +38,7 @@ import {
 } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
+import { Textarea } from './ui/textarea';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import {
   fetchActiveOperationalIssues,
@@ -116,18 +119,28 @@ interface OperationalIssueRowProps {
   issue: OperationalIssue;
   showResolveAction: boolean;
   resolveState: ResolveState | null;
-  onResolve?: (issue: OperationalIssue) => void;
+  resolveDraft: string;
+  isResolveExpanded: boolean;
+  onStartResolve?: (issue: OperationalIssue) => void;
+  onResolveDraftChange?: (value: string) => void;
+  onCancelResolve?: () => void;
+  onResolve?: (issue: OperationalIssue, notes: string) => void;
 }
 
 function OperationalIssueRow({
   issue,
   showResolveAction,
   resolveState,
+  resolveDraft,
+  isResolveExpanded,
+  onStartResolve,
+  onResolveDraftChange,
+  onCancelResolve,
   onResolve,
 }: OperationalIssueRowProps) {
   const isSaving = resolveState?.id === issue._id && resolveState?.isSaving;
   const rowError =
-    resolveState?.id === issue._id && !resolveState.isSaving
+    resolveState?.id === issue._id && !resolveState?.isSaving
       ? resolveState.error
       : null;
   const resolvedBy =
@@ -199,24 +212,65 @@ function OperationalIssueRow({
             </>
           )}
         </div>
-        {showResolveAction && (
+        {showResolveAction && !isResolveExpanded ? (
           <Button
             type="button"
             size="sm"
             variant="outline"
             disabled={isSaving}
-            onClick={() => onResolve?.(issue)}
+            onClick={() => onStartResolve?.(issue)}
             className="h-7 px-3 text-[11px] gap-1 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10"
           >
             <CheckCircle2 className="size-3" />
-            {isSaving ? 'جاري الحفظ...' : 'تم الحل'}
+            تم الحل
           </Button>
-        )}
+        ) : null}
       </div>
+
+      {showResolveAction && isResolveExpanded ? (
+        <div className="rounded-lg border border-emerald-500/35 bg-emerald-500/[0.06] p-3 space-y-2">
+          <div className="flex items-center justify-end gap-2 text-[11px] font-semibold text-emerald-800 dark:text-emerald-200">
+            <span>وصف الحل / الإجراء المتخذ</span>
+            <MessageSquareText className="size-3.5 shrink-0" aria-hidden />
+          </div>
+          <Textarea
+            value={resolveDraft}
+            onChange={(e) => onResolveDraftChange?.(e.target.value)}
+            disabled={isSaving}
+            placeholder="مثال: تم التواصل مع الجهة المختصة وإغلاق الحالات المفتوحة…"
+            className="min-h-[72px] text-right text-sm resize-y bg-background/80"
+            dir="rtl"
+            autoFocus
+          />
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={isSaving}
+              className="h-7 px-2 text-[11px] gap-1"
+              onClick={() => onCancelResolve?.()}
+            >
+              <X className="size-3" />
+              إلغاء
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={isSaving || !resolveDraft.trim()}
+              className="h-7 px-3 text-[11px] gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={() => onResolve?.(issue, resolveDraft.trim())}
+            >
+              <CheckCircle2 className="size-3" />
+              {isSaving ? 'جاري الحفظ...' : 'حفظ الحل'}
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {issue.resolutionNotes && (
         <p className="text-[10px] text-muted-foreground text-right italic">
-          ملاحظة الحل: {issue.resolutionNotes}
+          الحل: {issue.resolutionNotes}
         </p>
       )}
 
@@ -246,10 +300,12 @@ export function OperationalIssueTracker({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resolveState, setResolveState] = useState<ResolveState | null>(null);
+  const [resolvePanelId, setResolvePanelId] = useState<string | null>(null);
+  const [resolveDraft, setResolveDraft] = useState('');
   const [activeTab, setActiveTab] = useState<'active' | 'archive'>('active');
   // Collapsible on dashboard; in embedMode a separate flag controls the body.
   const [isOpen, setIsOpen] = useState(false);
-  const [isEmbedExpanded, setIsEmbedExpanded] = useState(true);
+  const [isEmbedExpanded, setIsEmbedExpanded] = useState(false);
 
   const refreshAll = useCallback(async () => {
     setIsLoading(true);
@@ -279,14 +335,36 @@ export function OperationalIssueTracker({
     }
   }, [showBody, refreshAll]);
 
+  const handleStartResolve = useCallback((issue: OperationalIssue) => {
+    setResolvePanelId(issue._id);
+    setResolveDraft('');
+    setResolveState(null);
+  }, []);
+
+  const handleCancelResolve = useCallback(() => {
+    setResolvePanelId(null);
+    setResolveDraft('');
+    setResolveState(null);
+  }, []);
+
   const handleResolve = useCallback(
-    async (issue: OperationalIssue) => {
+    async (issue: OperationalIssue, notes: string) => {
+      const trimmed = notes.trim();
+      if (!trimmed) {
+        setResolveState({
+          id: issue._id,
+          isSaving: false,
+          error: 'يرجى إدخال وصف الحل قبل الحفظ',
+        });
+        return;
+      }
       setResolveState({ id: issue._id, isSaving: true, error: null });
       try {
-        const updated = await markOperationalIssueResolved(issue._id);
-        // Move locally for instant feedback, then refresh in the background.
+        const updated = await markOperationalIssueResolved(issue._id, trimmed);
         setActive((prev) => prev.filter((it) => it._id !== issue._id));
         setArchive((prev) => [updated, ...prev]);
+        setResolvePanelId(null);
+        setResolveDraft('');
         setResolveState(null);
       } catch (err) {
         setResolveState({
@@ -329,6 +407,18 @@ export function OperationalIssueTracker({
   const dailyCount = dailyIssues.length;
   const persistentCount = persistentIssues.length;
 
+  const activeRowProps = (issue: OperationalIssue) => ({
+    issue,
+    showResolveAction: true as const,
+    resolveState,
+    resolveDraft: resolvePanelId === issue._id ? resolveDraft : '',
+    isResolveExpanded: resolvePanelId === issue._id,
+    onStartResolve: handleStartResolve,
+    onResolveDraftChange: setResolveDraft,
+    onCancelResolve: handleCancelResolve,
+    onResolve: handleResolve,
+  });
+
   return (
     <Card className="border-2 border-rose-300/60 dark:border-rose-500/40 shadow-lg overflow-hidden">
       {embedMode ? (
@@ -357,9 +447,6 @@ export function OperationalIssueTracker({
                     <ChevronDown className="size-4" />
                   )}
                 </button>
-                <Badge className="bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 text-[10px]">
-                  خاص بالأدمن
-                </Badge>
                 <Button
                   type="button"
                   size="sm"
@@ -392,9 +479,6 @@ export function OperationalIssueTracker({
         <CardHeader className="bg-gradient-to-r from-rose-500/15 to-orange-500/15 dark:from-rose-500/10 dark:to-orange-500/10 rounded-t-2xl border-b border-border cursor-pointer hover:from-rose-500/20 hover:to-orange-500/20 transition-all">
           <CardTitle className="text-foreground text-right font-bold flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <Badge className="bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 text-[10px]">
-                خاص بالأدمن
-              </Badge>
               {isOpen && (
                 <Button
                   type="button"
@@ -535,10 +619,7 @@ export function OperationalIssueTracker({
                       dailyIssues.map((issue) => (
                         <OperationalIssueRow
                           key={issue._id}
-                          issue={issue}
-                          showResolveAction
-                          resolveState={resolveState}
-                          onResolve={handleResolve}
+                          {...activeRowProps(issue)}
                         />
                       ))
                     )}
@@ -582,10 +663,7 @@ export function OperationalIssueTracker({
                       persistentIssues.map((issue) => (
                         <OperationalIssueRow
                           key={issue._id}
-                          issue={issue}
-                          showResolveAction
-                          resolveState={resolveState}
-                          onResolve={handleResolve}
+                          {...activeRowProps(issue)}
                         />
                       ))
                     )}
@@ -608,6 +686,8 @@ export function OperationalIssueTracker({
                     issue={issue}
                     showResolveAction={false}
                     resolveState={null}
+                    resolveDraft=""
+                    isResolveExpanded={false}
                   />
                 ))}
               </div>

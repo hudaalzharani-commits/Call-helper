@@ -14,7 +14,7 @@
  * ====================================================================
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useAdvancedSettings } from '../../contexts/AdvancedSettingsContext';
 import type { Route, Step, SubCondition } from '../../contexts/AdvancedSettingsContext';
 import { CALL_HELPER_ENTITY_TYPES } from '../../constants/userTypes';
@@ -71,6 +71,8 @@ import {
 } from '../ui/dialog';
 import { toast } from 'sonner';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { routeMatchesPilgrimageScope } from '../../utils/pilgrimageRouteScope';
+import { cn } from '../ui/utils';
 
 export function AdvancedSettingsPage() {
   const { t, dir } = useLanguage();
@@ -119,6 +121,9 @@ export function AdvancedSettingsPage() {
   // 🎯 Route Targeting (نوع الجهة + فئة الحالة)
   const [newRouteCategories, setNewRouteCategories] = useState<string[]>([]);
   const [newRouteEntityTypes, setNewRouteEntityTypes] = useState<string[]>([]);
+  const [routesViewScope, setRoutesViewScope] = useState<'umrah' | 'hajj'>('umrah');
+  const [newRoutePilgrimageScope, setNewRoutePilgrimageScope] = useState<'umrah' | 'hajj'>('umrah');
+  const [newRouteAppliesToBoth, setNewRouteAppliesToBoth] = useState(false);
   const [pendingCategoryInput, setPendingCategoryInput] = useState('');
   const [newSubConditionName, setNewSubConditionName] = useState('');
   const [newSubConditionAction, setNewSubConditionAction] = useState<SubCondition['action']>('continue');
@@ -135,6 +140,27 @@ export function AdvancedSettingsPage() {
 
   // File input ref for import
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const filteredRoutes = useMemo(
+    () => routes.filter((route) => routeMatchesPilgrimageScope(route, routesViewScope)),
+    [routes, routesViewScope],
+  );
+
+  const openAddRouteDialog = () => {
+    setNewRoutePilgrimageScope(routesViewScope);
+    setNewRouteAppliesToBoth(false);
+    setShowAddRouteDialog(true);
+  };
+
+  const resetRouteDialogForm = () => {
+    setNewRouteName('');
+    setNewRouteParentSteps([]);
+    setNewRouteCategories([]);
+    setNewRouteEntityTypes([]);
+    setNewRoutePilgrimageScope(routesViewScope);
+    setNewRouteAppliesToBoth(false);
+    setPendingCategoryInput('');
+  };
 
   const parseLocaleNumber = (value: string, fallback: number = 0): number => {
     const normalized = value
@@ -242,13 +268,13 @@ export function AdvancedSettingsPage() {
     addRoute(
       newRouteName.trim(),
       newRouteParentSteps,
-      { categories: normalizedCategories, entityTypes: normalizedEntityTypes },
+      {
+        categories: normalizedCategories,
+        entityTypes: normalizedEntityTypes,
+        pilgrimageScope: newRouteAppliesToBoth ? 'both' : newRoutePilgrimageScope,
+      },
     );
-    setNewRouteName('');
-    setNewRouteParentSteps([]);
-    setNewRouteCategories([]);
-    setNewRouteEntityTypes([]);
-    setPendingCategoryInput('');
+    resetRouteDialogForm();
     setShowAddRouteDialog(false);
     toast.success(t('admin.advancedSettings.routeAdded'));
   };
@@ -266,6 +292,8 @@ export function AdvancedSettingsPage() {
     setNewRouteParentSteps(route.parentSteps);
     setNewRouteCategories(Array.isArray(route.categories) ? [...route.categories] : []);
     setNewRouteEntityTypes(Array.isArray(route.entityTypes) ? [...route.entityTypes] : []);
+    setNewRoutePilgrimageScope(route.pilgrimageScope === 'hajj' ? 'hajj' : 'umrah');
+    setNewRouteAppliesToBoth(route.pilgrimageScope === 'both');
     setPendingCategoryInput('');
   };
 
@@ -285,14 +313,11 @@ export function AdvancedSettingsPage() {
       parentSteps: newRouteParentSteps,
       categories: normalizedCategories,
       entityTypes: normalizedEntityTypes,
+      pilgrimageScope: newRouteAppliesToBoth ? 'both' : newRoutePilgrimageScope,
     });
 
     setEditingRoute(null);
-    setNewRouteName('');
-    setNewRouteParentSteps([]);
-    setNewRouteCategories([]);
-    setNewRouteEntityTypes([]);
-    setPendingCategoryInput('');
+    resetRouteDialogForm();
     toast.success(t('admin.advancedSettings.routeUpdated'));
   };
 
@@ -767,10 +792,17 @@ export function AdvancedSettingsPage() {
           قواعد التوجيه - المسارات الرئيسية بدون keywords
           (الـ AI يتعامل مع الـ keywords تلقائياً)
       */}
-      <Card className="glass-panel border-2 border-border p-6">
-        <div className="flex items-center justify-between mb-6">
+      <Card
+        className={cn(
+          'p-6 transition-[border-color,box-shadow,background] duration-300',
+          routesViewScope === 'hajj'
+            ? 'glass-panel border-2 border-amber-600/50 bg-gradient-to-br from-amber-950/35 via-card to-amber-950/[0.12] shadow-[0_0_0_1px_rgba(245,158,11,0.12),0_18px_48px_-24px_rgba(180,83,9,0.45)] dark:from-amber-950/40 dark:shadow-[0_0_0_1px_rgba(245,158,11,0.2)]'
+            : 'glass-panel border-2 border-border bg-card/80 shadow-sm',
+        )}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-2">
-            <GitBranch className="size-6 text-primary" />
+            <GitBranch className="size-6 text-primary shrink-0" />
             <div>
               <h3 className="text-lg font-bold text-foreground">{t('admin.advancedSettings.routesTitle')}</h3>
               <p className="text-xs text-muted-foreground">
@@ -778,32 +810,104 @@ export function AdvancedSettingsPage() {
               </p>
             </div>
           </div>
-          <Button
-            onClick={() => setShowAddRouteDialog(true)}
-            className="bg-primary text-primary-foreground text-white"
-            size="sm"
+          <div
+            className="flex flex-wrap items-center gap-2 shrink-0"
+            role="radiogroup"
+            aria-label={t('admin.advancedSettings.routesScopeSwitchAria')}
           >
-            <Plus className="size-4 ml-2" />
-            {t('admin.advancedSettings.addRoute')}
-          </Button>
+            <div className="inline-flex rounded-xl border-2 border-border bg-muted/40 p-0.5 shadow-inner">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={routesViewScope === 'umrah'}
+                onClick={() => setRoutesViewScope('umrah')}
+                className={cn(
+                  'min-w-[4.5rem] rounded-lg px-3 py-1.5 text-sm font-bold transition-all',
+                  routesViewScope === 'umrah'
+                    ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-500/40 dark:bg-emerald-600'
+                    : 'text-muted-foreground hover:bg-background/80 hover:text-foreground',
+                )}
+              >
+                {t('admin.advancedSettings.pilgrimageScopeUmrah')}
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={routesViewScope === 'hajj'}
+                onClick={() => setRoutesViewScope('hajj')}
+                className={cn(
+                  'min-w-[4.5rem] rounded-lg px-3 py-1.5 text-sm font-bold transition-all',
+                  routesViewScope === 'hajj'
+                    ? 'bg-amber-600 text-white shadow-md ring-2 ring-amber-500/40 dark:bg-amber-600'
+                    : 'text-muted-foreground hover:bg-background/80 hover:text-foreground',
+                )}
+              >
+                {t('admin.advancedSettings.pilgrimageScopeHajj')}
+              </button>
+            </div>
+            <Button onClick={openAddRouteDialog} size="sm">
+              <Plus className="size-4 ml-2 shrink-0" />
+              {t('admin.advancedSettings.addRoute')}
+            </Button>
+          </div>
         </div>
 
         <div className="space-y-3">
-          {routes.length === 0 ? (
-            <div className="text-center py-12 glass-card rounded-xl border border-border">
-              <GitBranch className="size-12 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground">{t('admin.advancedSettings.noRoutes')}</p>
-              <p className="text-xs text-muted-foreground mt-1">{t('admin.advancedSettings.noRoutesHint')}</p>
+          {filteredRoutes.length === 0 ? (
+            <div
+              className={cn(
+                'text-center py-12 rounded-xl border',
+                routesViewScope === 'hajj'
+                  ? 'border-amber-500/35 bg-amber-950/15 dark:bg-amber-950/25'
+                  : 'glass-card border-border',
+              )}
+            >
+              <GitBranch
+                className={cn(
+                  'size-12 mx-auto mb-3',
+                  routesViewScope === 'hajj' ? 'text-amber-400/80' : 'text-muted-foreground',
+                )}
+              />
+              <p
+                className={cn(
+                  'text-muted-foreground',
+                  routesViewScope === 'hajj' && 'text-amber-100/90',
+                )}
+              >
+                {routes.length === 0
+                  ? t('admin.advancedSettings.noRoutes')
+                  : t('admin.advancedSettings.noRoutesForScope', {
+                      scope:
+                        routesViewScope === 'hajj'
+                          ? t('admin.advancedSettings.pilgrimageScopeHajj')
+                          : t('admin.advancedSettings.pilgrimageScopeUmrah'),
+                    })}
+              </p>
+              <p
+                className={cn(
+                  'text-xs text-muted-foreground mt-1',
+                  routesViewScope === 'hajj' && 'text-amber-200/70',
+                )}
+              >
+                {routes.length === 0
+                  ? t('admin.advancedSettings.noRoutesHint')
+                  : t('admin.advancedSettings.noRoutesForScopeHint')}
+              </p>
             </div>
           ) : (
-            routes.map((route) => {
+            filteredRoutes.map((route) => {
               const step = getStepsByRoute(route.id);
               const isExpanded = expandedRoutes.has(route.id);
 
               return (
                 <div
                   key={route.id}
-                  className="glass-card border-2 border-border rounded-xl overflow-hidden"
+                  className={cn(
+                    'rounded-xl overflow-hidden border-2',
+                    routesViewScope === 'hajj'
+                      ? 'border-amber-600/35 bg-gradient-to-r from-amber-950/25 via-card to-card shadow-[inset_5px_0_0_0_rgba(217,119,6,0.75)]'
+                      : 'glass-card border-border',
+                  )}
                 >
                   {/* Route Header */}
                   <div className="p-4 flex items-center justify-between">
@@ -871,6 +975,33 @@ export function AdvancedSettingsPage() {
                             : `${route.entityTypes.length} جهات`}
                         </Badge>
                       )}
+                      {route.pilgrimageScope === 'umrah' && (
+                        <Badge
+                          variant="outline"
+                          className="text-xs border-emerald-500/40 text-emerald-700 dark:text-emerald-400"
+                          title={t('admin.advancedSettings.badgePilgrimageUmrahTitle')}
+                        >
+                          {t('admin.advancedSettings.badgePilgrimageUmrah')}
+                        </Badge>
+                      )}
+                      {route.pilgrimageScope === 'hajj' && (
+                        <Badge
+                          variant="outline"
+                          className="text-xs border-amber-500/40 text-amber-800 dark:text-amber-400"
+                          title={t('admin.advancedSettings.badgePilgrimageHajjTitle')}
+                        >
+                          {t('admin.advancedSettings.badgePilgrimageHajj')}
+                        </Badge>
+                      )}
+                      {route.pilgrimageScope === 'both' && (
+                        <Badge
+                          variant="outline"
+                          className="text-xs border-violet-500/40 text-violet-800 dark:text-violet-300"
+                          title={t('admin.advancedSettings.badgePilgrimageBothTitle')}
+                        >
+                          {t('admin.advancedSettings.pilgrimageScopeAll')}
+                        </Badge>
+                      )}
 
                       <Badge variant="outline" className="text-xs">
                         {step?.subConditions.length || 0} {step?.subConditions.length === 1 ? t('admin.advancedSettings.stepOne') : t('admin.advancedSettings.stepsMany')}
@@ -903,7 +1034,12 @@ export function AdvancedSettingsPage() {
 
                   {/* Route Details (Expanded) */}
                   {isExpanded && step && (
-                    <div className="border-t border-border p-4 bg-muted/30">
+                    <div
+                      className={cn(
+                        'border-t border-border p-4',
+                        routesViewScope === 'hajj' ? 'bg-amber-950/20' : 'bg-muted/30',
+                      )}
+                    >
                       <div className="flex items-center justify-between mb-3">
                         <p className="text-sm font-semibold text-foreground">
                           {t('admin.advancedSettings.stepsAndActions')}
@@ -1396,11 +1532,7 @@ export function AdvancedSettingsPage() {
         if (!open) {
           setShowAddRouteDialog(false);
           setEditingRoute(null);
-          setNewRouteName('');
-          setNewRouteParentSteps([]);
-          setNewRouteCategories([]);
-          setNewRouteEntityTypes([]);
-          setPendingCategoryInput('');
+          resetRouteDialogForm();
         }
       }}>
         <DialogContent
@@ -1427,6 +1559,98 @@ export function AdvancedSettingsPage() {
                 onChange={(e) => setNewRouteName(e.target.value)}
                 className="glass-card border-2 border-border text-right"
               />
+            </div>
+
+            <div className="space-y-3 glass-card bento p-4 border border-primary/20">
+              <Label className="text-sm font-semibold text-foreground">
+                {t('admin.advancedSettings.pilgrimageScopeLabel')}
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {t('admin.advancedSettings.pilgrimageScopeSwitchHint')}
+              </p>
+              <div
+                className={cn(
+                  'grid grid-cols-1 gap-3 sm:grid-cols-2',
+                  newRouteAppliesToBoth && 'opacity-50',
+                )}
+                role="radiogroup"
+                aria-label={t('admin.advancedSettings.pilgrimageScopeLabel')}
+              >
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={!newRouteAppliesToBoth && newRoutePilgrimageScope === 'umrah'}
+                  disabled={newRouteAppliesToBoth}
+                  onClick={() => setNewRoutePilgrimageScope('umrah')}
+                  className={cn(
+                    'flex flex-col items-stretch rounded-xl border-2 p-4 text-right transition-all',
+                    !newRouteAppliesToBoth && newRoutePilgrimageScope === 'umrah'
+                      ? 'border-emerald-500 bg-emerald-500/15 shadow-md ring-2 ring-emerald-500/30 dark:bg-emerald-950/40'
+                      : 'border-border bg-muted/20 hover:border-emerald-500/50',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'text-base font-black',
+                      !newRouteAppliesToBoth && newRoutePilgrimageScope === 'umrah'
+                        ? 'text-emerald-800 dark:text-emerald-200'
+                        : 'text-muted-foreground',
+                    )}
+                  >
+                    {t('admin.advancedSettings.pilgrimageScopeUmrah')}
+                  </span>
+                  <span className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    {t('admin.advancedSettings.pilgrimageScopeChipSubtitleUmrah')}
+                  </span>
+                  {!newRouteAppliesToBoth && newRoutePilgrimageScope === 'umrah' && (
+                    <span className="mt-2 inline-flex w-fit rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white">
+                      {t('admin.advancedSettings.pilgrimageScopeSelected')}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={!newRouteAppliesToBoth && newRoutePilgrimageScope === 'hajj'}
+                  disabled={newRouteAppliesToBoth}
+                  onClick={() => setNewRoutePilgrimageScope('hajj')}
+                  className={cn(
+                    'flex flex-col items-stretch rounded-xl border-2 p-4 text-right transition-all',
+                    !newRouteAppliesToBoth && newRoutePilgrimageScope === 'hajj'
+                      ? 'border-amber-500 bg-amber-500/15 shadow-md ring-2 ring-amber-500/30 dark:bg-amber-950/40'
+                      : 'border-border bg-muted/20 hover:border-amber-500/50',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'text-base font-black',
+                      !newRouteAppliesToBoth && newRoutePilgrimageScope === 'hajj'
+                        ? 'text-amber-900 dark:text-amber-200'
+                        : 'text-muted-foreground',
+                    )}
+                  >
+                    {t('admin.advancedSettings.pilgrimageScopeHajj')}
+                  </span>
+                  <span className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    {t('admin.advancedSettings.pilgrimageScopeChipSubtitleHajj')}
+                  </span>
+                  {!newRouteAppliesToBoth && newRoutePilgrimageScope === 'hajj' && (
+                    <span className="mt-2 inline-flex w-fit rounded-full bg-amber-600 px-2.5 py-1 text-[11px] font-bold text-white">
+                      {t('admin.advancedSettings.pilgrimageScopeSelected')}
+                    </span>
+                  )}
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="route-applies-to-both"
+                  checked={newRouteAppliesToBoth}
+                  onCheckedChange={setNewRouteAppliesToBoth}
+                />
+                <Label htmlFor="route-applies-to-both" className="text-xs cursor-pointer font-normal">
+                  {t('admin.advancedSettings.pilgrimageScopeAll')}
+                </Label>
+              </div>
             </div>
 
             {/* 🎯 Route Targeting - Categories & Entity Types */}
@@ -1632,11 +1856,7 @@ export function AdvancedSettingsPage() {
             <Button variant="outline" onClick={() => {
               setShowAddRouteDialog(false);
               setEditingRoute(null);
-              setNewRouteName('');
-              setNewRouteParentSteps([]);
-              setNewRouteCategories([]);
-              setNewRouteEntityTypes([]);
-              setPendingCategoryInput('');
+              resetRouteDialogForm();
             }}>
               {t('admin.advancedSettings.cancel')}
             </Button>
@@ -1744,7 +1964,7 @@ export function AdvancedSettingsPage() {
             toast.success(t('admin.advancedSettings.conditionUpdated'));
           }
         }}
-        routes={routes}
+        routes={filteredRoutes}
         steps={steps}
         selectedStepId={selectedStepForSubCondition}
         editingSubCondition={editingSubCondition}

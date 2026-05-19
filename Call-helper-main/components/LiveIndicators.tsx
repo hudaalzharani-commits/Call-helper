@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import {
   Calendar,
   TrendingUp,
@@ -7,6 +7,8 @@ import {
   CalendarIcon,
   Flame,
   BarChart3,
+  Trash2,
+  Search,
 } from "lucide-react";
 
 import {
@@ -70,6 +72,7 @@ import {
   PopoverTrigger,
 } from "./ui/popover";
 import { Button } from "./ui/button";
+import { Input } from "./ui/input";
 import { Calendar as CalendarComponent } from "./ui/calendar";
 import {
   Dialog,
@@ -79,67 +82,82 @@ import {
 } from "./ui/dialog";
 import {
   formatAppDate,
-  formatAppMonthDay,
+  formatAppDateWithWeekday,
+  type AppDateLocale,
+  formatAnalyticsChartDay,
   formatAppWeekdayFullDate,
   formatAppTime,
   formatChartHourLabel,
-  toAnalyticsDateKey,
-  toLocalCalendarDateKey,
+  computeAnalyticsPeriodRange,
+  fillDailyTimeSeriesForRange,
 } from "../utils/dateDisplay";
 import { useLanguage } from "../contexts/LanguageContext";
+import { useAuth } from "../contexts/AuthContext";
+import { tCategory, tEntity } from "../i18n/translations";
+import { canDeleteConfirmedBriefing } from "../utils/uiVisibility";
+import { deleteCallLog } from "../services/callLogsService";
+import { toast } from "sonner";
+import type { AdvancedFlowSummary } from "../utils/advancedFlowSummary";
+import {
+  buildConfirmedBriefingView,
+  formatConfirmedBriefingBody,
+} from "../utils/briefingDisplay";
+import { ConfirmedBriefingDisplay } from "./ConfirmedBriefingDisplay";
+import type { DateRange as DayPickerDateRange } from "react-day-picker";
+import { arSA, enUS } from "react-day-picker/locale";
 
 type IndicatorCardId = "dailyCases" | "confirmedReports" | "topProblems" | "publicIssues";
 
-/** نطاق التقويم المعروض في المؤشرات (يُستخدم للسلاسل الزمنية وقائمة الإفادات المؤكدة) */
-function computeIndicatorDateRange(
-  selectedPeriod: string,
-  appliedDateRange: { start: Date; end: Date } | null,
-): { start: Date; end: Date } {
-  const now = new Date();
-  const start = new Date(now);
-  const end = new Date(now);
-
-  switch (selectedPeriod) {
-    case "today":
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
-      return { start, end };
-    case "week": {
-      const dayOfWeek = now.getDay();
-      const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-      start.setDate(now.getDate() - diff);
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
-      return { start, end };
-    }
-    case "month":
-      start.setDate(1);
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
-      return { start, end };
-    case "year":
-      start.setMonth(0, 1);
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
-      return { start, end };
-    case "custom":
-      if (appliedDateRange) {
-        return {
-          start: new Date(appliedDateRange.start),
-          end: new Date(appliedDateRange.end),
-        };
-      }
-      break;
-    default:
-      break;
+/** Ø¹Ø¯Ø¯ Ø§Ù„Ø¥ÙØ§Ø¯Ø§Øª Ø§Ù„Ù…Ø¤ÙƒØ¯Ø© + Ø§Ù„Ù†Ø³Ø¨Ø© â€” Ù…Ø¹ ØªÙ‚Ø¯ÙŠØ± Ø§Ù„Ø¹Ø¯Ø¯ Ø¥Ù† Ù„Ù… ÙŠÙØ±Ø¬ÙØ¹Ù‡Ø§ Ø§Ù„Ø®Ø§Ø¯Ù… Ø§Ù„Ù‚Ø¯ÙŠÙ… */
+function resolveBriefingKpi(stats: SummaryStats | null) {
+  const rate = Number(stats?.briefingConfirmationRate ?? 0);
+  const withGenerated = Number(stats?.briefingsWithGeneratedCount ?? 0);
+  let count = stats?.confirmedBriefingCount;
+  if (typeof count !== "number" || !Number.isFinite(count)) {
+    count =
+      withGenerated > 0 && rate > 0
+        ? Math.round((withGenerated * rate) / 100)
+        : 0;
   }
-  start.setHours(0, 0, 0, 0);
-  end.setHours(23, 59, 59, 999);
-  return { start, end };
+  return { count, rate, withGenerated };
+}
+
+
+function confirmedBriefingMatchesQuery(
+  row: ConfirmedBriefingRow,
+  query: string,
+): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const flow = row.advancedFlowSummary;
+  const view = buildConfirmedBriefingView(row);
+  const haystack = [
+    row.customerName,
+    row.entityType,
+    row.category,
+    row.problemSummary,
+    row.solution,
+    formatConfirmedBriefingBody(row),
+    view.solution,
+    view.routes.map((s) => `${s.routeName ?? ""} ${s.stepName ?? ""} ${s.choiceName}`).join(" "),
+    flow?.pathLabel,
+    flow?.routeNames?.join(" "),
+    flow?.questionTitle,
+    flow?.selections?.map((s) => `${s.routeName} ${s.stepName} ${s.choiceName}`).join(" "),
+    row.createdAt ? formatAppDate(new Date(row.createdAt)) : "",
+  ]
+    .filter((part) => part != null && String(part).trim() !== "")
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(q);
 }
 
 export function LiveIndicators() {
-  const { t } = useLanguage();
+  const { t, dir, locale } = useLanguage();
+  const dateLocale = locale as AppDateLocale;
+  const dayPickerLocale = locale === "en" ? enUS : arSA;
+  const { user } = useAuth();
+  const mayDeleteBriefing = canDeleteConfirmedBriefing(user);
   const chartColors = useDashboardChartColors();
   const dailyAreaGradId = useId();
   const axisTick = useMemo(() => dashAxisTickFrom(chartColors), [chartColors]);
@@ -167,6 +185,10 @@ export function LiveIndicators() {
   const [confirmedBriefingsError, setConfirmedBriefingsError] = useState<
     string | null
   >(null);
+  const [briefingsSearchQuery, setBriefingsSearchQuery] = useState("");
+  const [deletingBriefingId, setDeletingBriefingId] = useState<string | null>(
+    null,
+  );
   const [date, setDate] = useState<Date | undefined>(
     new Date(),
   );
@@ -174,12 +196,9 @@ export function LiveIndicators() {
   const [minute, setMinute] = useState("00");
 
   // Date Range Filter States
-  const [startDate, setStartDate] = useState<Date | undefined>(
-    undefined,
-  );
-  const [endDate, setEndDate] = useState<Date | undefined>(
-    undefined,
-  );
+  const [customPickerRange, setCustomPickerRange] = useState<
+    DayPickerDateRange | undefined
+  >(undefined);
   const [isCustomRangeOpen, setIsCustomRangeOpen] =
     useState(false);
   const [dateRangeError, setDateRangeError] = useState("");
@@ -190,7 +209,7 @@ export function LiveIndicators() {
 
   // Get date range based on selected period
   const getDateRange = () =>
-    computeIndicatorDateRange(selectedPeriod, appliedDateRange);
+    computeAnalyticsPeriodRange(selectedPeriod, appliedDateRange);
 
   // Fetch analytics when period / custom range changes
   useEffect(() => {
@@ -200,19 +219,19 @@ export function LiveIndicators() {
       setIsLoadingAnalytics(true);
       setAnalyticsError(null);
       try {
-        const { start, end } = computeIndicatorDateRange(
+        const periodRange = computeAnalyticsPeriodRange(
           selectedPeriod,
           appliedDateRange,
         );
         const rangeKeys = {
-          from: toAnalyticsDateKey(start),
-          to: toAnalyticsDateKey(end),
+          from: periodRange.fromYmd,
+          to: periodRange.toYmd,
         };
         const [summary, series, hourly, distribution] = await Promise.all([
-          getSummaryStats(),
+          getSummaryStats(rangeKeys),
           getTimeSeriesData(rangeKeys),
           getHourlyActivity(rangeKeys),
-          getDistributionStats(),
+          getDistributionStats(rangeKeys),
         ]);
 
         if (cancelled) return;
@@ -234,17 +253,89 @@ export function LiveIndicators() {
     };
   }, [selectedPeriod, appliedDateRange]);
 
-  // Format date for display (ميلادي فقط)
+  const loadConfirmedBriefings = useCallback(async () => {
+    setConfirmedBriefingsLoading(true);
+    setConfirmedBriefingsError(null);
+    try {
+      const periodRange = computeAnalyticsPeriodRange(
+        selectedPeriod,
+        appliedDateRange,
+      );
+      const res = await getConfirmedBriefings({
+        from: periodRange.fromYmd,
+        to: periodRange.toYmd,
+        limit: 100,
+      });
+      setConfirmedBriefingsItems(res.items ?? []);
+    } catch (err) {
+      setConfirmedBriefingsItems([]);
+      setConfirmedBriefingsError(
+        err instanceof Error
+          ? err.message
+          : t("liveIndicators.briefingsLoadFailed"),
+      );
+    } finally {
+      setConfirmedBriefingsLoading(false);
+    }
+  }, [selectedPeriod, appliedDateRange, t]);
+
+  const handleDeleteBriefing = useCallback(
+    async (row: ConfirmedBriefingRow) => {
+      if (!mayDeleteBriefing || !row.id) return;
+      if (!window.confirm(t("liveIndicators.briefingDeleteConfirm"))) return;
+      setDeletingBriefingId(row.id);
+      try {
+        await deleteCallLog(row.id);
+        toast.success(t("liveIndicators.briefingDeleteSuccess"));
+        setConfirmedBriefingsItems((prev) =>
+          prev.filter((item) => item.id !== row.id),
+        );
+        const periodRange = computeAnalyticsPeriodRange(
+          selectedPeriod,
+          appliedDateRange,
+        );
+        const summary = await getSummaryStats({
+          from: periodRange.fromYmd,
+          to: periodRange.toYmd,
+        });
+        setSummaryStats(summary);
+      } catch (err) {
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : t("liveIndicators.briefingDeleteFailed"),
+        );
+      } finally {
+        setDeletingBriefingId(null);
+      }
+    },
+    [mayDeleteBriefing, selectedPeriod, appliedDateRange, t],
+  );
+
+  useEffect(() => {
+    if (selectedCategory !== "confirmedReports") return;
+    void loadConfirmedBriefings();
+  }, [selectedCategory, loadConfirmedBriefings]);
+
+  useEffect(() => {
+    const onCallLogSaved = () => {
+      void loadConfirmedBriefings();
+    };
+    window.addEventListener("rafeeq:call-log-saved", onCallLogSaved);
+    return () => window.removeEventListener("rafeeq:call-log-saved", onCallLogSaved);
+  }, [loadConfirmedBriefings]);
+
+  // Format date for display (Ù…ÙŠÙ„Ø§Ø¯ÙŠ ÙÙ‚Ø·)
   const formatDateForDisplay = () => {
     const { start, end } = getDateRange();
 
     if (selectedPeriod === "today") {
-      const gregorianDate = formatAppDate(start);
+      const gregorianDate = formatAppDate(start, dateLocale);
       return t("liveIndicators.todayPrefix", { date: gregorianDate });
     }
 
-    const startGregorian = formatAppDate(start);
-    const endGregorian = formatAppDate(end);
+    const startGregorian = formatAppDate(start, dateLocale);
+    const endGregorian = formatAppDate(end, dateLocale);
 
     return t("liveIndicators.rangeTo", { start: startGregorian, end: endGregorian });
   };
@@ -253,26 +344,27 @@ export function LiveIndicators() {
   const handleApplyCustomRange = () => {
     setDateRangeError("");
 
-    if (!startDate || !endDate) {
+    const from = customPickerRange?.from;
+    const to = customPickerRange?.to;
+
+    if (!from || !to) {
       setDateRangeError(t("liveIndicators.pickBothDates"));
       return;
     }
 
-    if (startDate > endDate) {
+    if (from > to) {
       setDateRangeError(t("liveIndicators.startBeforeEnd"));
       return;
     }
 
-    // Apply the custom range
-    const start = new Date(startDate);
+    const start = new Date(from);
     start.setHours(0, 0, 0, 0);
-    const end = new Date(endDate);
+    const end = new Date(to);
     end.setHours(23, 59, 59, 999);
 
     setAppliedDateRange({ start, end });
     setSelectedPeriod("custom");
     setIsCustomRangeOpen(false);
-
   };
 
   // Handle preset period selection
@@ -283,19 +375,21 @@ export function LiveIndicators() {
     }
   };
 
-  /** دمج تصنيفات متشابهة (نفس النص باختلاف حالة/مسافات) لعرض المشاكل العامة دون تكرار */
+  /** Ù†ÙØ³ Ù…Ù†Ø·Ù‚ ØµÙØ­Ø© Â«Ø§Ù„Ù…Ø´Ø§ÙƒÙ„ Ø§Ù„Ø¹Ø§Ù…Ø©Â»: topCategories Ù…Ù† Ø§Ù„ØªÙˆØ²ÙŠØ¹ØŒ Ù…Ø¹ Ø¯Ù…Ø¬ Ø£Ø³Ù…Ø§Ø¡ Ù…ØªØ´Ø§Ø¨Ù‡Ø© Ù„Ù„Ø¹Ø±Ø¶ */
   const uniqueCommonIssuesChartData = useMemo(() => {
     const byKey = new Map<string, { name: string; value: number }>();
     for (const c of distributionStats?.topCategories ?? []) {
-      const raw = (c.category || "غير محدد").trim();
+      const raw = (c.category || "ØºÙŠØ± Ù…Ø­Ø¯Ø¯").trim();
       const key = raw.toLowerCase();
       const count = Number(c.count);
       const prev = byKey.get(key);
-      if (!prev) byKey.set(key, { name: raw || "غير محدد", value: count });
+      if (!prev) byKey.set(key, { name: raw || "ØºÙŠØ± Ù…Ø­Ø¯Ø¯", value: count });
       else prev.value += count;
     }
-    return [...byKey.values()].sort((a, b) => b.value - a.value);
-  }, [distributionStats]);
+    return [...byKey.values()]
+      .map((row) => ({ name: tCategory(t, row.name), value: row.value }))
+      .sort((a, b) => b.value - a.value);
+  }, [distributionStats, t]);
 
   const periodCasesTotal = useMemo(
     () => timeSeries.reduce((sum, p) => sum + (Number(p.count) || 0), 0),
@@ -303,6 +397,11 @@ export function LiveIndicators() {
   );
 
   const isTodayPeriod = selectedPeriod === "today";
+
+  const periodRange = useMemo(
+    () => computeAnalyticsPeriodRange(selectedPeriod, appliedDateRange),
+    [selectedPeriod, appliedDateRange],
+  );
 
   const dailyCasesChartTitle = useMemo(() => {
     switch (selectedPeriod) {
@@ -327,13 +426,13 @@ export function LiveIndicators() {
         ? (summaryStats?.callsToday ?? periodCasesTotal)
         : periodCasesTotal;
     const topIssueCount = distributionStats?.topCategories?.[0]?.count ?? 0;
-    const uniqueGeneralTypes =
-      distributionStats?.uniqueCategoryCount ?? uniqueCommonIssuesChartData.length;
+    /** ÙŠØ·Ø§Ø¨Ù‚ Ø¹Ø¯Ø¯ Ø§Ù„Ø£Ø¹Ù…Ø¯Ø©/Ø§Ù„ÙØ¦Ø§Øª Ø§Ù„Ù…Ø¹Ø±ÙˆØ¶Ø© ÙÙŠ Ù…Ø®Ø·Ø· Â«Ø§Ù„Ù…Ø´Ø§ÙƒÙ„ Ø§Ù„Ø¹Ø§Ù…Ø©Â» (Ø¨Ø¹Ø¯ Ø§Ù„Ø¯Ù…Ø¬)ØŒ ÙˆÙ„ÙŠØ³ ÙƒÙ„ Ø§Ù„ØªØµÙ†ÙŠÙØ§Øª ÙÙŠ Ø§Ù„ÙØªØ±Ø© */
+    const uniqueGeneralTypes = uniqueCommonIssuesChartData.length;
 
     const callsTrend = summaryStats?.trends?.calls;
     const callsChange = typeof callsTrend === "number" ? `${callsTrend >= 0 ? "+" : ""}${callsTrend}%` : "";
 
-    const briefingRate = summaryStats?.briefingConfirmationRate ?? summaryStats?.resolutionRate ?? 0;
+    const briefingKpi = resolveBriefingKpi(summaryStats);
     return [
       {
         id: "dailyCases" as const,
@@ -347,8 +446,22 @@ export function LiveIndicators() {
       {
         id: "confirmedReports" as const,
         title: t("liveIndicators.confirmedReports"),
-        value: `${briefingRate}%`,
-        change: "",
+        value:
+          briefingKpi.count > 0
+            ? String(briefingKpi.count)
+            : briefingKpi.rate > 0
+              ? `${briefingKpi.rate}%`
+              : "0",
+        change:
+          briefingKpi.count > 0 && briefingKpi.rate > 0
+            ? t("liveIndicators.confirmedBriefingRateDelta", {
+                rate: briefingKpi.rate,
+              })
+            : briefingKpi.count === 0 && briefingKpi.withGenerated > 0
+              ? t("liveIndicators.briefingsWithGeneratedInPeriod", {
+                  count: briefingKpi.withGenerated,
+                })
+              : "",
         trend: "neutral",
         color: "from-slate-300 to-slate-200",
         activeColor: "from-primary to-primary",
@@ -372,24 +485,41 @@ export function LiveIndicators() {
         activeColor: "from-primary to-primary",
       },
     ];
-  }, [summaryStats, distributionStats, selectedPeriod, periodCasesTotal, t]);
+  }, [
+    summaryStats,
+    distributionStats,
+    selectedPeriod,
+    periodCasesTotal,
+    uniqueCommonIssuesChartData.length,
+    t,
+  ]);
 
   const dailyCasesChartData = useMemo(() => {
     if (selectedPeriod === "today") {
       return hourlyActivity.map((h) => ({
+        date: String(h.hour),
         name: formatChartHourLabel(h.hour, h.name),
         value: Number(h.value) || 0,
       }));
     }
-    return timeSeries.map((p) => ({
-      name: formatAppMonthDay(new Date(`${p.date}T12:00:00`)),
-      value: Number(p.count) || 0,
+    const filled = fillDailyTimeSeriesForRange(
+      timeSeries,
+      periodRange.fromYmd,
+      periodRange.toYmd,
+    );
+    return filled.map((p) => ({
+      date: p.date,
+      name: formatAnalyticsChartDay(p.date),
+      value: p.count,
     }));
-  }, [selectedPeriod, timeSeries, hourlyActivity]);
+  }, [selectedPeriod, timeSeries, hourlyActivity, periodRange]);
+
+  const hourlyChartTitle = isTodayPeriod
+    ? t("liveIndicators.hourlyActivity")
+    : t("liveIndicators.hourlyActivityPeriod");
 
   const confirmedReportsData = useMemo(() => {
-    const briefingRate =
-      summaryStats?.briefingConfirmationRate ?? summaryStats?.resolutionRate ?? 0;
+    const { rate: briefingRate } = resolveBriefingKpi(summaryStats);
     const confirmed = Math.max(0, Math.min(100, Number(briefingRate)));
     const notConfirmed = Math.max(0, 100 - confirmed);
 
@@ -407,11 +537,11 @@ export function LiveIndicators() {
   const platformsData = useMemo(() => {
     const entities = distributionStats?.issuesByEntity ?? [];
     return entities.map((e, idx) => ({
-      name: e.entityType,
+      name: tEntity(t, e.entityType),
       value: Number(e.count),
       color: palette[idx % palette.length],
     }));
-  }, [distributionStats, palette]);
+  }, [distributionStats, palette, t]);
 
   const hourlyActivityData = useMemo(() => {
     return hourlyActivity.map((h) => ({
@@ -421,13 +551,25 @@ export function LiveIndicators() {
     }));
   }, [hourlyActivity]);
 
+  const filteredConfirmedBriefings = useMemo(() => {
+    if (!briefingsSearchQuery.trim()) return confirmedBriefingsItems;
+    return confirmedBriefingsItems.filter((row) =>
+      confirmedBriefingMatchesQuery(row, briefingsSearchQuery),
+    );
+  }, [confirmedBriefingsItems, briefingsSearchQuery]);
+
   return (
     <div className="dashboard-cosmos space-y-6">
       <Dialog
         open={confirmedBriefingsOpen}
         onOpenChange={(open) => {
           setConfirmedBriefingsOpen(open);
-          if (!open) setConfirmedBriefingsError(null);
+          if (open) {
+            void loadConfirmedBriefings();
+          } else {
+            setConfirmedBriefingsError(null);
+            setBriefingsSearchQuery("");
+          }
         }}
       >
         <DialogContent
@@ -439,6 +581,22 @@ export function LiveIndicators() {
               {t("liveIndicators.briefingsDialogTitle")}
             </DialogTitle>
           </DialogHeader>
+          <div className="shrink-0 border-b border-border bg-white px-6 py-3 dark:bg-zinc-950">
+            <div className="relative" dir={dir}>
+              <Search
+                className="pointer-events-none absolute top-1/2 size-4 -translate-y-1/2 text-muted-foreground start-3"
+                aria-hidden
+              />
+              <Input
+                type="search"
+                value={briefingsSearchQuery}
+                onChange={(e) => setBriefingsSearchQuery(e.target.value)}
+                placeholder={t("liveIndicators.briefingsSearchPlaceholder")}
+                className="h-10 ps-9 text-sm"
+                aria-label={t("liveIndicators.briefingsSearchPlaceholder")}
+              />
+            </div>
+          </div>
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-white px-6 py-4 dark:bg-zinc-950">
             {confirmedBriefingsLoading && (
               <p className="text-sm text-muted-foreground text-center py-10">
@@ -458,57 +616,53 @@ export function LiveIndicators() {
                 </p>
               )}
             {!confirmedBriefingsLoading &&
-              confirmedBriefingsItems.map((row) => (
-                <div
+              !confirmedBriefingsError &&
+              confirmedBriefingsItems.length > 0 &&
+              filteredConfirmedBriefings.length === 0 && (
+                <p className="text-sm text-muted-foreground text-right py-4">
+                  {t("liveIndicators.briefingsSearchEmpty")}
+                </p>
+              )}
+            {!confirmedBriefingsLoading &&
+              filteredConfirmedBriefings.map((row) => (
+                <article
                   key={row.id}
-                  className="space-y-3 rounded-xl border border-border bg-zinc-50 p-4 text-right dark:bg-zinc-900"
+                  className="overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-b from-zinc-50/90 to-white shadow-sm ring-1 ring-black/[0.03] dark:from-zinc-900 dark:to-zinc-950 dark:ring-white/[0.04]"
                 >
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground justify-end">
-                    {row.createdAt && (
-                      <span>{formatAppDate(new Date(row.createdAt))}</span>
-                    )}
-                    {row.customerName ? (
-                      <span>
-                        {t("liveIndicators.customer")}{" "}
-                        <span className="text-foreground font-medium">
-                          {row.customerName}
-                        </span>
-                      </span>
-                    ) : null}
-                    {row.entityType ? (
-                      <span>
-                        {t("liveIndicators.entity")}{" "}
-                        <span className="text-foreground font-medium">
-                          {row.entityType}
-                        </span>
+                  <header className="flex flex-wrap items-center justify-end gap-2 border-b border-border/60 bg-muted/40 px-4 py-2.5">
+                    {row.createdAt ? (
+                      <span className="inline-flex items-center rounded-full bg-background/80 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground border border-border/60">
+                        {formatAppDate(new Date(row.createdAt))}
                       </span>
                     ) : null}
                     {row.category ? (
-                      <span>
-                        {t("liveIndicators.category")}{" "}
-                        <span className="text-foreground font-medium">
-                          {row.category}
-                        </span>
+                      <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary border border-primary/20">
+                        {row.category}
                       </span>
                     ) : null}
+                  </header>
+                  <div className="max-h-[min(52vh,420px)] overflow-y-auto px-4 py-3.5">
+                    <ConfirmedBriefingDisplay row={row} />
                   </div>
-                  <div>
-                    <p className="text-xs font-bold text-muted-foreground mb-1">
-                      {t("liveIndicators.problem")}
-                    </p>
-                    <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-                      {row.problemSummary?.trim() ? row.problemSummary : "—"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-muted-foreground mb-1">
-                      {t("liveIndicators.solution")}
-                    </p>
-                    <pre className="m-0 max-h-[220px] overflow-y-auto rounded-lg border border-border bg-zinc-100 p-3 font-sans text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words dark:bg-zinc-950">
-                      {row.solution?.trim() ? row.solution : "—"}
-                    </pre>
-                  </div>
-                </div>
+                  {mayDeleteBriefing ? (
+                    <div className="flex justify-start border-t border-border/60 bg-muted/20 px-4 py-2">
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="gap-1.5 h-8"
+                        disabled={deletingBriefingId === row.id}
+                        title={t("liveIndicators.briefingDeleteTitle")}
+                        onClick={() => void handleDeleteBriefing(row)}
+                      >
+                        <Trash2 className="size-3.5 shrink-0" />
+                        {deletingBriefingId === row.id
+                          ? t("liveIndicators.briefingsLoading")
+                          : t("liveIndicators.briefingDelete")}
+                      </Button>
+                    </div>
+                  ) : null}
+                </article>
               ))}
           </div>
         </DialogContent>
@@ -565,7 +719,19 @@ export function LiveIndicators() {
           {/* Custom Date Range Picker */}
           <Popover
             open={isCustomRangeOpen}
-            onOpenChange={setIsCustomRangeOpen}
+            onOpenChange={(open) => {
+              setIsCustomRangeOpen(open);
+              if (open) {
+                if (appliedDateRange) {
+                  setCustomPickerRange({
+                    from: new Date(appliedDateRange.start),
+                    to: new Date(appliedDateRange.end),
+                  });
+                }
+              } else {
+                setDateRangeError("");
+              }
+            }}
           >
             <PopoverTrigger asChild>
               <Button
@@ -587,89 +753,109 @@ export function LiveIndicators() {
             <PopoverContent
               className="w-auto p-0"
               align="end"
-              dir="rtl"
+              dir={dir}
             >
-              <div className="p-6 space-y-6 bg-white dark:bg-gray-800">
-                {/* Header */}
-                <div className="text-center pb-4 border-b border-gray-200 dark:border-gray-700">
-                  <h3 className="font-bold text-gray-900 dark:text-white mb-1">
-                    {t("liveIndicators.customRangeTitle")}
-                  </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {t("liveIndicators.customRangeHint")}
-                  </p>
-                </div>
-
-                {/* Date Pickers */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Start Date */}
-                  <div className="space-y-3">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 text-right">
-                      {t("liveIndicators.startDate")}
-                    </label>
-                    <CalendarComponent
-                      mode="single"
-                      selected={startDate}
-                      onSelect={setStartDate}
-                      dir="rtl"
-                      className="rounded-lg border border-gray-200 dark:border-gray-700"
-                    />
-                  </div>
-
-                  {/* End Date */}
-                  <div className="space-y-3">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 text-right">
-                      {t("liveIndicators.endDate")}
-                    </label>
-                    <CalendarComponent
-                      mode="single"
-                      selected={endDate}
-                      onSelect={setEndDate}
-                      dir="rtl"
-                      className="rounded-lg border border-gray-200 dark:border-gray-700"
-                    />
-                  </div>
+              <div className="p-3 space-y-3 bg-white dark:bg-gray-800">
+                <div className="mx-auto w-fit rounded-lg border border-border bg-card px-2 py-2 shadow-sm">
+                  <CalendarComponent
+                    mode="range"
+                    numberOfMonths={1}
+                    selected={customPickerRange}
+                    onSelect={setCustomPickerRange}
+                    dir={dir}
+                    locale={dayPickerLocale}
+                    defaultMonth={customPickerRange?.from ?? new Date()}
+                    className="p-0 bg-transparent"
+                    classNames={{
+                      month: "gap-2",
+                      caption: "mb-0.5",
+                      caption_label: "text-xs font-semibold",
+                      nav_button:
+                        "size-6 p-0 opacity-70 hover:opacity-100 border bg-background",
+                      table: "mx-auto",
+                      head_row: "flex w-full justify-center",
+                      head_cell:
+                        "w-8 text-[0.65rem] font-semibold text-muted-foreground flex items-center justify-center text-center",
+                      row: "flex w-full mt-0.5 justify-center",
+                      cell: "p-0",
+                      day: "size-8 rounded-md border border-transparent text-xs font-medium hover:border-primary/30 hover:bg-primary/5",
+                      day_range_start:
+                        "!rounded-md !border-primary !bg-primary !text-primary-foreground !text-xs shadow-sm",
+                      day_range_end:
+                        "!rounded-md !border-primary !bg-primary !text-primary-foreground !text-xs shadow-sm",
+                      day_range_middle: "!rounded-none !bg-primary/15 !text-xs",
+                      day_today: "border-primary/35 bg-primary/10 text-xs",
+                    }}
+                  />
                 </div>
 
                 {/* Error Message */}
                 {dateRangeError && (
-                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-right">
-                    <p className="text-sm text-red-600 dark:text-red-400">
+                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-2 text-right">
+                    <p className="text-xs text-red-600 dark:text-red-400">
                       {dateRangeError}
                     </p>
                   </div>
                 )}
 
                 {/* Selected Range Preview */}
-                {startDate && endDate && !dateRangeError && (
-                  <div className="bg-primary-soft border border-primary/20 rounded-lg p-3 text-right space-y-1">
-                    <p className="text-xs text-primary mb-1">
-                      {t("liveIndicators.selectedRange")}
-                    </p>
-                    <p className="text-sm font-medium text-foreground">
-                      {formatAppDate(startDate)}
-                      <br />
-                      إلى {formatAppDate(endDate)}
-                    </p>
+                {customPickerRange?.from &&
+                  customPickerRange?.to &&
+                  !dateRangeError && (
+                  <div className="rounded-lg border border-primary/25 bg-primary/5 p-2 space-y-2">
+                    <div className="grid grid-cols-[1fr_auto_1fr] gap-1.5 items-center" dir={dir}>
+                      <div className="rounded-md border border-primary bg-background px-2 py-1.5 text-center">
+                        <p className="text-[9px] font-medium text-muted-foreground mb-0.5">
+                          {t("liveIndicators.startDate")}
+                        </p>
+                        <p className="text-[11px] font-semibold text-foreground leading-tight">
+                          {formatAppDateWithWeekday(
+                            customPickerRange.from,
+                            dateLocale,
+                          )}
+                        </p>
+                      </div>
+                      <span
+                        className="flex items-center justify-center text-primary text-sm font-bold"
+                        aria-hidden
+                      >
+                        â†’
+                      </span>
+                      <div className="rounded-md border border-primary bg-background px-2 py-1.5 text-center">
+                        <p className="text-[9px] font-medium text-muted-foreground mb-0.5">
+                          {t("liveIndicators.endDate")}
+                        </p>
+                        <p className="text-[11px] font-semibold text-foreground leading-tight">
+                          {formatAppDateWithWeekday(
+                            customPickerRange.to,
+                            dateLocale,
+                          )}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-2 pt-2 border-t border-border/60">
                   <Button
+                    size="sm"
                     onClick={() => {
                       setIsCustomRangeOpen(false);
                       setDateRangeError("");
                     }}
                     variant="outline"
-                    className="flex-1 glass-card border-2 border-border hover:border-primary/40 transition-all"
+                    className="flex-1 h-8 text-xs"
                   >
                     {t("actions.cancel")}
                   </Button>
                   <Button
+                    size="sm"
                     onClick={handleApplyCustomRange}
-                    disabled={!startDate || !endDate}
-                    className="flex-1 bg-primary text-primary-foreground hover:opacity-95 text-white border-0 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed shadow-lg disabled:shadow-none transition-all"
+                    disabled={
+                      !customPickerRange?.from || !customPickerRange?.to
+                    }
+                    className="flex-1 h-8 text-xs bg-primary text-primary-foreground hover:opacity-95 disabled:opacity-50"
                   >
                     {t("liveIndicators.applyFilter")}
                   </Button>
@@ -711,7 +897,7 @@ export function LiveIndicators() {
         ))}
       </div>
 
-      {/* Charts for "سجل الحالات اليومية" */}
+      {/* Charts for "Ø³Ø¬Ù„ Ø§Ù„Ø­Ø§Ù„Ø§Øª Ø§Ù„ÙŠÙˆÙ…ÙŠØ©" */}
       {selectedCategory === "dailyCases" && (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -743,11 +929,22 @@ export function LiveIndicators() {
                       vertical={false}
                     />
                     <XAxis
-                      dataKey="name"
+                      dataKey="date"
                       tick={axisTick}
                       tickLine={axisLine}
-                      interval={isTodayPeriod ? 2 : "preserveStartEnd"}
-                      minTickGap={12}
+                      interval={
+                        isTodayPeriod
+                          ? 2
+                          : selectedPeriod === "week"
+                            ? 0
+                            : "preserveStartEnd"
+                      }
+                      minTickGap={isTodayPeriod ? 12 : 8}
+                      tickFormatter={(key) =>
+                        isTodayPeriod
+                          ? formatChartHourLabel(Number(key))
+                          : formatAnalyticsChartDay(String(key))
+                      }
                     />
                     <YAxis width={DASH_Y_AXIS_WIDTH} {...DASH_Y_AXIS_SPACER} />
                     <YAxis tick={axisTick} tickLine={axisLine} {...DASH_Y_AXIS_RTL} />
@@ -772,7 +969,7 @@ export function LiveIndicators() {
             <Card className="dash-chart-card gap-0 p-0 min-w-0">
               <CardHeader className="dash-chart-card__header border-0 rounded-none shadow-none">
                 <CardTitle className="dash-chart-card__title">
-                  {t("liveIndicators.hourlyActivity")}
+                  {hourlyChartTitle}
                 </CardTitle>
               </CardHeader>
               <CardContent className="dash-chart-canvas !p-0 !px-0">
@@ -832,7 +1029,7 @@ export function LiveIndicators() {
                   (best, p) => (!best || p.count > best.count ? { date: p.date, count: p.count } : best),
                   null,
                 );
-                const maxLabel = max ? formatAppMonthDay(new Date(max.date)) : "—";
+                const maxLabel = max ? formatAnalyticsChartDay(max.date) : "â€”";
 
                 return (
                   <>
@@ -856,7 +1053,7 @@ export function LiveIndicators() {
         </>
       )}
 
-      {/* Charts for "الإفادات المؤكدة" */}
+      {/* Charts for "Ø§Ù„Ø¥ÙØ§Ø¯Ø§Øª Ø§Ù„Ù…Ø¤ÙƒØ¯Ø©" */}
       {selectedCategory === "confirmedReports" && (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -882,28 +1079,7 @@ export function LiveIndicators() {
                       onClick={(entry) => {
                         if (!entry || entry.name !== confirmedReportsData[0]?.name) return;
                         setConfirmedBriefingsOpen(true);
-                        setConfirmedBriefingsItems([]);
-                        setConfirmedBriefingsError(null);
-                        setConfirmedBriefingsLoading(true);
-                        const { start, end } = getDateRange();
-                        getConfirmedBriefings({
-                          from: toLocalCalendarDateKey(start),
-                          to: toLocalCalendarDateKey(end),
-                          limit: 100,
-                        })
-                          .then((res) =>
-                            setConfirmedBriefingsItems(res.items ?? []),
-                          )
-                          .catch((err) =>
-                            setConfirmedBriefingsError(
-                              err instanceof Error
-                                ? err.message
-                                : t("liveIndicators.briefingsLoadFailed"),
-                            ),
-                          )
-                          .finally(() =>
-                            setConfirmedBriefingsLoading(false),
-                          );
+                        void loadConfirmedBriefings();
                       }}
                     >
                       {confirmedReportsData.map((entry, index) => (
@@ -942,41 +1118,85 @@ export function LiveIndicators() {
                   {t("liveIndicators.briefingDetails")}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4 pt-6">
-                {(() => {
-                  const total = summaryStats?.totalCalls ?? 0;
-                  const resolved = summaryStats?.resolvedCalls ?? 0;
-                  const rate = summaryStats?.resolutionRate ?? 0;
-                  const notResolved = Math.max(0, total - resolved);
-
-                  return (
-                    <>
-                      <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
-                        <span className="text-sm text-foreground font-medium">{t("liveIndicators.totalReports")}</span>
-                        <span className="dash-inline-stat">{total}</span>
-                      </div>
-                      <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
-                        <span className="text-sm text-foreground font-medium">{t("liveIndicators.resolved")}</span>
-                        <span className="text-lg text-emerald-600 dark:text-emerald-400 font-bold">{resolved} ({rate}%)</span>
-                      </div>
-                      <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
-                        <span className="text-sm text-foreground font-medium">{t("liveIndicators.unresolved")}</span>
-                        <span className="text-lg text-red-600 dark:text-red-400 font-bold">{notResolved} ({Math.max(0, 100 - Number(rate))}%)</span>
-                      </div>
-                      <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
-                        <span className="text-sm text-foreground font-medium">{t("liveIndicators.resolutionRate")}</span>
-                        <span className="dash-inline-stat">{rate}%</span>
-                      </div>
-                    </>
-                  );
-                })()}
+              <CardContent className="space-y-4 pt-6 max-h-[420px] overflow-y-auto">
+                <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
+                  <span className="text-sm text-foreground font-medium">{t("liveIndicators.confirmed")}</span>
+                  <span className="dash-inline-stat text-emerald-600 dark:text-emerald-400">
+                    {resolveBriefingKpi(summaryStats).count}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
+                  <span className="text-sm text-foreground font-medium">{t("liveIndicators.confirmedRatio")}</span>
+                  <span className="dash-inline-stat">
+                    {summaryStats?.briefingConfirmationRate ?? 0}%
+                  </span>
+                </div>
+                {confirmedBriefingsLoading && (
+                  <p className="text-sm text-muted-foreground text-center py-6">
+                    {t("liveIndicators.briefingsLoading")}
+                  </p>
+                )}
+                {confirmedBriefingsError && (
+                  <p className="text-sm text-destructive text-right">
+                    {confirmedBriefingsError}
+                  </p>
+                )}
+                {!confirmedBriefingsLoading &&
+                  !confirmedBriefingsError &&
+                  confirmedBriefingsItems.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-right py-2">
+                      {t("liveIndicators.briefingsEmpty")}
+                    </p>
+                  )}
+                {!confirmedBriefingsLoading &&
+                  confirmedBriefingsItems.slice(0, 8).map((row) => {
+                    const preview = buildConfirmedBriefingView(row);
+                    return (
+                      <button
+                        key={row.id}
+                        type="button"
+                        onClick={() => setConfirmedBriefingsOpen(true)}
+                        className="w-full space-y-1.5 rounded-xl border border-border bg-zinc-50 p-3 text-right transition-colors hover:border-primary/30 hover:bg-primary/[0.04] dark:bg-zinc-900 dark:hover:bg-primary/10"
+                      >
+                        <p className="text-xs font-semibold text-foreground line-clamp-2">
+                          {preview.problemSummary || row.problemSummary || "—"}
+                        </p>
+                        {preview.routes.length > 0 ? (
+                          <p className="text-[10px] font-medium text-primary line-clamp-1">
+                            {preview.routes[0].routeName
+                              ? `${preview.routes[0].routeName} → ${preview.routes[0].choiceName}`
+                              : preview.routes[0].choiceName}
+                            {preview.routes.length > 1
+                              ? ` (+${preview.routes.length - 1})`
+                              : ""}
+                          </p>
+                        ) : null}
+                        {preview.solution ? (
+                          <p className="text-[11px] text-muted-foreground line-clamp-2">
+                            {preview.solution}
+                          </p>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                {!confirmedBriefingsLoading &&
+                  confirmedBriefingsItems.length > 8 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setConfirmedBriefingsOpen(true)}
+                    >
+                      {t("liveIndicators.briefingsDialogTitle")}
+                    </Button>
+                  )}
               </CardContent>
             </Card>
           </div>
         </>
       )}
 
-      {/* Charts for "أكثر المشاكل تكرارًا" */}
+      {/* Charts for "Ø£ÙƒØ«Ø± Ø§Ù„Ù…Ø´Ø§ÙƒÙ„ ØªÙƒØ±Ø§Ø±Ù‹Ø§" */}
       {selectedCategory === "topProblems" && (
         <>
           <div className="grid grid-cols-1 gap-6">
@@ -1086,7 +1306,7 @@ export function LiveIndicators() {
                     </div>
                     <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
                       <span className="text-sm text-foreground font-medium">{t("liveIndicators.topRepeated")}</span>
-                      <span className="dash-inline-stat">{top ? `${top.category} (${top.count})` : '—'}</span>
+                      <span className="dash-inline-stat">{top ? `${top.category} (${top.count})` : 'â€”'}</span>
                     </div>
                     <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
                       <span className="text-sm text-foreground font-medium">{t("liveIndicators.totalRepeats")}</span>
@@ -1100,7 +1320,7 @@ export function LiveIndicators() {
         </>
       )}
 
-      {/* Charts for "المشاكل العامة" */}
+      {/* Charts for "Ø§Ù„Ù…Ø´Ø§ÙƒÙ„ Ø§Ù„Ø¹Ø§Ù…Ø©" */}
       {selectedCategory === "publicIssues" && (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 dash-charts-grid--general">
@@ -1112,45 +1332,51 @@ export function LiveIndicators() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="dash-chart-canvas !p-0 !px-0">
-                <DashboardChartFrame>
-                  <PieChart>
-                    <Pie
-                      data={platformsData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={65}
-                      outerRadius={100}
-                      paddingAngle={4}
-                      dataKey="value"
-                      label={false}
-                    >
-                      {platformsData.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={entry.color}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      contentStyle={{
-                        backgroundColor: 'var(--card)',
-                        border: '2px solid var(--border)',
-                        borderRadius: '0.75rem',
-                        color: 'var(--foreground)'
-                      }}
-                    />
-                    <Legend
-                      verticalAlign="bottom"
-                      height={60}
-                      wrapperStyle={{ paddingTop: "25px" }}
-                      formatter={(value, entry: any) => (
-                        <span className="text-foreground text-sm">
-                          {value} ({entry.payload.value})
-                        </span>
-                      )}
-                    />
-                  </PieChart>
-                </DashboardChartFrame>
+                {platformsData.length === 0 ? (
+                  <div className="flex h-[340px] items-center justify-center px-6 text-right text-sm text-muted-foreground">
+                    {t("liveIndicators.noPeriodData")}
+                  </div>
+                ) : (
+                  <DashboardChartFrame>
+                    <PieChart>
+                      <Pie
+                        data={platformsData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={65}
+                        outerRadius={100}
+                        paddingAngle={4}
+                        dataKey="value"
+                        label={false}
+                      >
+                        {platformsData.map((entry, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={entry.color}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "var(--card)",
+                          border: "2px solid var(--border)",
+                          borderRadius: "0.75rem",
+                          color: "var(--foreground)",
+                        }}
+                      />
+                      <Legend
+                        verticalAlign="bottom"
+                        height={60}
+                        wrapperStyle={{ paddingTop: "25px" }}
+                        formatter={(value, entry: any) => (
+                          <span className="text-foreground text-sm">
+                            {value} ({entry.payload.value})
+                          </span>
+                        )}
+                      />
+                    </PieChart>
+                  </DashboardChartFrame>
+                )}
               </CardContent>
             </Card>
 
@@ -1376,7 +1602,7 @@ export function LiveIndicators() {
               <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">
                 <span className="text-sm text-foreground font-medium">{t("liveIndicators.uniqueGeneralTypesLabel")}</span>
                 <span className="dash-inline-stat">
-                  {distributionStats?.uniqueCategoryCount ?? uniqueCommonIssuesChartData.length}
+                  {uniqueCommonIssuesChartData.length}
                 </span>
               </div>
               <div className="flex items-center justify-between p-3 glass-panel rounded-xl border border-border">

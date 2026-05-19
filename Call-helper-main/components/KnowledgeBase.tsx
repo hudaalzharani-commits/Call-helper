@@ -32,6 +32,7 @@ import {
   mapCategoryToBackend,
   recordKnowledgeFeedback,
   recordKnowledgeView,
+  recordReferenceCaseView,
   updateKnowledgeArticle,
   type BackendKnowledgeArticle,
   type BackendReferenceCase,
@@ -183,7 +184,7 @@ export function KnowledgeBase({
         author: c.createdBy?.name || c.createdBy?.username || '—',
         createdAt,
         updatedAt,
-        views: c.matchCount ?? 0,
+        views: c.viewCount ?? 0,
         helpful: 0,
         notHelpful: 0,
         relatedIssues: [],
@@ -220,7 +221,7 @@ export function KnowledgeBase({
         author: 'تحليلات المكالمات',
         createdAt: new Date(),
         updatedAt: new Date(),
-        views: stat.count,
+        views: 0,
         helpful: 0,
         notHelpful: 0,
         relatedIssues: [],
@@ -494,16 +495,36 @@ export function KnowledgeBase({
   const handleViewArticle = async (article: KnowledgeArticle) => {
     setSelectedArticle(article);
     setIsViewDialogOpen(true);
-    if (article.source !== 'knowledge') return;
     try {
-      const updated = await recordKnowledgeView(article.id);
-      setArticles(prev =>
-        prev.map(a => (a.id === article.id ? { ...a, views: updated.viewCount ?? a.views } : a)),
-      );
+      if (article.source === 'knowledge') {
+        const updated = await recordKnowledgeView(article.id);
+        setArticles(prev =>
+          prev.map(a =>
+            a.id === article.id ? { ...a, views: updated.viewCount ?? a.views } : a,
+          ),
+        );
+        setSelectedArticle(prev =>
+          prev?.id === article.id
+            ? { ...prev, views: updated.viewCount ?? prev.views }
+            : prev,
+        );
+      } else if (article.source === 'reference_case' && article.referenceCaseId) {
+        const updated = await recordReferenceCaseView(article.referenceCaseId);
+        const nextViews = updated.viewCount ?? article.views;
+        setArticles(prev =>
+          prev.map(a => (a.id === article.id ? { ...a, views: nextViews } : a)),
+        );
+        setSelectedArticle(prev =>
+          prev?.id === article.id ? { ...prev, views: nextViews } : prev,
+        );
+      }
     } catch (error) {
       console.warn('Failed to record view', error);
     }
   };
+
+  const hasPageViews = (article: KnowledgeArticle) =>
+    article.source === 'knowledge' || article.source === 'reference_case';
 
   const handleFeedback = async (articleId: string, helpful: boolean) => {
     const row = articles.find(a => a.id === articleId);
@@ -763,19 +784,17 @@ export function KnowledgeBase({
                       </span>
                     </td>
                     <td className="px-4 py-3 align-top text-right">
-                      <span
-                        className="inline-flex items-center gap-1 text-sm tabular-nums text-foreground"
-                        title={
-                          article.source === 'reference_case'
-                            ? t('knowledge.tooltips.matchCount')
-                            : article.source === 'common_issue'
-                              ? t('knowledge.tooltips.repeatCount')
-                              : undefined
-                        }
-                      >
-                        <Eye className="size-3.5 shrink-0 opacity-70" />
-                        {article.views}
-                      </span>
+                      {hasPageViews(article) ? (
+                        <span
+                          className="inline-flex items-center gap-1 text-sm tabular-nums text-foreground"
+                          title={t('knowledge.tooltips.pageViews')}
+                        >
+                          <Eye className="size-3.5 shrink-0 opacity-70" />
+                          {article.views}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 align-top text-right">
                       {article.source === 'knowledge' ? (

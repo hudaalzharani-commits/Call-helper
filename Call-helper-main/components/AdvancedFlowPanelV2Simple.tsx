@@ -30,6 +30,7 @@ import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
 import type { Route, Step, SubCondition } from '../contexts/AdvancedSettingsContext';
 import { useAdvancedSettings } from '../contexts/AdvancedSettingsContext';
+import { resolveActiveRouteIdsByKeywords } from '../utils/keywordMatcher';
 
 interface AdvancedFlowPanelV2Props {
   routes: Route[];
@@ -41,9 +42,11 @@ interface AdvancedFlowPanelV2Props {
     completedSteps: Array<{
       stepId: string;
       stepName: string;
+      routeId?: string;
+      routeName?: string;
       selectedSubCondition: SubCondition;
     }>;
-    finalAction: 'continue' | 'force_solution' | 'escalation';
+    finalAction: 'continue' | 'force_solution' | 'direct_answer' | 'escalation';
     escalationDetails?: string;
     solutionDetails?: string;
   }) => void;
@@ -62,7 +65,8 @@ type WizardStep =
 
 export function AdvancedFlowPanelV2({ 
   routes, 
-  steps, 
+  steps,
+  problemDescription,
   isGrayAreaMode,
   initialFilteredRouteIds,
   onFlowComplete,
@@ -92,24 +96,30 @@ export function AdvancedFlowPanelV2({
   const [selectedConditionId, setSelectedConditionId] = useState<string | null>(null);
   const [flowFinished, setFlowFinished] = useState(false);
   const [finalAction, setFinalAction] = useState<'continue' | 'force_solution' | 'escalation' | null>(null);
+  const [appliedGuidanceText, setAppliedGuidanceText] = useState<string | null>(null);
 
   // ====================================================================
   // Initialize Available Routes
   // ====================================================================
 
   useEffect(() => {
-    if (isGrayAreaMode) {
-      if (initialFilteredRouteIds && initialFilteredRouteIds.length > 0) {
-        const filteredRoutes = routes.filter(r => r.isActive && initialFilteredRouteIds.includes(r.id));
-        setWizardHistory([{ type: 'route_select', availableRouteIds: filteredRoutes.map(r => r.id) }]);
-      } else {
-        setWizardHistory([{ type: 'route_select', availableRouteIds: [] }]);
-      }
+    let availableIds: string[];
+    if (initialFilteredRouteIds !== undefined) {
+      availableIds = routes
+        .filter((r) => r.isActive && initialFilteredRouteIds.includes(r.id))
+        .map((r) => r.id);
+    } else if (isGrayAreaMode) {
+      availableIds = [];
     } else {
-      const allActiveRoutes = routes.filter(r => r.isActive);
-      setWizardHistory([{ type: 'route_select', availableRouteIds: allActiveRoutes.map(r => r.id) }]);
+      const text = (problemDescription || '').trim();
+      const keywordIds = text ? resolveActiveRouteIdsByKeywords(text, routes) : [];
+      availableIds =
+        keywordIds.length > 0
+          ? keywordIds
+          : routes.filter((r) => r.isActive).map((r) => r.id);
     }
-  }, [routes, isGrayAreaMode, initialFilteredRouteIds]);
+    setWizardHistory([{ type: 'route_select', availableRouteIds: availableIds }]);
+  }, [routes, isGrayAreaMode, initialFilteredRouteIds, problemDescription]);
 
   // ====================================================================
   // Get Current Data
@@ -278,24 +288,37 @@ export function AdvancedFlowPanelV2({
 
   const finishFlow = (
     path: Array<{ route: Route; step: Step; subCondition: SubCondition }>,
-    action: 'continue' | 'force_solution' | 'escalation'
+    action: 'continue' | 'force_solution' | 'direct_answer' | 'escalation'
   ) => {
+    const lastStep = path[path.length - 1];
     setFlowFinished(true);
     setFinalAction(action);
+    const guidance = (lastStep.subCondition.actionDetails || '').trim();
+    const showsGuidanceInBriefing =
+      action === 'force_solution' ||
+      action === 'direct_answer' ||
+      action === 'escalation';
+    setAppliedGuidanceText(
+      showsGuidanceInBriefing ? guidance || lastStep.subCondition.name : null,
+    );
 
-    const completedSteps = path.map(p => ({
+    const completedSteps = path.map((p) => ({
       stepId: p.step.id,
       stepName: p.step.name,
+      routeId: p.route.id,
+      routeName: p.route.name,
       selectedSubCondition: p.subCondition,
     }));
-
-    const lastStep = path[path.length - 1];
     
     onFlowComplete({
       completedSteps,
       finalAction: action,
-      escalationDetails: action === 'escalation' ? lastStep.subCondition.actionDetails : undefined,
-      solutionDetails: action === 'force_solution' ? lastStep.subCondition.actionDetails : undefined,
+      escalationDetails:
+        action === 'escalation' ? lastStep.subCondition.actionDetails : undefined,
+      solutionDetails:
+        action === 'force_solution' || action === 'direct_answer'
+          ? lastStep.subCondition.actionDetails
+          : undefined,
     });
 
     console.log('🏁 Flow finished:', { action, completedSteps: completedSteps.length });
@@ -320,6 +343,7 @@ export function AdvancedFlowPanelV2({
     setSelectedConditionId(null);
     setFlowFinished(false);
     setFinalAction(null);
+    setAppliedGuidanceText(null);
   };
 
   // ====================================================================
@@ -388,24 +412,27 @@ export function AdvancedFlowPanelV2({
           {/* Route Selector */}
           {currentWizardStep.type === 'route_select' && (
             <div className="space-y-2">
-              {currentWizardStep.availableRouteIds.map(routeId => {
+              {currentWizardStep.availableRouteIds.map((routeId, pickIndex) => {
                 const route = routes.find(r => r.id === routeId);
                 if (!route) return null;
+                const showPickOrder = currentWizardStep.availableRouteIds.length > 1;
 
                 return (
                   <button
                     key={route.id}
                     onClick={() => handleRouteSelect(route.id)}
-                    className="w-full glass-panel border-2 border-border hover:border-primary/50 rounded-lg p-4 text-left transition-all group"
+                    className="w-full glass-panel border-2 border-border hover:border-primary/50 rounded-lg p-4 text-start transition-all group"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <MapPin className="size-4 text-primary" />
                           <h5 className="font-semibold text-foreground">{route.name}</h5>
-                          <Badge className="bg-primary/10 text-primary dark:bg-primary-soft dark:text-primary border-0 text-[10px]">
-                            Stage {route.order}
-                          </Badge>
+                          {showPickOrder && (
+                            <Badge className="bg-primary/10 text-primary dark:bg-primary-soft dark:text-primary border-0 text-[10px]">
+                              المرحلة {pickIndex + 1}
+                            </Badge>
+                          )}
                         </div>
                         {route.description && (
                           <p className="text-xs text-muted-foreground mt-1">{route.description}</p>
@@ -508,7 +535,7 @@ export function AdvancedFlowPanelV2({
                             )}
                             {subCond.action === 'escalation' && (
                               <Badge className="bg-primary/10 text-primary dark:text-orange-400 border-0 text-[10px]">
-                                Escalate
+                                توجيه تصعيد
                               </Badge>
                             )}
                             {subCond.action === 'continue' && (
@@ -535,7 +562,7 @@ export function AdvancedFlowPanelV2({
                           <div className="mt-2 pt-2 border-t border-border">
                             <p className="text-xs font-semibold text-foreground mb-1">
                               {subCond.action === 'escalation' 
-                                ? '⚠️ Notes before escalation:' 
+                                ? '⚠️ توجيه التصعيد (لا إحالة آلية لجهة أخرى):' 
                                 : subCond.action === 'force_solution'
                                 ? '💡 Resolution guidance:'
                                 : 'Details:'}
@@ -560,9 +587,10 @@ export function AdvancedFlowPanelV2({
               }}
               className="w-full bg-gradient-to-r bg-primary text-white hover:from-orange-600 hover:to-red-600 font-bold"
             >
-              {currentConditions.find(sc => sc.id === selectedConditionId)?.action === 'force_solution' 
-                ? '✓ Apply resolution' 
-                : '✓ Apply escalation'}
+              <span className="inline-flex items-center justify-center gap-2">
+                <CheckCircle2 className="size-4 shrink-0" aria-hidden />
+                تطبيق الحل
+              </span>
             </Button>
           )}
         </div>
@@ -591,14 +619,25 @@ export function AdvancedFlowPanelV2({
                   ? 'All steps completed.'
                   : finalAction === 'force_solution'
                   ? 'Stopped — resolution available.'
-                  : 'Escalated to the relevant team.'
+                  : 'تم اعتماد توجيه التصعيد — صيغة للعميل فقط (إحالة يدوية خارج النظام).'
                 }
               </h4>
               <p className="text-xs text-muted-foreground mt-1">
-                Response created based on the selected route.
+                لا يُرسل طلباً لجهة أو نظام آخر؛ يُولَّد نص إرشادي حسب المسار المختار.
               </p>
             </div>
           </div>
+
+          {appliedGuidanceText ? (
+            <div className="mb-4 rounded-lg border border-border bg-background/80 px-3 py-2.5 text-right">
+              <p className="text-[10px] font-bold text-muted-foreground mb-1">
+                {finalAction === 'force_solution' ? '💡 توجيه الحل:' : '⚠️ ملاحظات التصعيد:'}
+              </p>
+              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+                {appliedGuidanceText}
+              </p>
+            </div>
+          ) : null}
 
           <Button
             onClick={handleReset}

@@ -376,7 +376,7 @@ export function AddStepDialog({
                 <SelectItem value="escalation" className="text-right">
                   <div className="flex items-center gap-2">
                     <AlertCircle className="size-4 text-red-500" />
-                    تصعيد - إحالة لجهة مختصة
+                    تصعيد — توجيه للموظف
                   </div>
                 </SelectItem>
               </SelectContent>
@@ -389,14 +389,14 @@ export function AddStepDialog({
               <Label htmlFor="sub-details">
                 {action === 'force_solution' || action === 'direct_answer'
                   ? '💡 توجيهات الحل (اختياري)'
-                  : '⚠️ ملاحظات التصعيد (اختياري)'}
+                  : '⚠️ توجيه التصعيد للصيغة/الإجراء (اختياري)'}
               </Label>
               <Input
                 id="sub-details"
                 placeholder={
                   action === 'force_solution' || action === 'direct_answer'
                     ? 'مثال: التأكد من إكمال التسجيل أولاً'
-                    : 'مثال: يحتاج رقم التأشيرة والمجموعة قبل التصعيد'
+                    : 'مثال: يُنصح بإحالة الحالة يدوياً للقسم المختص بعد التحقق من البيانات'
                 }
                 value={actionDetails}
                 onChange={(e) => setActionDetails(e.target.value)}

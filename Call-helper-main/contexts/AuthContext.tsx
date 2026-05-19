@@ -1,19 +1,16 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import type { AppRole } from '../utils/appRoles';
+import { getApiBaseUrl } from '../utils/apiBase';
 
 interface User {
   id: string;
   name: string;
   email: string;
   username: string;
-  role: AppRole;
+  role: 'admin' | 'user' | 'moderator';
   status: 'active' | 'inactive' | 'suspended';
   lastActive: string;
   joinDate: string;
   avatar?: string;
-  permAdminPanel?: boolean;
-  permContentCreate?: boolean;
-  uiVisibility?: Record<string, boolean>;
   password: string; // Keep password in the full user object
 }
 
@@ -22,18 +19,14 @@ interface PublicUser {
   name: string;
   email: string;
   username: string;
-  role: AppRole;
+  role: 'admin' | 'user' | 'moderator';
   avatar?: string;
-  permAdminPanel?: boolean;
-  permContentCreate?: boolean;
-  uiVisibility?: Record<string, boolean>;
 }
 
 interface AuthContextType {
   user: PublicUser | null;
   login: (emailOrUsername: string, password: string) => Promise<boolean>;
   logout: () => void;
-  refreshCurrentUser: () => Promise<void>;
   isAdmin: boolean;
   updateUserAvatar: (avatar: string | undefined) => void;
   updateUserPassword: (oldPassword: string, newPassword: string) => Promise<boolean>;
@@ -63,8 +56,6 @@ const INITIAL_MOCK_USERS: User[] = [
     lastActive: 'الآن',
     joinDate: '2025-01-01',
     avatar: undefined,
-    permAdminPanel: true,
-    permContentCreate: true,
   },
   {
     id: 'seed-user',
@@ -88,9 +79,7 @@ const INITIAL_MOCK_USERS: User[] = [
     status: 'active',
     lastActive: 'الآن',
     joinDate: '2025-01-01',
-    avatar: undefined,
-    permAdminPanel: true,
-    permContentCreate: true,
+    avatar: undefined
   },
   { 
     id: '2', 
@@ -102,9 +91,7 @@ const INITIAL_MOCK_USERS: User[] = [
     status: 'active',
     lastActive: 'منذ 5 دقائق',
     joinDate: '2025-01-10',
-    avatar: undefined,
-    permAdminPanel: true,
-    permContentCreate: true,
+    avatar: undefined
   },
   { 
     id: '3', 
@@ -115,8 +102,7 @@ const INITIAL_MOCK_USERS: User[] = [
     role: 'moderator', 
     status: 'active', 
     lastActive: 'منذ ساعة',
-    joinDate: '2025-01-15',
-    permContentCreate: true,
+    joinDate: '2025-01-15'
   },
   { 
     id: '4', 
@@ -136,41 +122,7 @@ const CURRENT_USER_KEY = 'rafeeq_current_user';
 const TOKEN_KEY = 'token';
 const VERSION_KEY = 'rafeeq_db_version';
 const CURRENT_VERSION = '2.2'; // Update this to reset database
-const API_BASE_URL = 'http://localhost:5000';
-
-function visibilityFromBackend(raw: unknown): Record<string, boolean> | undefined {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
-  const out: Record<string, boolean> = {};
-  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-    if (typeof v === 'boolean') out[k] = v;
-  }
-  return Object.keys(out).length ? out : undefined;
-}
-
-function publicUserFromBackend(backendUser: {
-  _id?: string;
-  id?: string;
-  name: string;
-  email: string;
-  username: string;
-  role: AppRole;
-  avatar?: string | null;
-  permAdminPanel?: unknown;
-  permContentCreate?: unknown;
-  uiVisibility?: unknown;
-}): PublicUser {
-  return {
-    id: String(backendUser._id || backendUser.id || ''),
-    name: backendUser.name,
-    email: backendUser.email,
-    username: backendUser.username,
-    role: backendUser.role as AppRole,
-    avatar: backendUser.avatar || undefined,
-    permAdminPanel: typeof backendUser.permAdminPanel === 'boolean' ? backendUser.permAdminPanel : undefined,
-    permContentCreate: typeof backendUser.permContentCreate === 'boolean' ? backendUser.permContentCreate : undefined,
-    uiVisibility: visibilityFromBackend(backendUser.uiVisibility),
-  };
-}
+const API_BASE_URL = getApiBaseUrl();
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<PublicUser | null>(null);
@@ -198,7 +150,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     
     if (savedUsers) {
-      setAllUsers(JSON.parse(savedUsers));
+      try {
+        setAllUsers(JSON.parse(savedUsers));
+      } catch {
+        console.warn('Invalid saved users in localStorage, resetting.');
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_MOCK_USERS));
+        setAllUsers(INITIAL_MOCK_USERS);
+      }
     } else {
       setAllUsers(INITIAL_MOCK_USERS);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_MOCK_USERS));
@@ -210,8 +168,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (savedToken !== 'local-auth-token') {
         verifyToken(savedToken, savedCurrentUser);
       } else {
-        // Local auth token - just restore from localStorage
-        setUser(JSON.parse(savedCurrentUser));
+        try {
+          setUser(JSON.parse(savedCurrentUser));
+        } catch {
+          localStorage.removeItem(CURRENT_USER_KEY);
+          localStorage.removeItem(TOKEN_KEY);
+        }
       }
     }
   }, []);
@@ -221,7 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // ====================================================================
   const verifyToken = async (token: string, savedCurrentUser: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+      const response = await fetch(`${API_BASE_URL}/auth/me`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -233,7 +195,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (data.success && data.data.user) {
           // Token is valid, restore user
           const backendUser = data.data.user;
-          const publicUser = publicUserFromBackend(backendUser);
+          const publicUser: PublicUser = {
+            id: backendUser._id || backendUser.id,
+            name: backendUser.name,
+            email: backendUser.email,
+            username: backendUser.username,
+            role: backendUser.role,
+            avatar: backendUser.avatar,
+          };
           setUser(publicUser);
           localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(publicUser));
           console.log('✅ Token verified, user session restored');
@@ -251,7 +220,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('❌ Token verification error:', error);
       // Fallback to saved user if backend is down
       console.log('ℹ️ Backend unavailable, using cached user data');
-      setUser(JSON.parse(savedCurrentUser));
+      try {
+        setUser(JSON.parse(savedCurrentUser));
+      } catch {
+        logout();
+      }
     }
   };
 
@@ -273,9 +246,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             username: updatedCurrentUser.username,
             role: updatedCurrentUser.role,
             avatar: updatedCurrentUser.avatar,
-            permAdminPanel: updatedCurrentUser.permAdminPanel,
-            permContentCreate: updatedCurrentUser.permContentCreate,
-            uiVisibility: updatedCurrentUser.uiVisibility,
           };
           
           // Only update if data actually changed
@@ -306,7 +276,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('📦 Sending login data:', loginData);
       
       // Try backend authentication first
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -327,11 +297,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           
           // Store user data
           const backendUser = data.data.user;
-          const publicUser = publicUserFromBackend(backendUser);
-
+          const publicUser: PublicUser = {
+            id: backendUser._id || backendUser.id,
+            name: backendUser.name,
+            email: backendUser.email,
+            username: backendUser.username,
+            role: backendUser.role,
+            avatar: backendUser.avatar,
+          };
+          
           setUser(publicUser);
           localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(publicUser));
-
+          
           return true;
         }
       } else {
@@ -359,9 +336,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         username: foundUser.username,
         role: foundUser.role,
         avatar: foundUser.avatar,
-        permAdminPanel: foundUser.permAdminPanel,
-        permContentCreate: foundUser.permContentCreate,
-        uiVisibility: foundUser.uiVisibility,
       };
       setUser(publicUser);
       localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(publicUser));
@@ -387,26 +361,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     localStorage.removeItem(CURRENT_USER_KEY);
     localStorage.removeItem(TOKEN_KEY);
-  };
-
-  const refreshCurrentUser = async () => {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (!token || token === 'local-auth-token') return;
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!response.ok) return;
-      const data = await response.json();
-      if (data.success && data.data.user) {
-        const publicUser = publicUserFromBackend(data.data.user);
-        setUser(publicUser);
-        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(publicUser));
-      }
-    } catch {
-      // تجاهل أخطاء الشبكة — الجلسة تبقى كما هي
-    }
   };
 
   // ====================================================================
@@ -496,7 +450,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user, 
       login, 
       logout, 
-      refreshCurrentUser,
       isAdmin, 
       updateUserAvatar, 
       updateUserPassword,

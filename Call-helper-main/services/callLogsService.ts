@@ -78,3 +78,21 @@ export async function fetchAllCallLogs(): Promise<BackendCallLog[]> {
   });
   return Array.isArray(data) ? data : [];
 }
+
+export async function deleteCallLog(id: string): Promise<void> {
+  const token = getToken();
+  if (!token) throw new Error("Not authenticated");
+
+  const res = await fetch(`/api/calls/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      typeof json?.message === "string"
+        ? json.message
+        : `HTTP ${res.status}: ${res.statusText}`,
+    );
+  }
+}

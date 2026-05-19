@@ -44,7 +44,9 @@ export interface ConfidenceApiResponse {
 // Configuration
 // ========================
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+import { getApiBaseUrl } from '../utils/apiBase';
+
+const API_BASE_URL = getApiBaseUrl();
 const API_TIMEOUT = 5000; // 5 seconds
 const DEBOUNCE_DELAY = 500; // 500ms delay after user stops typing
 

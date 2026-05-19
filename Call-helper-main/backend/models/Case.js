@@ -72,6 +72,12 @@ const caseSchema = new mongoose.Schema({
     default: 0,
     min: 0
   },
+  /** عدد مرات فتح السجل من سجل المعرفة (عرض تفاصيل الحالة) */
+  viewCount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   priority: {
     type: String,
     enum: ['Low', 'Medium', 'High', 'Critical'],

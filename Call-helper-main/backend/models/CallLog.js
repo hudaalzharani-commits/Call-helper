@@ -57,26 +57,15 @@ const callLogSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  /** مسار الوضع المتقدم / Gray Area — Mixed لتفادي فقدان الحقول (مثل direct_answer أو selectedSteps) */
   flowResult: {
-    completedSteps: [{
-      stepId: String,
-      stepName: String,
-      selectedSubCondition: {
-        id: String,
-        name: String,
-        action: {
-          type: String,
-          enum: ['continue', 'force_solution', 'escalation']
-        },
-        actionDetails: String
-      }
-    }],
-    finalAction: {
-      type: String,
-      enum: ['continue', 'force_solution', 'escalation']
-    },
-    escalationDetails: String,
-    solutionDetails: String
+    type: mongoose.Schema.Types.Mixed,
+    default: null,
+  },
+  /** ملخص مسار الوضع المتقدم — Mixed لتفادي فقدان الحقول عند الحفظ */
+  advancedFlowSummary: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null,
   },
   generatedResponse: {
     type: String,

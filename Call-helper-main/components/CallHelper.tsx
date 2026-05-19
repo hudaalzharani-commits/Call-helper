@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+﻿import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -73,6 +73,16 @@ import {
 // ============ NEW: Import Advanced Settings Context ============
 import { useAdvancedSettings } from "../contexts/AdvancedSettingsContext";
 import type { Route, Step, SubCondition } from "../contexts/AdvancedSettingsContext";
+import {
+  matchRoutesFromDescription,
+  resolveActiveRouteIdsByKeywords,
+  ROUTE_KEYWORDS,
+} from "../utils/keywordMatcher";
+import { buildAdvancedFlowSummary } from "../utils/advancedFlowSummary";
+import {
+  resolveCallHelperBriefingText,
+  resolveFlowGuidanceFromFlowResult,
+} from "../utils/briefingDisplay";
 
 // ============ NEW: Import Debug Panel (Admin Only) ============
 import { DebugPanel } from "./DebugPanel";
@@ -89,7 +99,39 @@ import { generateAIResponse, simulateAIProcessing } from "../utils/mockAIRespons
 // ============ NEW: Import Gray Area Wizard ============
 import { GrayAreaWizard, type FlowPath } from "./GrayAreaWizard";
 import { useLanguage } from "../contexts/LanguageContext";
-import { tEntity } from "../i18n/translations";
+import {
+  ENTITY_KEYS,
+  entityForApi,
+  entityKeyFromValue,
+  pilgrimageScopeFromEntityType,
+  tEntity,
+} from "../i18n/translations";
+import { routeMatchesPilgrimageScope } from "../utils/pilgrimageRouteScope";
+import { isValidMongoObjectId } from "../utils/mongoId";
+import { toast } from "sonner";
+import { callHelperAr } from "../i18n/modules/callHelper";
+
+/** صيغ الإفادات المحفوظة في السجل — عربي دائماً (لوحة الإفادات المؤكدة) */
+const AR_CALL_TEMPLATES = callHelperAr.callHelper.templates;
+
+/** صيغة ثابتة لجميع ردود «توجيه التصعيد» (لا تُستبدل بتفاصيل الشرط). */
+const ESCALATION_GUIDANCE_RESPONSE =
+  'يتم توجيه العميل لرفع بلاغ عن طريق النظام مع المرفقات اللازمة ليتسنى لنا التحقق.';
+
+function scoreForCallLog(score: number | null | undefined): number | undefined {
+  if (typeof score !== 'number' || !Number.isFinite(score)) return undefined;
+  return Math.min(100, Math.max(0, Math.round(score)));
+}
+
+/** سكور التحليلات: إجابة مباشرة (≥ العتبة) تُسجَّل 100٪ كإفادة مؤكدة */
+function analyticsFinalScore(
+  score: number | null | undefined,
+  directAnswerMin: number,
+): number | undefined {
+  const rounded = scoreForCallLog(score);
+  if (rounded === undefined) return undefined;
+  return rounded >= directAnswerMin ? 100 : rounded;
+}
 
 export function CallHelper({
   isDarkMode,
@@ -101,15 +143,11 @@ export function CallHelper({
   callHelperLaunch?: { seed: string; nonce: number } | null;
   onConsumeCallHelperLaunch?: () => void;
 }) {
-  const { t } = useLanguage();
+  const { t, dir, isRtl } = useLanguage();
   const ENABLE_AI = import.meta.env.VITE_ENABLE_AI === "true";
-  const USER_TYPE_OPTIONS = [
-    'وكيل خارجي',
-    'شركة عمرة',
-    'مقدم خدمة سكن',
-    'مكتب شؤون',
-    'منظم تابع',
-  ] as const;
+
+  /** آخر سجل مكالمة في هذه الجلسة — يُحدَّث عند إكمال الوضع المتقدم بدل إنشاء سجل مكرر */
+  const lastCallLogIdRef = useRef<string | null>(null);
 
   // =========================
   // Real call logging (for analytics)
@@ -118,55 +156,90 @@ export function CallHelper({
     generatedResponse: string;
     status: "pending" | "resolved" | "escalated" | "closed";
     flowResult?: unknown;
+    advancedFlowSummary?: ReturnType<typeof buildAdvancedFlowSummary>;
     matchedCaseDbId?: string | null;
     matchedCaseCode?: string | null;
     matchedAt?: string | null;
     category?: string | null;
     /** سكور العرض الأخير (0–100) — للتحليلات والإفادات المؤكدة */
     finalDisplayScore?: number | null;
+    /** إنشاء سجل جديد دائماً (مثلاً أول توليد) بدل تحديث السجل الحالي */
+    forceNewLog?: boolean;
   }) => {
     try {
       const token = localStorage.getItem("token");
-      if (!token || token === "local-auth-token") return;
+      if (!token) return;
 
       // Only log when we have the minimum required fields for CallLog
       if (!customerName || !entityType || !problemSummary) return;
 
-      const response = await fetch("/api/calls", {
-        method: "POST",
+      const advancedFlowSummary =
+        params.advancedFlowSummary ??
+        (params.flowResult
+          ? buildAdvancedFlowSummary(params.flowResult, { routes, steps })
+          : null);
+
+      const payload: Record<string, unknown> = {
+        customerName,
+        entityType: entityForApi(entityType) || entityType,
+        problemType: selectedProblemType || "general",
+        problemSummary,
+        category: params.category && params.category.trim() ? params.category.trim() : null,
+        matchedCase:
+          params.matchedCaseDbId && isValidMongoObjectId(params.matchedCaseDbId)
+            ? params.matchedCaseDbId
+            : null,
+        matchedCaseCode: params.matchedCaseCode || null,
+        matchedAt: params.matchedAt || null,
+        generatedResponse: params.generatedResponse,
+        status: params.status,
+      };
+      if (params.flowResult !== undefined) payload.flowResult = params.flowResult;
+      if (advancedFlowSummary) payload.advancedFlowSummary = advancedFlowSummary;
+      const score = scoreForCallLog(params.finalDisplayScore);
+      if (score !== undefined) payload.finalDisplayScore = score;
+
+      const wantsPatch =
+        !params.forceNewLog &&
+        Boolean(lastCallLogIdRef.current) &&
+        (params.flowResult !== undefined || advancedFlowSummary);
+
+      const requestInit = {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          customerName,
-          entityType,
-          problemType: selectedProblemType || "general",
-          problemSummary,
-          // Category at log time enables the daily frequency bucket (used by the admin-only dashboard section). Empty string normalized to null.
-          category: params.category && params.category.trim() ? params.category.trim() : null,
-          matchedCase: params.matchedCaseDbId || null,
-          matchedCaseCode: params.matchedCaseCode || null,
-          matchedAt: params.matchedAt || null,
-          flowResult: params.flowResult,
-          generatedResponse: params.generatedResponse,
-          status: params.status,
-          ...(typeof params.finalDisplayScore === "number" &&
-          Number.isFinite(params.finalDisplayScore)
-            ? {
-                finalDisplayScore: Math.min(
-                  100,
-                  Math.max(0, Math.round(params.finalDisplayScore)),
-                ),
-              }
-            : {}),
-        }),
-      });
+        body: JSON.stringify(payload),
+      };
+
+      let response = await fetch(
+        wantsPatch ? `/api/calls/${lastCallLogIdRef.current}` : "/api/calls",
+        { ...requestInit, method: wantsPatch ? "PATCH" : "POST" },
+      );
+
+      if (wantsPatch && (response.status === 404 || response.status === 405)) {
+        lastCallLogIdRef.current = null;
+        response = await fetch("/api/calls", {
+          ...requestInit,
+          method: "POST",
+        });
+      }
 
       if (!response.ok) {
         const errorBody = await response.text().catch(() => "");
         console.warn("⚠️ Failed to save call log:", response.status, errorBody);
+        toast.error(
+          isRtl
+            ? "تعذّر حفظ الإفادة في السجل. تأكد أن الخادم محدّث وأعد التوليد."
+            : "Could not save briefing to the log. Restart the backend and try again.",
+        );
+        return;
       }
+
+      const saved = await response.json().catch(() => null);
+      const id = saved?.data?._id ?? saved?.data?.id;
+      if (id) lastCallLogIdRef.current = String(id);
+      window.dispatchEvent(new CustomEvent("rafeeq:call-log-saved"));
     } catch (error) {
       // Don't block the UX for logging failures
       console.warn("⚠️ Failed to log call for analytics", error);
@@ -177,12 +250,22 @@ export function CallHelper({
   const [problemDescription, setProblemDescription] = useState("");
   const [problemSummary, setProblemSummary] = useState("");
 
+  const selectedEntityKey = entityKeyFromValue(entityType) || entityType;
+  const entityTypeApi = entityForApi(entityType) || entityType;
+  /** يُستنتج من «مقدم الخدمة» بنفس منطق Service Type في قاعدة البيانات (عمرة vs حج) */
+  const callPilgrimageScope = useMemo<"umrah" | "hajj">(
+    () => pilgrimageScopeFromEntityType(entityType),
+    [entityType],
+  );
+
   useEffect(() => {
     if (!callHelperLaunch?.seed?.trim()) return;
     setProblemSummary(callHelperLaunch.seed.trim());
     onConsumeCallHelperLaunch?.();
   }, [callHelperLaunch?.nonce, callHelperLaunch?.seed, onConsumeCallHelperLaunch]);
   const [generatedText, setGeneratedText] = useState("");
+  /** نص الإرشاد من مسار الوضع المتقدم — يُعرض في «تم إفادة العميل» (أولوية على قاعدة المعرفة) */
+  const [flowBriefingGuidance, setFlowBriefingGuidance] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
   const [activeButton, setActiveButton] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -294,6 +377,10 @@ export function CallHelper({
   const [debugScoringBreakdown, setDebugScoringBreakdown] = useState<KnowledgeSearchResult['debugBreakdown'] | null>(null);
   /** رسالة «تفكير» واحدة ظاهرة في كل لحظة (يُستبدل النص عند كل مرحلة حقيقية) */
   const [thinkingSteps, setThinkingSteps] = useState<CallHelperThinkingStep[]>([]);
+  /** تحليل جارٍ — لا يُعرض الحل حتى تنتهي عبارات التفكير */
+  const isAnalysisInProgress = isGenerating || thinkingSteps.length > 0;
+  const showGeneratedOutput =
+    Boolean(generatedText?.trim()) && !isAnalysisInProgress;
 
   const getScoringWeightValue = (weightName: string, fallback: number): number => {
     const normalizedTarget = weightName.trim().toLowerCase();
@@ -313,7 +400,7 @@ export function CallHelper({
     const caseFreshnessWeight = getScoringWeightValue('caseFreshness', 0);
     const caseMetadataMatchWeight = getScoringWeightValue('caseMetadataMatch', 0);
     const decayRateDays = Math.max(1, Number(scoringSettings.decayRateDays || 30));
-    const userTypeHint = entityType || '';
+    const userTypeHint = entityTypeApi || '';
     const includeDebugBreakdown = Boolean(isAdmin);
 
     return {
@@ -399,7 +486,7 @@ export function CallHelper({
       if (opts?.includeGrayAreaHint) {
         const previewText =
           searchResult.isMatched && searchResult.problem
-            ? getFormattedResponse(searchResult.problem, customerName, entityType)
+            ? getFormattedResponse(searchResult.problem, customerName, entityTypeApi)
             : `السلام عليكم ورحمة الله وبركاته،\n\nتم استقبال بلاغ من العميل: ${customerName}\nنوع الجهة: ${entityType}\n\nوصف المشكلة:\n${problemSummary}\n\nتم تسجيل البلاغ في النظام وسيتم المتابعة مع الفريق المختص.\n\nشكراً لتواصلكم معنا.`;
         const simDesc = searchResult.matchPercentage;
         const simConf = searchResult.matchPercentage;
@@ -481,10 +568,12 @@ export function CallHelper({
       setMatchedProblem(null);
       setIsMatchedResponse(false);
       setGeneratedText('');
+      setFlowBriefingGuidance(null);
       setActiveButton(null);
       setWasGrayAreaResolved(false);
       setSelectedProblemType('');
       setDebugScoringBreakdown(null);
+      lastCallLogIdRef.current = null;
       cancelDebouncedAnalysis(); // Cancel pending analysis
     }
     
@@ -501,7 +590,10 @@ export function CallHelper({
 
     setIsGenerating(true);
     setThinkingSteps([]);
+    setGeneratedText('');
     setIsAlternativeFormat(false);
+    lastCallLogIdRef.current = null;
+    setFlowBriefingGuidance(null);
 
     // ✅ Reset Gray Area states when generating new response
     setWasGrayAreaResolved(false);
@@ -543,21 +635,24 @@ export function CallHelper({
         const formattedText = getFormattedResponse(
           searchResult.problem,
           customerName,
-          entityType
+          entityTypeApi,
         );
         
         setGeneratedText(formattedText);
         // Forward the matched case category so the backend can update the
         // daily frequency bucket (used by the admin-only dashboard section).
         const matchedCategory = (searchResult.problem.category || '').trim();
+        const matchScore = searchResult.matchPercentage;
+        const isConfirmedBriefing = matchScore >= directAnswerThreshold;
         void logCallToBackend({
           generatedResponse: formattedText,
-          status: "pending",
+          status: isConfirmedBriefing ? 'resolved' : 'pending',
           matchedCaseDbId: searchResult.problem.id,
           matchedCaseCode: searchResult.problem.description,
           matchedAt: new Date().toISOString(),
           category: matchedCategory || null,
-          finalDisplayScore: searchResult.matchPercentage,
+          finalDisplayScore: analyticsFinalScore(matchScore, directAnswerThreshold),
+          forceNewLog: true,
         });
         setDescriptionMatchPercentage(searchResult.matchPercentage);
         // Update confidence score to match percentage to prevent gray area warning
@@ -577,7 +672,7 @@ export function CallHelper({
         // No match found - generate generic response
         console.log('❌ No match found, using generic response');
         
-      const entityTypeArabic = entityType;
+      const entityTypeArabic = entityTypeApi;
 
         const generated = `السلام عليكم ورحمة الله وبركاته،\n\nتم استقبال بلاغ من العميل: ${customerName}\nنوع الجهة: ${entityTypeArabic}\n\nوصف المشكلة:\n${problemSummary}\n\nتم تسجيل البلاغ في النظام وسيتم المتابعة مع الفريق المختص.\n\nشكراً لتواصلكم معنا.`;
 
@@ -585,7 +680,11 @@ export function CallHelper({
         void logCallToBackend({
           generatedResponse: generated,
           status: "pending",
-          finalDisplayScore: searchResult.matchPercentage,
+          finalDisplayScore: analyticsFinalScore(
+            searchResult.matchPercentage,
+            directAnswerThreshold,
+          ),
+          forceNewLog: true,
         });
         setDescriptionMatchPercentage(searchResult.matchPercentage);
         // Keep displayed score consistent with weighted keyword matching result
@@ -602,7 +701,7 @@ export function CallHelper({
       );
       
       // Fallback to generic response on error
-      const entityTypeArabic = entityType;
+      const entityTypeArabic = entityTypeApi;
 
       const generated = `السلام عليكم ورحمة الله وبركاته،\n\nتم استقبال بلاغ من العميل: ${customerName}\nنوع الجهة: ${entityTypeArabic}\n\nوصف المشكلة:\n${problemSummary}\n\nتم تسجيل البلاغ في النظام وسيتم المتابعة مع الفريق المختص.\n\nشكراً لتواصلكم معنا.`;
 
@@ -629,6 +728,7 @@ export function CallHelper({
     setThinkingSteps([]);
     void (async () => {
       setIsGenerating(true);
+      setGeneratedText('');
       await appendThinkingStep(
         "مراجعة السكور الحالي وتجهيز صيغة بديلة وفق نفس السياق.",
         480,
@@ -642,7 +742,7 @@ export function CallHelper({
 
       await new Promise<void>((r) => setTimeout(r, 400));
 
-      const entityTypeArabic = entityType;
+      const entityTypeArabic = entityTypeApi;
 
       const alternativeGenerated = `مرحباً،\n\nنفيدكم باستلام بلاغكم بخصوص:\nاسم المبلغ: ${customerName}\nطبيعة الجهة: ${entityTypeArabic}\n\nتفاصيل البلاغ:\n${problemSummary}\n\nسيتم دراسة الموضوع والرد عليكم في أقرب وقت.\n\nمع التقدير،`;
 
@@ -650,9 +750,9 @@ export function CallHelper({
       void logCallToBackend({
         generatedResponse: alternativeGenerated,
         status: "pending",
-        finalDisplayScore: Math.min(
-          100,
-          Math.max(0, Math.round(Number(scoreSnapshot) || 0)),
+        finalDisplayScore: analyticsFinalScore(
+          Number(scoreSnapshot) || 0,
+          directAnswerThreshold,
         ),
       });
       await new Promise<void>((r) => setTimeout(r, 280));
@@ -687,14 +787,18 @@ export function CallHelper({
       isMatchedResponse && matchedProblem?.response?.trim()
         ? matchedProblem.response.trim()
         : "";
+    const matchedCaseId =
+      (matchedProblem?.description || "").trim() ||
+      (debugScoringBreakdown?.caseId || "").trim();
     window.dispatchEvent(
       new CustomEvent("app:navigate", {
         detail: {
           view: "teach-rafeeq",
           prefill: {
-            entityType,
+            entityType: selectedEntityKey || entityKeyFromValue(entityType) || entityType,
             problemDetails: problemSummary,
             correctInfo: dbResponse,
+            caseId: matchedCaseId,
           },
         },
       }),
@@ -752,7 +856,8 @@ export function CallHelper({
    * Uses grayAreaThreshold from settings instead of hardcoded value
    * IMPORTANT: Hide Gray Area if wasGrayAreaResolved is true (user already selected problem type)
    */
-  const isLowConfidence = !wasGrayAreaResolved && confidenceScore < grayAreaThreshold && generatedText;
+  const isLowConfidence =
+    !wasGrayAreaResolved && confidenceScore < grayAreaThreshold && showGeneratedOutput;
 
   /**
    * Calculate the actual displayed score (for consistency)
@@ -762,15 +867,32 @@ export function CallHelper({
   const displayedScore = descriptionMatchPercentage > 40 ? descriptionMatchPercentage : confidenceScore;
 
   /**
-   * NEW: Determine button visibility based on DISPLAYED score and settings thresholds
-   * Uses directAnswerThreshold and showAdvancedThreshold from settings
-   * >= directAnswerThreshold: Direct Answer route - Only show "أفدتك؟" button
-   * >= showAdvancedThreshold and < directAnswerThreshold: Show Advanced + other solution - Show all buttons
-   * < grayAreaThreshold: Gray Area - Show "حدد نوع المشكلة" warning
-   * EXCEPTION: If wasGrayAreaResolved is true, always show all buttons
+   * Button visibility from displayed score (matches badge):
+   * >= directAnswerThreshold (default 80): hide «صيغة أخرى» + «وضع متقدم» — only «أفدتك؟»
+   * >= showAdvancedThreshold and < directAnswerThreshold: show all three action buttons
+   * < grayAreaThreshold: Gray Area warning (above)
    */
-  const isDirectAnswerRoute = !wasGrayAreaResolved && displayedScore >= directAnswerThreshold;
-  const showAllButtons = wasGrayAreaResolved || (displayedScore >= showAdvancedThreshold && displayedScore < directAnswerThreshold);
+  const hasGeneratedAnswer = showGeneratedOutput;
+
+  const clientBriefingText = useMemo(
+    () =>
+      resolveCallHelperBriefingText({
+        flowBriefingGuidance,
+        generatedText,
+        matchedKbResponse:
+          isMatchedResponse && matchedProblem?.response?.trim()
+            ? matchedProblem.response.trim()
+            : null,
+      }),
+    [flowBriefingGuidance, generatedText, isMatchedResponse, matchedProblem],
+  );
+  const isHighConfidenceAnswer =
+    hasGeneratedAnswer && displayedScore >= directAnswerThreshold;
+  const isDirectAnswerRoute = isHighConfidenceAnswer;
+  const showAllButtons =
+    hasGeneratedAnswer &&
+    !isHighConfidenceAnswer &&
+    (displayedScore >= showAdvancedThreshold && displayedScore < directAnswerThreshold);
 
   /**
    * استنتاج فئة الحالة من وصف المشكلة عندما لا يوجد تطابق قاعدة معرفة،
@@ -779,20 +901,29 @@ export function CallHelper({
   const inferredCategoryFromDescription = useMemo(() => {
     const text = problemSummary.trim();
     if (!text) return '';
+
+    const keywordMatches = matchRoutesFromDescription(text, Object.keys(ROUTE_KEYWORDS));
+    if (keywordMatches.length > 0) {
+      return keywordMatches[0].routeName;
+    }
+
     const candidates = new Set<string>();
     for (const route of routes) {
       if (!route.isActive) continue;
+      if (!routeMatchesPilgrimageScope(route, callPilgrimageScope)) continue;
       for (const c of route.categories || []) {
         const t = (c || '').trim();
         if (t.length >= 2) candidates.add(t);
       }
+      const routeName = (route.name || '').trim();
+      if (routeName.length >= 2) candidates.add(routeName);
     }
     const sorted = [...candidates].sort((a, b) => b.length - a.length);
     for (const cat of sorted) {
       if (descriptionImpliesCategory(text, cat)) return cat;
     }
     return '';
-  }, [problemSummary, routes]);
+  }, [problemSummary, routes, callPilgrimageScope]);
 
   /**
    * 🎯 مسارات الوضع المتقدم / Gray Area
@@ -809,11 +940,45 @@ export function CallHelper({
    */
   const targetedRouteIds = useMemo<string[] | undefined>(() => {
     if (selectedQuestionLinkedRoutes.length > 0) {
-      return selectedQuestionLinkedRoutes;
+      return selectedQuestionLinkedRoutes.filter((id) => {
+        const route = routes.find((r) => r.id === id);
+        if (!route?.isActive) return false;
+        return routeMatchesPilgrimageScope(route, callPilgrimageScope);
+      });
     }
 
+    const summaryText = problemSummary.trim();
+    const keywordRouteIds = resolveActiveRouteIdsByKeywords(summaryText, routes);
+    const scopeKeywordRoutes = (ids: string[]): string[] => {
+      if (ids.length === 0) return [];
+      if (entityType.trim()) {
+        const entityAllowed = getRoutesForContext({
+          entityType: entityTypeApi,
+          category: '',
+          pilgrimageScope: callPilgrimageScope,
+        }).map((route) => route.id);
+        return ids.filter((id) => entityAllowed.includes(id));
+      }
+      return ids.filter((id) => {
+        const route = routes.find((r) => r.id === id);
+        return Boolean(route?.isActive && routeMatchesPilgrimageScope(route, callPilgrimageScope));
+      });
+    };
+
+    /** أولوية الكلمات المفتاحية في الوصف (مثال: «تصريح» → مسار التسجيل وليس التأشيرة) */
+    if (summaryText && keywordRouteIds.length > 0) {
+      const scoped = scopeKeywordRoutes(keywordRouteIds);
+      if (scoped.length > 0) return scoped;
+    }
+
+    const keywordCategory =
+      summaryText && keywordRouteIds.length > 0
+        ? matchRoutesFromDescription(summaryText, Object.keys(ROUTE_KEYWORDS))[0]?.routeName || ''
+        : '';
     const resolvedCategory =
-      (matchedProblem?.category || '').trim() || inferredCategoryFromDescription;
+      keywordCategory ||
+      inferredCategoryFromDescription ||
+      (matchedProblem?.category || '').trim();
     const hasCategory = Boolean(resolvedCategory);
     const hasEntity = Boolean(entityType.trim());
     const hasGenerated = Boolean(generatedText?.trim());
@@ -835,22 +1000,79 @@ export function CallHelper({
       return undefined;
     }
 
+    if (keywordRouteIds.length > 0) {
+      const entityScoped = scopeKeywordRoutes(keywordRouteIds);
+      if (entityScoped.length > 0) return entityScoped;
+    }
+
+    if (!resolvedCategory) {
+      return undefined;
+    }
+
     const contextRoutes = getRoutesForContext({
-      entityType,
+      entityType: entityTypeApi,
       category: resolvedCategory,
+      pilgrimageScope: callPilgrimageScope,
     });
+    if (contextRoutes.length === 0) {
+      return undefined;
+    }
     return contextRoutes.map((route) => route.id);
   }, [
+    problemSummary,
+    routes,
     selectedQuestionLinkedRoutes,
     wasGrayAreaResolved,
     matchedProblem,
     inferredCategoryFromDescription,
     entityType,
+    entityTypeApi,
+    callPilgrimageScope,
     generatedText,
     displayedScore,
     showAdvancedThreshold,
     descriptionMatchPercentage,
     getRoutesForContext,
+  ]);
+
+  /** إغلاق «صيغة أخرى» / «وضع متقدم» عند وصول السكور لعتبة الرد المباشر (≥80 افتراضياً) */
+  useEffect(() => {
+    if (!hasGeneratedAnswer) return;
+    if (displayedScore < directAnswerThreshold) return;
+    setActiveButton((prev) =>
+      prev === "advanced" || prev === "retry" ? null : prev,
+    );
+  }, [hasGeneratedAnswer, displayedScore, directAnswerThreshold]);
+
+  /** ضمان تسجيل إفادة مؤكدة إذا وُجد رد عالي الثقة ولم يُحفظ سجل (مثلاً فشل طلب سابق) */
+  useEffect(() => {
+    if (!hasGeneratedAnswer) return;
+    if (displayedScore < directAnswerThreshold) return;
+    if (lastCallLogIdRef.current) return;
+    if (!customerName.trim() || !entityType.trim() || !problemSummary.trim()) return;
+
+    const storedText = generatedText.trim();
+    if (!storedText) return;
+
+    void logCallToBackend({
+      generatedResponse: storedText,
+      status: 'resolved',
+      finalDisplayScore: 100,
+      category: matchedProblem?.category?.trim() || null,
+      matchedCaseDbId: matchedProblem?.id ?? null,
+      matchedCaseCode: matchedProblem?.description ?? null,
+      matchedAt: matchedProblem ? new Date().toISOString() : null,
+      forceNewLog: true,
+    });
+  }, [
+    hasGeneratedAnswer,
+    displayedScore,
+    directAnswerThreshold,
+    customerName,
+    entityType,
+    problemSummary,
+    generatedText,
+    matchedProblem,
   ]);
 
   /**
@@ -878,16 +1100,16 @@ export function CallHelper({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Left Panel - Input Form */}
         <Card className="glass-card border-0 rounded-3xl overflow-hidden shadow-lg">
-          <div className="bg-surface-2 border-b border-border p-4 sm:p-6 border-b">
-            <h2 className="text-lg sm:text-xl font-bold text-foreground flex items-center gap-2">
-              <MessageCircle className="size-5 sm:size-6 text-primary" />
+          <div className="bg-surface-2 border-b border-border p-4 sm:p-6" dir={dir}>
+            <h2 className="text-lg sm:text-xl font-bold text-foreground flex items-center gap-2 text-start">
+              <MessageCircle className="size-5 sm:size-6 text-primary shrink-0" />
               {t("callHelper.form.title")}
             </h2>
           </div>
-          <CardContent className="p-4 sm:p-6 lg:p-8 space-y-5">
+          <CardContent className="p-4 sm:p-6 lg:p-8 space-y-5" dir={dir}>
             {/* Customer Name */}
             <div className="space-y-2">
-              <Label htmlFor="customerName" className="text-right block text-foreground font-semibold text-sm">
+              <Label htmlFor="customerName" className="block text-start text-foreground font-semibold text-sm">
                 {t("callHelper.form.customerName")}
               </Label>
               <Input
@@ -896,26 +1118,39 @@ export function CallHelper({
                 placeholder={t("callHelper.form.customerNamePlaceholder")}
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
-                className="text-right glass-panel border focus:border-primary rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground transition-all"
+                className="text-start glass-panel border focus:border-primary rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground transition-all"
               />
             </div>
 
             {/* Entity Type */}
             <div className="space-y-2">
-              <Label htmlFor="entityType" className="text-right block text-foreground font-semibold text-sm">
+              <Label htmlFor="entityType" className="block text-start text-foreground font-semibold text-sm">
                 {t("callHelper.form.entityType")}
               </Label>
-              <Select value={entityType} onValueChange={setEntityType} dir="rtl">
+              <Select
+                value={selectedEntityKey || undefined}
+                onValueChange={setEntityType}
+                dir={dir}
+              >
                 <SelectTrigger
                   id="entityType"
-                  className="text-right glass-panel border focus:border-primary rounded-xl px-4 py-3 [&>span]:text-right text-foreground"
+                  className="glass-panel border focus:border-primary rounded-xl px-4 py-3 text-foreground text-start [&>span]:text-start"
                 >
-                  <SelectValue placeholder={t("callHelper.form.entityPlaceholder")} />
+                  <SelectValue placeholder={t("callHelper.form.entityPlaceholder")}>
+                    {selectedEntityKey ? tEntity(t, selectedEntityKey) : null}
+                  </SelectValue>
                 </SelectTrigger>
-                <SelectContent className="glass-card" dir="rtl">
-                  {USER_TYPE_OPTIONS.map((option) => (
-                    <SelectItem key={option} value={option} className="text-right cursor-pointer rounded-lg">
-                      {tEntity(t, option)}
+                <SelectContent
+                  className="glass-card"
+                  dir={dir}
+                >
+                  {ENTITY_KEYS.map((key) => (
+                    <SelectItem
+                      key={key}
+                      value={key}
+                      className="cursor-pointer rounded-lg text-start"
+                    >
+                      {tEntity(t, key)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -924,7 +1159,7 @@ export function CallHelper({
 
             {/* Problem Summary */}
             <div className="space-y-2">
-              <Label htmlFor="problemSummary" className="text-right block text-foreground font-semibold text-sm">
+              <Label htmlFor="problemSummary" className="block text-start text-foreground font-semibold text-sm">
                 {t("callHelper.form.problemSummary")}
               </Label>
               <Textarea
@@ -932,7 +1167,7 @@ export function CallHelper({
                 placeholder={t("callHelper.form.problemPlaceholder")}
                 value={problemSummary}
                 onChange={(e) => setProblemSummary(e.target.value)}
-                className="text-right glass-panel border focus:border-primary rounded-xl px-4 py-3 min-h-[100px] text-foreground placeholder:text-muted-foreground resize-none transition-all"
+                className="text-start glass-panel border focus:border-primary rounded-xl px-4 py-3 min-h-[100px] text-foreground placeholder:text-muted-foreground resize-none transition-all"
               />
             </div>
 
@@ -967,7 +1202,7 @@ export function CallHelper({
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <h2 className="text-lg sm:text-xl font-bold text-foreground">{t("callHelper.output.title")}</h2>
-                {generatedText && !isLowConfidence && (
+                {showGeneratedOutput && !isLowConfidence && (
                   <TooltipProvider delayDuration={200}>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -1023,7 +1258,7 @@ export function CallHelper({
               )}
             </div>
           </div>
-          <CardContent className="p-4 sm:p-6 lg:p-8 space-y-4">
+          <CardContent className="p-4 sm:p-6 lg:p-8 space-y-4" dir={dir}>
             {/* ============ GRAY AREA WARNING (shows when confidence < 40%) ============ */}
             {isLowConfidence && (
               <div className="glass-panel border-2 border-orange-500/50 dark:border-orange-400/50 rounded-xl p-4 space-y-3 bg-orange-50/50 dark:bg-orange-950/20">
@@ -1050,7 +1285,7 @@ export function CallHelper({
 
             {/* ============ DESCRIPTION MATCH INDICATOR (shows above generated text box) ============ */}
             {/* Shows either descriptionMatchPercentage OR confidenceScore */}
-            {generatedText && !isLowConfidence && (
+            {showGeneratedOutput && !isLowConfidence && (
               <div className={`glass-panel rounded-xl p-3 border-2 ${
                 // If we have description match, use it; otherwise use confidence score
                 descriptionMatchPercentage > 40 ? (
@@ -1176,16 +1411,27 @@ export function CallHelper({
               </div>
             )}
 
-            {/* Generated response — عرض تشغيلي فقط؛ النص المخزّن في generatedText دون تغيير */}
+            {/* Generated response — يظهر بعد انتهاء عبارات التحليل */}
             <div
               className={`relative ${isLowConfidence ? "pointer-events-none" : ""}`}
             >
-              {generatedText.trim() ? (
+              {isAnalysisInProgress ? (
                 <div
-                  className={`text-right rounded-xl border border-border/80 bg-card/40 shadow-sm overflow-hidden ${
+                  className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-primary/30 bg-primary/[0.06] px-4 py-14 min-h-[240px]"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <Wand2 className="size-8 text-primary animate-spin" aria-hidden />
+                  <p className="text-sm font-semibold text-muted-foreground">
+                    {t("callHelper.form.generating")}
+                  </p>
+                </div>
+              ) : showGeneratedOutput ? (
+                <div
+                  className={`text-start rounded-xl border border-border/80 bg-card/40 shadow-sm overflow-hidden ${
                     isLowConfidence ? "blur-sm select-none" : ""
                   }`}
-                  dir="rtl"
+                  dir={dir}
                 >
                   <div className="border-b border-border/60 bg-muted/25 px-4 sm:px-5 py-4 space-y-3.5">
                     <div className="space-y-1">
@@ -1201,7 +1447,7 @@ export function CallHelper({
                         نوع الجهة
                       </p>
                       <p className="text-sm sm:text-[15px] font-semibold text-foreground leading-snug">
-                        {entityType.trim() || "—"}
+                        {selectedEntityKey ? tEntity(t, selectedEntityKey) : "—"}
                       </p>
                     </div>
                     <div className="space-y-1">
@@ -1218,10 +1464,8 @@ export function CallHelper({
                       تم إفادة العميل بالتالي:
                     </p>
                     <div className="rounded-lg border border-border/70 bg-muted/20 px-3 sm:px-4 py-3 min-h-[180px]">
-                      <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-foreground m-0 text-right">
-                        {isMatchedResponse && matchedProblem?.response?.trim()
-                          ? matchedProblem.response.trim()
-                          : generatedText}
+                      <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-foreground m-0 text-start">
+                        {clientBriefingText}
                       </pre>
                     </div>
                   </div>
@@ -1230,8 +1474,9 @@ export function CallHelper({
                 <Textarea
                   value={generatedText}
                   readOnly
-                  placeholder="سيتم عرض الصيغة المولدة هنا..."
-                  className={`text-right glass-panel border rounded-xl px-4 py-3 min-h-[240px] resize-none text-foreground placeholder:text-muted-foreground transition-all ${
+                  dir={dir}
+                  placeholder={t('callHelper.output.placeholder')}
+                  className={`text-start glass-panel border rounded-xl px-4 py-3 min-h-[240px] resize-none text-foreground placeholder:text-muted-foreground transition-all ${
                     isLowConfidence ? "blur-sm select-none" : ""
                   }`}
                 />
@@ -1246,7 +1491,7 @@ export function CallHelper({
               )}
             </div>
 
-            {generatedText && !isLowConfidence && (
+            {showGeneratedOutput && !isLowConfidence && (
               <>
                 {/* Copy Button */}
                 <button
@@ -1295,7 +1540,9 @@ export function CallHelper({
                           </button>
                         </TooltipTrigger>
                         <TooltipContent side="top" className="border-2 border-border bg-gray-900 dark:bg-gray-100 shadow-xl">
-                          <p className="text-xs text-gray-100 dark:text-gray-900 font-medium">يفتح صفحة «علّم رفيق من تجربتك» مع تعبئة تلقائية من هذه المكالمة</p>
+                          <p className="text-xs text-gray-100 dark:text-gray-900 font-medium">
+                            {t('callHelper.feedback.helpedTooltip')}
+                          </p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
@@ -1320,10 +1567,7 @@ export function CallHelper({
                     </button>
 
                     {/* ============ ADVANCED MODE BUTTON ============ */}
-                    <TooltipProvider delayDuration={200}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
+                    <button
                             onClick={handleAdvancedModeToggle}
                             className={`py-2.5 sm:py-3 rounded-xl transition-all duration-300 font-semibold flex flex-col items-center justify-center gap-1 shadow-md relative ${
                                 activeButton === "advanced"
@@ -1336,21 +1580,7 @@ export function CallHelper({
                             )}
                             <Sliders className={`size-4 ${activeButton === "advanced" ? "rotate-12" : ""} transition-transform ${activeButton === "advanced" ? "" : "text-blue-600 dark:text-blue-400"}`} />
                             <span className={`text-[10px] sm:text-xs ${activeButton === "advanced" ? "" : "text-blue-700 dark:text-blue-300"}`}>وضع متقدم</span>
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="border-2 border-border bg-gray-900 dark:bg-gray-100 max-w-xs shadow-xl" dir="rtl">
-                          <div className="text-right space-y-1">
-                            <p className="text-xs font-semibold text-gray-100 dark:text-gray-900">الوضع المتقدم</p>
-                            <p className="text-[10px] text-gray-300 dark:text-gray-700">
-                              {isAdvancedModeEnabled 
-                                ? "يتم عرض خيارات متقدمة بناءً على نوع المشكلة المحدد"
-                                : "سيتم تفعيله تلقائياً عند تحديد نوع المشكلة أو يمكنك تفعيله يدوياً"
-                              }
-                            </p>
-                          </div>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    </button>
 
                     <TooltipProvider delayDuration={200}>
                       <Tooltip>
@@ -1364,7 +1594,9 @@ export function CallHelper({
                           </button>
                         </TooltipTrigger>
                         <TooltipContent side="top" className="border-2 border-border bg-gray-900 dark:bg-gray-100 shadow-xl">
-                          <p className="text-xs text-gray-100 dark:text-gray-900 font-medium">يفتح صفحة «علّم رفيق من تجربتك» مع تعبئة تلقائية</p>
+                          <p className="text-xs text-gray-100 dark:text-gray-900 font-medium">
+                            {t('callHelper.feedback.helpedTooltip')}
+                          </p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
@@ -1373,7 +1605,7 @@ export function CallHelper({
 
                 {/* ============ ADVANCED MODE PANEL ============ */}
                 {/* Shows when advanced mode is active */}
-                {activeButton === "advanced" && isAdvancedModeEnabled && (
+                {activeButton === "advanced" && isAdvancedModeEnabled && !isHighConfidenceAnswer && (
                   <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
                     {selectedProblemType && (
                       <div className="flex items-center justify-between text-xs glass-panel rounded-lg p-3 border">
@@ -1409,7 +1641,7 @@ export function CallHelper({
                         
                         // Generate response based on final action
                         // Common variables
-                        const entityTypeArabic = entityType;
+                        const entityTypeArabic = entityTypeApi;
                         const problemTypeName = selectedProblemType 
                           ? (PROBLEM_TYPES.find(t => t.id === selectedProblemType)?.name || '')
                           : '';
@@ -1424,12 +1656,38 @@ export function CallHelper({
                         const subConditionNames = result.completedSteps
                           .map((completedStep) => completedStep.selectedSubCondition?.name || '')
                           .filter(Boolean);
-                        if (result.finalAction === 'direct_answer') {
-                          const directAnswerText = lastSubCondition.actionDetails || lastSubCondition.name || 'تم تقديم الإجابة المباشرة';
-                          const newGeneratedText = `السلام عليكم ورحمة الله وبركاته،\n\nتم استقبال بلاغ من العميل: ${customerName}\nنوع الجهة: ${entityTypeArabic}\nنوع المشكلة: ${problemTypeName}\n\nالحالة: ${lastSubCondition.name}\n\n💡 توجيهات الحل:\n${directAnswerText}\n\nشكراً لتواصلكم معنا.`;
-                          setGeneratedText(newGeneratedText);
+
+                        const fillFlowTemplate = (
+                          template: string,
+                          vars: Record<string, string>,
+                        ) =>
+                          template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => vars[key] ?? '');
+
+                        const flowGuidanceText =
+                          resolveFlowGuidanceFromFlowResult(
+                            result,
+                            lastSubCondition,
+                          ) || AR_CALL_TEMPLATES.defaultSolution;
+
+                        const applyGuidanceToBriefingBox = () => {
+                          setFlowBriefingGuidance(flowGuidanceText);
                           setIsMatchedResponse(false);
                           setMatchedProblem(null);
+                        };
+
+                        if (result.finalAction === 'direct_answer') {
+                          applyGuidanceToBriefingBox();
+                          const newGeneratedText = fillFlowTemplate(
+                            AR_CALL_TEMPLATES.flowDirectAnswer,
+                            {
+                              customerName,
+                              entityType: entityTypeArabic,
+                              problemType: problemTypeName || '—',
+                              condition: lastSubCondition.name,
+                              solution: flowGuidanceText,
+                            },
+                          );
+                          setGeneratedText(newGeneratedText);
                           setDescriptionMatchPercentage(0);
                           void logCallToBackend({
                             generatedResponse: newGeneratedText,
@@ -1450,23 +1708,96 @@ export function CallHelper({
                           });
                           return;
                         }
+
+                        /** إيقاف المسار + حل إجباري: توجيه الحل من الإعدادات وليس قاعدة المعرفة */
+                        if (result.finalAction === 'force_solution') {
+                          applyGuidanceToBriefingBox();
+                          const newGeneratedText = fillFlowTemplate(
+                            AR_CALL_TEMPLATES.flowForceSolution,
+                            {
+                              customerName,
+                              entityType: entityTypeArabic,
+                              problemType: problemTypeName || '—',
+                              condition: lastSubCondition.name,
+                              solution: flowGuidanceText,
+                            },
+                          );
+                          setGeneratedText(newGeneratedText);
+                          setDescriptionMatchPercentage(0);
+                          void logCallToBackend({
+                            generatedResponse: newGeneratedText,
+                            status: 'resolved',
+                            flowResult: result,
+                            finalDisplayScore: 100,
+                          });
+                          result.completedSteps.forEach((step) => {
+                            setDebugFlowLog(prev => [
+                              ...prev,
+                              {
+                                step: step.stepName,
+                                subCondition: step.selectedSubCondition.name,
+                                action: step.selectedSubCondition.action,
+                                timestamp: new Date(),
+                              },
+                            ]);
+                          });
+                          return;
+                        }
+
+                        if (result.finalAction === 'escalation') {
+                          const escalationGuidance =
+                            resolveFlowGuidanceFromFlowResult(
+                              result,
+                              lastSubCondition,
+                            ) || AR_CALL_TEMPLATES.defaultEscalation;
+                          setFlowBriefingGuidance(escalationGuidance);
+                          setIsMatchedResponse(false);
+                          setMatchedProblem(null);
+                          const newGeneratedText = fillFlowTemplate(
+                            AR_CALL_TEMPLATES.flowEscalation,
+                            {
+                              customerName,
+                              entityType: entityTypeArabic,
+                              problemType: problemTypeName || '—',
+                              condition: lastSubCondition.name,
+                              solution: escalationGuidance,
+                            },
+                          );
+                          setGeneratedText(newGeneratedText);
+                          setDescriptionMatchPercentage(0);
+                          void logCallToBackend({
+                            generatedResponse: newGeneratedText,
+                            status: 'escalated',
+                            flowResult: result,
+                            finalDisplayScore: 100,
+                          });
+                          result.completedSteps.forEach((step) => {
+                            setDebugFlowLog(prev => [
+                              ...prev,
+                              {
+                                step: step.stepName,
+                                subCondition: step.selectedSubCondition.name,
+                                action: step.selectedSubCondition.action,
+                                timestamp: new Date(),
+                              },
+                            ]);
+                          });
+                          return;
+                        }
+
                         const enhancedSearchResult = await rerunMatchWithFlowContext({
                           routeNames,
                           stepNames,
                           subConditionNames,
                           problemTypeName,
                         });
-                        if (
-                          result.finalAction !== 'escalation'
-                          && result.finalAction !== 'direct_answer'
-                          && enhancedSearchResult?.isMatched
-                          && enhancedSearchResult.problem
-                        ) {
+                        if (enhancedSearchResult?.isMatched && enhancedSearchResult.problem) {
                           const matchedText = getFormattedResponse(
                             enhancedSearchResult.problem,
                             customerName,
-                            entityType
+                            entityTypeApi,
                           );
+                          setFlowBriefingGuidance(null);
                           setGeneratedText(matchedText);
                           setDescriptionMatchPercentage(enhancedSearchResult.matchPercentage);
                           setConfidenceScore(100);
@@ -1481,14 +1812,23 @@ export function CallHelper({
                             why: (enhancedSearchResult.problem.why || '').trim(),
                           } as RegisteredProblem);
                           setIsMatchedResponse(true);
+                          const rematchScore = enhancedSearchResult.matchPercentage;
+                          const rematchConfirmed = rematchScore >= directAnswerThreshold;
                           void logCallToBackend({
                             generatedResponse: matchedText,
-                            status: result.finalAction === 'force_solution' ? 'resolved' : 'pending',
+                            status:
+                              result.finalAction === 'force_solution' || rematchConfirmed
+                                ? 'resolved'
+                                : 'pending',
                             matchedCaseDbId: enhancedSearchResult.problem.id,
                             matchedCaseCode: enhancedSearchResult.problem.description,
                             matchedAt: new Date().toISOString(),
+                            category: enhancedSearchResult.problem.category?.trim() || null,
                             flowResult: result,
-                            finalDisplayScore: enhancedSearchResult.matchPercentage,
+                            finalDisplayScore: analyticsFinalScore(
+                              rematchScore,
+                              directAnswerThreshold,
+                            ),
                           });
                           result.completedSteps.forEach((step) => {
                             setDebugFlowLog(prev => [
@@ -1506,44 +1846,27 @@ export function CallHelper({
                         setIsMatchedResponse(false);
                         setMatchedProblem(null);
                         setDescriptionMatchPercentage(0);
-                        
-                        if (result.finalAction === 'escalation') {
-                          const escalationText = lastSubCondition.actionDetails || 'يرجى تصعيد المشكلة للقسم المختص';
-                          const newGeneratedText = `السلام عليكم ورحمة الله وبركاته،\n\nتم استقبال بلاغ من العميل: ${customerName}\nنوع الجهة: ${entityTypeArabic}\nنوع المشكلة: ${problemTypeName}\n\nالحالة: ${lastSubCondition.name}\n\n⚠️ تصعيد:\\n${escalationText}\\n\nشكراً لتواصلكم معنا.`;
-                          setGeneratedText(newGeneratedText);
-                          void logCallToBackend({
-                            generatedResponse: newGeneratedText,
-                            status: "escalated",
-                            flowResult: result,
-                            finalDisplayScore: 100,
-                          });
-                        } else if (result.finalAction === 'force_solution') {
-                          const solutionText = lastSubCondition.actionDetails || 'الحل المقترح';
-                          const newGeneratedText = `السلام عليكم ورحمة الله وبركاته،\n\nتم استقبال بلاغ من العميل: ${customerName}\nنوع الجهة: ${entityTypeArabic}\nنوع المشكلة: ${problemTypeName}\n\nالحالة: ${lastSubCondition.name}\n\n💡 الحل:\\n${solutionText}\\n\nشكراً لتواصلكم معنا.`;
-                          setGeneratedText(newGeneratedText);
-                          void logCallToBackend({
-                            generatedResponse: newGeneratedText,
-                            status: "resolved",
-                            flowResult: result,
-                            finalDisplayScore: 100,
-                          });
-                        } else {
-                          // Continue action - generate success message
-                          const entityTypeArabic = entityType;
-                          const problemTypeName = selectedProblemType 
-                            ? (PROBLEM_TYPES.find(t => t.id === selectedProblemType)?.name || '')
-                            : '';
-                          
-                          const continueMessage = `السلام عليكم ورحمة الله وبركاته،\n\nتم استقبال بلاغ من العميل: ${customerName}\nنوع الجهة: ${entityTypeArabic}\nنوع المشكلة: ${problemTypeName}\n\nالحالة: ${lastSubCondition.name}\n\n✅ تمت معالجة جميع الخطوات بنجاح.\n\nشكراً لتواصلكم معنا.`;
-                          
-                          setGeneratedText(continueMessage);
-                          void logCallToBackend({
-                            generatedResponse: continueMessage,
-                            status: "pending",
-                            flowResult: result,
-                            finalDisplayScore: 100,
-                          });
-                        }
+                        setFlowBriefingGuidance(null);
+
+                        // Continue action — generate success message
+                        const continueMessage = fillFlowTemplate(
+                          AR_CALL_TEMPLATES.flowContinue,
+                          {
+                            customerName,
+                            entityType: entityTypeArabic,
+                            problemType: problemTypeName || '—',
+                            condition: lastSubCondition.name,
+                            solution: lastSubCondition.name,
+                          },
+                        );
+
+                        setGeneratedText(continueMessage);
+                        void logCallToBackend({
+                          generatedResponse: continueMessage,
+                          status: 'pending',
+                          flowResult: result,
+                          finalDisplayScore: 100,
+                        });
 
                         // Add to flow log
                         result.completedSteps.forEach((step) => {
@@ -1590,6 +1913,8 @@ export function CallHelper({
           // Show loading state
           setIsGenerating(true);
           setThinkingSteps([]);
+          setGeneratedText('');
+          setFlowBriefingGuidance(null);
           try {
           await appendThinkingStep(
             "رفيق يربط نوع المشكلة مع المسارات والخطوات التي اخترتها.",
@@ -1603,7 +1928,7 @@ export function CallHelper({
           }
           
           // Generate response based on flow path
-          const entityTypeArabic = entityType;
+          const entityTypeArabic = entityTypeApi;
           const problemTypeName = flowPath.questionTitle;
           const routeNames = flowPath.selectedSteps.map((item) => item.route.name).filter(Boolean);
           const stepNames = flowPath.selectedSteps.map((item) => item.step.name).filter(Boolean);
@@ -1662,7 +1987,7 @@ export function CallHelper({
             const matchedText = getFormattedResponse(
               enhancedSearchResult.problem,
               customerName,
-              entityType
+              entityTypeApi,
             );
             setGeneratedText(matchedText);
             setDescriptionMatchPercentage(enhancedSearchResult.matchPercentage);
@@ -1685,7 +2010,10 @@ export function CallHelper({
               matchedCaseCode: enhancedSearchResult.problem.description,
               matchedAt: new Date().toISOString(),
               flowResult: flowPath,
-              finalDisplayScore: enhancedSearchResult.matchPercentage,
+              finalDisplayScore: analyticsFinalScore(
+                enhancedSearchResult.matchPercentage,
+                directAnswerThreshold,
+              ),
             });
             setIsGenerating(false);
             flowPath.selectedSteps.forEach((item) => {
@@ -1713,7 +2041,7 @@ export function CallHelper({
             );
           } else if (flowPath.finalAction === "escalation") {
             await appendThinkingStep(
-              "اعتماد نص الرد وفق إجراء «تصعيد» المختار في المسار.",
+              "اعتماد نص الرد وفق توجيه «تصعيد» المختار في المسار (لا إحالة آلية).",
               460,
               "APPLYING ESCALATION MESSAGE FROM ROUTE",
             );
@@ -1742,14 +2070,7 @@ export function CallHelper({
             generatedResponse += `تفاصيل المشكلة:\\n${problemSummary}\\n\\nتم معالجة طلبكم بنجاح. في حال وجود أي استفسار، لا تترددوا بالتواصل معنا.\\n\\nمع تحياتنا،`;
             
           } else if (flowPath.finalAction === 'escalation') {
-            generatedResponse = `السلام عليكم ورحمة الله وبركاته،\\n\\nعزيزي/عزيزتي ${customerName}،\\n\\nتم استلام بلاغكم بخصوص: ${problemTypeName}\\nنوع الجهة: ${entityTypeArabic}\\n\\n`;
-            
-            if (flowPath.finalStepDescription) {
-              generatedResponse += `⚠️ ${flowPath.finalStepDescription}\\n\\n`;
-            }
-            
-            generatedResponse += `تفاصيل المشكلة:\\n${problemSummary}\\n\\nتم تصعيد طلبكم للإدارة المختصة وسيتم التواصل معكم في أقرب وقت ممكن.\\n\\nنعتذر عن أي إزعاج، ونقدر تفهمكم.\\n\\nمع تحياتنا،`;
-            
+            generatedResponse = ESCALATION_GUIDANCE_RESPONSE;
           } else {
             // continue action
             generatedResponse = `السلام عليكم ورحمة الله وبركاته،\\n\\nعزيزي/عزيزتي ${customerName}،\\n\\nتم استلام بلاغكم بخصوص: ${problemTypeName}\\nنوع الجهة: ${entityTypeArabic}\\n\\n`;

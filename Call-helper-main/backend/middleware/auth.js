@@ -19,7 +19,6 @@ export const authenticate = async (req, res, next) => {
       const user =
         (await User.findOne({ role: 'admin', isActive: true }).sort({ createdAt: 1 })) ||
         (await User.findOne({ role: 'moderator', isActive: true }).sort({ createdAt: 1 })) ||
-        (await User.findOne({ role: 'customer_service', isActive: true }).sort({ createdAt: 1 })) ||
         (await User.findOne({ isActive: true }).sort({ createdAt: 1 }));
 
       if (!user) {

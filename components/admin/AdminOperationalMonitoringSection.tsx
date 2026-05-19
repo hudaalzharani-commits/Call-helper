@@ -23,7 +23,7 @@ import { OperationalIssueTracker } from "../OperationalIssueTracker";
 
 export function AdminOperationalMonitoringSection() {
   const { isAdmin } = useAuth();
-  const [isGeneralIssuesOpen, setIsGeneralIssuesOpen] = useState(true);
+  const [isGeneralIssuesOpen, setIsGeneralIssuesOpen] = useState(false);
 
   const [thresholdConfig, setThresholdConfig] = useState<{
     value: number;

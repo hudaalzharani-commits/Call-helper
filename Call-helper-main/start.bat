@@ -112,10 +112,19 @@ if not exist "backend\.seeded" (
   )
   echo seeded>"backend\.seeded"
 )
+echo [INFO] Seeding default users
+pushd backend
+call npm run seed:users
+popd
+if errorlevel 1 (
+  echo [ERROR] Users seeding failed. Make sure MongoDB is running.
+  pause
+  exit /b 1
+)
 
 REM --- Start backend + frontend in separate terminals ---
 start "Rafeeq Backend" cmd /k "cd /d %cd%\backend && npm run dev"
-start "Rafeeq Frontend" cmd /k "cd /d %cd% && npm run dev"
+start "Rafeeq Frontend" cmd /k "cd /d %cd% && call dev-fresh.bat"
 
 echo.
 echo =============================================
@@ -128,6 +137,7 @@ echo.
 echo   Login:
 echo     admin / admin123
 echo     user  / user123
+echo     supervisor / supervisor123
 echo.
 echo =============================================
 echo.

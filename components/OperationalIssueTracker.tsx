@@ -249,7 +249,7 @@ export function OperationalIssueTracker({
   const [activeTab, setActiveTab] = useState<'active' | 'archive'>('active');
   // Collapsible on dashboard; in embedMode a separate flag controls the body.
   const [isOpen, setIsOpen] = useState(false);
-  const [isEmbedExpanded, setIsEmbedExpanded] = useState(true);
+  const [isEmbedExpanded, setIsEmbedExpanded] = useState(false);
 
   const refreshAll = useCallback(async () => {
     setIsLoading(true);

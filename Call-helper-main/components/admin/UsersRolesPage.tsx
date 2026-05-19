@@ -48,7 +48,11 @@ import {
   effectivePermContentCreate,
   type AppRole,
 } from '../../utils/appRoles';
-import { buildVisibilityDraft, UI_SURFACE_DEFINITIONS, GRANULAR_CREATE_DEFINITIONS } from '../../utils/uiVisibility';
+import {
+  buildVisibilityDraft,
+  UI_SURFACE_DEFINITIONS,
+  CONTENT_PERMISSION_DEFINITIONS,
+} from '../../utils/uiVisibility';
 
 interface User {
   id: string;
@@ -862,13 +866,13 @@ export function UsersRolesPage() {
               <div className="space-y-3 py-1" dir={dir}>
                 {(permissionsDialogUser.role === 'moderator' ||
                   permissionsDialogUser.role === 'customer_service') && (
-                  <div className="rounded-lg border border-primary/30 bg-primary/5 dark:bg-primary/10 p-3 max-h-52 overflow-y-auto space-y-2">
+                  <div className="rounded-lg border border-primary/30 bg-primary/5 dark:bg-primary/10 p-3 max-h-64 overflow-y-auto space-y-2">
                     <div className="flex flex-row-reverse items-center justify-end gap-2 font-semibold text-sm text-foreground border-b border-border/50 pb-2 mb-1">
                       <PlusCircle className="size-4 text-primary shrink-0" aria-hidden />
                       <span>أزرار إضافة المحتوى</span>
                     </div>
                     <div className="space-y-2">
-                      {GRANULAR_CREATE_DEFINITIONS.map(({ key, label }) => (
+                      {CONTENT_PERMISSION_DEFINITIONS.map(({ key, label, optIn }) => (
                         <div key={key} className="flex justify-between items-center gap-2">
                           <Label
                             id={`perm-dlg-create-label-${key}`}
@@ -877,7 +881,11 @@ export function UsersRolesPage() {
                             {label}
                           </Label>
                           <OnOffToggle
-                            value={permDialogDraft.uiVisibility[key] !== false}
+                            value={
+                              optIn
+                                ? permDialogDraft.uiVisibility[key] === true
+                                : permDialogDraft.uiVisibility[key] !== false
+                            }
                             disabled={permSavingId === permissionsDialogUser.id}
                             onChange={(c) =>
                               setPermDialogDraft((d) => {

@@ -17,13 +17,12 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from './ui/utils';
-import { formatAppDateShort } from '../utils/dateDisplay';
+import { formatAppDateShort, formatAppDateTime } from '../utils/dateDisplay';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import {
   Dialog,
   DialogContent,
@@ -111,6 +110,88 @@ function normCat(s: string) {
   return s.trim().toLowerCase();
 }
 
+/** صفحة «المشاكل العامة» — فقط أنماط فوق 10 حالات ومستمرة أكثر من 24 ساعة (متتبعة تشغيلياً). */
+const PUBLIC_ISSUES_MIN_CASES = 10;
+const PUBLIC_ISSUES_PERSISTENCE_MS = 24 * 60 * 60 * 1000;
+
+function hubCaseCount(stat: CategoryStat, op?: OperationalIssue): number {
+  const fromDist = Number(stat.count) || 0;
+  const fromOp = op?.occurrenceCount ?? 0;
+  return Math.max(fromDist, fromOp);
+}
+
+function categoryPersistedOver24h(
+  category: string,
+  operationalActive: OperationalIssue[],
+  operationalArchived: OperationalIssue[],
+): boolean {
+  const n = normCat(category);
+  const ops = [...operationalActive, ...operationalArchived].filter(
+    o => normCat(o.category) === n,
+  );
+  if (!ops.length) return false;
+  const now = Date.now();
+  return ops.some(op => {
+    if (op.status === 'persistent_operational') return true;
+    if (op.detectionCriteria?.includes('spans-beyond-24h')) return true;
+    const first = new Date(op.firstDetectedAt).getTime();
+    return Number.isFinite(first) && now - first >= PUBLIC_ISSUES_PERSISTENCE_MS;
+  });
+}
+
+function qualifiesForPublicIssuesHub(
+  stat: CategoryStat,
+  operationalActive: OperationalIssue[],
+  operationalArchived: OperationalIssue[],
+): boolean {
+  const opA = findActiveOp(stat.category, operationalActive);
+  const count = hubCaseCount(stat, opA);
+  if (count <= PUBLIC_ISSUES_MIN_CASES) return false;
+  return categoryPersistedOver24h(stat.category, operationalActive, operationalArchived);
+}
+
+function buildPublicIssuesFromStats(
+  top: CategoryStat[],
+  weekMap: Map<string, WeekOverWeekCategoryRow>,
+  operationalActive: OperationalIssue[],
+  operationalArchived: OperationalIssue[],
+): Issue[] {
+  // Ensure one row per normalized category to avoid duplicate card ids/states.
+  const dedupedTop = new Map<string, CategoryStat>();
+  for (const stat of top) {
+    const key = normCat(stat.category);
+    const prev = dedupedTop.get(key);
+    if (!prev || Number(stat.count) > Number(prev.count)) {
+      dedupedTop.set(key, stat);
+    }
+  }
+
+  const qualified = Array.from(dedupedTop.values()).filter(s =>
+    qualifiesForPublicIssuesHub(s, operationalActive, operationalArchived),
+  );
+  const seen = new Set(qualified.map(s => normCat(s.category)));
+
+  for (const op of operationalActive) {
+    const n = normCat(op.category);
+    if (seen.has(n)) continue;
+    const synthetic: CategoryStat = {
+      category: op.category,
+      count: op.occurrenceCount ?? 0,
+      percentage: 0,
+    };
+    if (qualifiesForPublicIssuesHub(synthetic, operationalActive, operationalArchived)) {
+      qualified.push(synthetic);
+      seen.add(n);
+    }
+  }
+
+  qualified.sort((a, b) => hubCaseCount(b, findActiveOp(b.category, operationalActive)) - hubCaseCount(a, findActiveOp(a.category, operationalActive)));
+
+  return qualified.map((s, i) =>
+    categoryStatToIssue(s, i, qualified.length, weekMap.get(s.category)),
+  );
+}
+
 function categoryStatToIssue(
   stat: CategoryStat,
   index: number,
@@ -126,7 +207,7 @@ function categoryStatToIssue(
     );
   }
   return {
-    id: `distribution:${index}:${stat.category}`,
+    id: `hub:${index}:${normCat(stat.category)}`,
     title: stat.category,
     description: descParts.join(' — '),
     status: 'active',
@@ -409,8 +490,6 @@ type HubIssueCardProps = {
   operationalActive: OperationalIssue[];
   operationalArchived: OperationalIssue[];
   kbArticles: BackendKnowledgeArticle[];
-  openRowId: string | null;
-  setOpenRowId: (id: string | null) => void;
 };
 
 function HubIssueCard({
@@ -421,11 +500,10 @@ function HubIssueCard({
   operationalActive,
   operationalArchived,
   kbArticles,
-  openRowId,
-  setOpenRowId,
 }: HubIssueCardProps) {
   const { t } = useI18nLayout();
   const [whyOpen, setWhyOpen] = useState(false);
+  const [kbOpen, setKbOpen] = useState(false);
   const count = Number((issue.metadata?.count as number) ?? 0);
   const pctRaw = issue.metadata?.percentage;
   const pctNum = toPctNumber(pctRaw);
@@ -439,7 +517,6 @@ function HubIssueCard({
   const opBadge = operationalBadgeForCategory(issue.category, operationalActive, operationalArchived);
   const rel = relatedKnowledgeArticles(kbArticles, issue.category);
   const kw = topKeywordsFromArticles(rel);
-  const isOpen = openRowId === issue.id;
   const humanLbl = humanShareLabel(pctNum, w);
   const ring = HUB_SECTION_COPY[sectionKey].cardRing;
 
@@ -488,13 +565,13 @@ function HubIssueCard({
   return (
     <Card
       className={cn(
-        'group flex h-full flex-col overflow-hidden rounded-xl border border-border/70 bg-card/90 text-right shadow-sm transition-all duration-200',
+        'group flex w-full flex-col self-start overflow-hidden rounded-xl border border-border/70 bg-card/90 text-right shadow-sm transition-all duration-200',
         'hover:border-primary/20 hover:shadow-md',
         ring,
         overRed && 'border-red-500/50 ring-1 ring-red-500/20',
       )}
     >
-      <CardContent className="flex h-full flex-col gap-0 p-0">
+      <CardContent className="flex flex-col gap-0 p-0">
         {/* —— HEADER —— */}
         <div className="border-b border-border/60 bg-muted/25 px-3 py-2.5">
           <div className="flex items-start justify-between gap-3" dir="rtl">
@@ -560,21 +637,29 @@ function HubIssueCard({
           </div>
         </div>
 
-        {/* —— COLLAPSIBLE: لماذا مهمة —— */}
-        <Collapsible open={whyOpen} onOpenChange={setWhyOpen} className="border-t border-border/50">
-          <CollapsibleTrigger asChild>
-            <button
-              type="button"
-              className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted/40"
+        {/* —— لماذا مهمة (حالة لكل بطاقة على حدة) —— */}
+        <div className="border-t border-border/50">
+          <button
+            type="button"
+            aria-expanded={whyOpen}
+            onClick={e => {
+              e.stopPropagation();
+              e.preventDefault();
+              setWhyOpen(prev => !prev);
+            }}
+            className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted/40"
+          >
+            <ChevronDown
+              className={cn('size-3.5 shrink-0 transition-transform duration-200', whyOpen && 'rotate-180')}
+              aria-hidden
+            />
+            <span className="font-medium text-foreground/90">لماذا هذه المشكلة مهمة؟</span>
+          </button>
+          {whyOpen ? (
+            <div
+              role="region"
+              className="space-y-2 border-t border-border/40 bg-muted/15 px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground"
             >
-              <ChevronDown
-                className={cn('size-3.5 shrink-0 transition-transform duration-200', whyOpen && 'rotate-180')}
-                aria-hidden
-              />
-              <span className="font-medium text-foreground/90">لماذا هذه المشكلة مهمة؟</span>
-            </button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="space-y-2 border-t border-border/40 bg-muted/15 px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
             <p>
               <span className="font-semibold text-primary">• </span>
               تكرار إجمالي{' '}
@@ -626,8 +711,9 @@ function HubIssueCard({
                   ? 'سُجّل سابقًا في التتبع التشغيلي وأُغلق.'
                   : 'لم تُصنَّف بعد كمشكلة تشغيلية نشطة.'}
             </p>
-          </CollapsibleContent>
-        </Collapsible>
+            </div>
+          ) : null}
+        </div>
 
         {/* —— FOOTER —— */}
         <div className="mt-auto space-y-2 border-t border-border/60 bg-muted/10 px-3 py-2">
@@ -690,32 +776,33 @@ function HubIssueCard({
         </div>
 
         {/* —— مقالات المعرفة —— */}
-        <Collapsible
-          open={isOpen}
-          onOpenChange={open => setOpenRowId(open ? issue.id : null)}
-          className="border-t border-border/50"
-        >
-          <CollapsibleTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 w-full justify-center rounded-none text-[11px] text-muted-foreground hover:bg-muted/30"
-            >
-              {isOpen ? (
-                <>
-                  إخفاء المقالات ({rel.length})
-                  <ChevronUp className="mr-1 size-3" />
-                </>
-              ) : (
-                <>
-                  مقالات ذات صلة ({rel.length})
-                  <ChevronDown className="mr-1 size-3" />
-                </>
-              )}
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="space-y-1.5 border-t border-border/40 bg-muted/5 px-2 py-2">
+        <div className="border-t border-border/50">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-expanded={kbOpen}
+            className="h-8 w-full justify-center rounded-none text-[11px] text-muted-foreground hover:bg-muted/30"
+            onClick={e => {
+              e.stopPropagation();
+              e.preventDefault();
+              setKbOpen(prev => !prev);
+            }}
+          >
+            {kbOpen ? (
+              <>
+                إخفاء المقالات ({rel.length})
+                <ChevronUp className="mr-1 size-3" />
+              </>
+            ) : (
+              <>
+                مقالات ذات صلة ({rel.length})
+                <ChevronDown className="mr-1 size-3" />
+              </>
+            )}
+          </Button>
+          {kbOpen ? (
+            <div className="space-y-1.5 border-t border-border/40 bg-muted/5 px-2 py-2">
             {rel.length === 0 ? (
               <p className="px-1 py-1 text-center text-[10px] text-muted-foreground">لا مقالات مطابقة.</p>
             ) : (
@@ -739,8 +826,9 @@ function HubIssueCard({
                 </div>
               ))
             )}
-          </CollapsibleContent>
-        </Collapsible>
+            </div>
+          ) : null}
+        </div>
       </CardContent>
     </Card>
   );
@@ -762,8 +850,8 @@ export function CommonIssues() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [openRowId, setOpenRowId] = useState<string | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [closedTodayDialogOpen, setClosedTodayDialogOpen] = useState(false);
   const [formData, setFormData] = useState<IssueFormData>({
     title: '',
     description: '',
@@ -779,27 +867,26 @@ export function CommonIssues() {
     setLoadError(null);
     try {
       const dist = await getDistributionStats();
-
       const top = dist.topCategories ?? [];
       const weekList = dist.weekOverWeekByCategory ?? [];
       const weekMap = new Map(weekList.map(w => [w.category, w]));
 
-      setIssues(
-        top.map((s, i) =>
-          categoryStatToIssue(s, i, top.length, weekMap.get(s.category)),
-        ),
-      );
-
-      const kbP = listKnowledgeArticles({}).then(rows => setKbArticles(rows)).catch(() => setKbArticles([]));
-      const opP = Promise.all([
+      const [kbRows, activeOps, archivedOps] = await Promise.all([
+        listKnowledgeArticles({}).catch(() => [] as BackendKnowledgeArticle[]),
         fetchActiveOperationalIssues()
-          .then(r => setOperationalActive(r.issues))
-          .catch(() => setOperationalActive([])),
+          .then(r => r.issues)
+          .catch(() => [] as OperationalIssue[]),
         fetchArchivedOperationalIssues(80)
-          .then(r => setOperationalArchived(r.issues))
-          .catch(() => setOperationalArchived([])),
+          .then(r => r.issues)
+          .catch(() => [] as OperationalIssue[]),
       ]);
-      await Promise.all([kbP, opP]);
+      setKbArticles(kbRows);
+      setOperationalActive(activeOps);
+      setOperationalArchived(archivedOps);
+
+      setIssues(
+        buildPublicIssuesFromStats(top, weekMap, activeOps, archivedOps),
+      );
     } catch (error) {
       console.error('Error loading common issues hub:', error);
       setIssues([]);
@@ -922,48 +1009,56 @@ export function CommonIssues() {
     toast.success(t('commonIssues.exportSuccess'));
   };
 
-  const { buckets, issueSection } = useMemo(
+  const { issueSection } = useMemo(
     () => partitionHubIssues(filteredIssues, operationalActive, operationalArchived, kbArticles),
     [filteredIssues, operationalActive, operationalArchived, kbArticles],
   );
 
-  const flatOrderedIssues = useMemo(() => HUB_SECTION_ORDER.flatMap(k => buckets[k]), [buckets]);
+  const sortedByCount = useMemo(() => {
+    return [...filteredIssues].sort((a, b) => {
+      const ca = Number((a.metadata?.count as number) ?? 0);
+      const cb = Number((b.metadata?.count as number) ?? 0);
+      return cb - ca;
+    });
+  }, [filteredIssues]);
 
   const issueRankById = useMemo(() => {
     const m = new Map<string, number>();
-    flatOrderedIssues.forEach((issue, i) => m.set(issue.id, i + 1));
+    sortedByCount.forEach((issue, i) => m.set(issue.id, i + 1));
     return m;
-  }, [flatOrderedIssues]);
+  }, [sortedByCount]);
+
+  const closedTodayIssues = useMemo(
+    () =>
+      operationalArchived
+        .filter(o => isResolvedToday(o.resolvedAt))
+        .sort(
+          (a, b) =>
+            new Date(b.resolvedAt!).getTime() - new Date(a.resolvedAt!).getTime(),
+        ),
+    [operationalArchived],
+  );
 
   const hubStrip = useMemo(() => {
-    const top = filteredIssues[0];
+    const top = sortedByCount[0];
     const topLine =
       top != null
         ? `${kbCategoryLabel(top.title)} (${Number((top.metadata?.count as number) ?? 0)})`
         : '—';
     const operationalCount = operationalActive.length;
-    const solvedToday = operationalArchived.filter(o => isResolvedToday(o.resolvedAt)).length;
+    const solvedToday = closedTodayIssues.length;
     return { topLine, operationalCount, solvedToday };
-  }, [filteredIssues, operationalActive, operationalArchived]);
+  }, [sortedByCount, operationalActive.length, closedTodayIssues]);
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = flatOrderedIssues.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(flatOrderedIssues.length / itemsPerPage);
-
-  const groupedPageSections = useMemo(() => {
-    const blocks: { key: HubSectionKey; items: Issue[] }[] = [];
-    for (const key of HUB_SECTION_ORDER) {
-      const row = currentItems.filter(i => issueSection.get(i.id) === key);
-      if (row.length) blocks.push({ key, items: row });
-    }
-    return blocks;
-  }, [currentItems, issueSection]);
+  const currentItems = sortedByCount.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(sortedByCount.length / itemsPerPage);
 
   useEffect(() => {
-    const tp = Math.ceil(flatOrderedIssues.length / itemsPerPage);
+    const tp = Math.ceil(sortedByCount.length / itemsPerPage);
     if (tp > 0 && currentPage > tp) setCurrentPage(tp);
-  }, [flatOrderedIssues.length, currentPage, itemsPerPage]);
+  }, [sortedByCount.length, currentPage, itemsPerPage]);
 
   return (
     <div className="space-y-6">
@@ -1024,11 +1119,26 @@ export function CommonIssues() {
               <span className="font-medium text-foreground tabular-nums">{hubStrip.operationalCount}</span>
               <span>{t('commonIssues.hubActive')}</span>
             </span>
-            <span className="inline-flex max-w-full flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              disabled={hubStrip.solvedToday === 0}
+              onClick={() => setClosedTodayDialogOpen(true)}
+              title={
+                hubStrip.solvedToday > 0
+                  ? t('commonIssues.hubClosedTodayViewList')
+                  : undefined
+              }
+              className={cn(
+                'inline-flex max-w-full flex-wrap items-center justify-center gap-2 rounded-lg px-2 py-0.5 -my-0.5 transition-colors',
+                hubStrip.solvedToday > 0
+                  ? 'cursor-pointer hover:bg-emerald-500/15 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40'
+                  : 'cursor-default opacity-80',
+              )}
+            >
               <span aria-hidden>🟢</span>
               <span className="font-medium text-foreground tabular-nums">{hubStrip.solvedToday}</span>
               <span>{t('commonIssues.hubClosedToday')}</span>
-            </span>
+            </button>
           </div>
         </div>
       )}
@@ -1069,7 +1179,7 @@ export function CommonIssues() {
               <p className="text-muted-foreground">{t('commonIssues.loading')}</p>
             </CardContent>
           </Card>
-        ) : flatOrderedIssues.length === 0 ? (
+        ) : sortedByCount.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="p-10 text-center">
               <AlertCircle className="size-12 text-muted-foreground mx-auto mb-4" />
@@ -1077,26 +1187,20 @@ export function CommonIssues() {
             </CardContent>
           </Card>
         ) : (
-          groupedPageSections.map(block => (
-            <section key={block.key} className="space-y-3 scroll-mt-4">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {block.items.map(issue => (
-                  <HubIssueCard
-                    key={issue.id}
-                    issue={issue}
-                    sectionKey={block.key}
-                    rankDisplay={`#${issueRankById.get(issue.id) ?? ''}`}
-                    redlines={redlines}
-                    operationalActive={operationalActive}
-                    operationalArchived={operationalArchived}
-                    kbArticles={kbArticles}
-                    openRowId={openRowId}
-                    setOpenRowId={setOpenRowId}
-                  />
-                ))}
-              </div>
-            </section>
-          ))
+          <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {currentItems.map((issue, localIdx) => (
+              <HubIssueCard
+                key={`${issue.id}:${indexOfFirstItem + localIdx}`}
+                issue={issue}
+                sectionKey={issueSection.get(issue.id) ?? 'other'}
+                rankDisplay={`#${issueRankById.get(issue.id) ?? ''}`}
+                redlines={redlines}
+                operationalActive={operationalActive}
+                operationalArchived={operationalArchived}
+                kbArticles={kbArticles}
+              />
+            ))}
+          </div>
         )}
       </div>
 
@@ -1121,6 +1225,93 @@ export function CommonIssues() {
           </Button>
         </div>
       )}
+
+      <Dialog open={closedTodayDialogOpen} onOpenChange={setClosedTodayDialogOpen}>
+        <DialogContent
+          dir="rtl"
+          className="max-w-lg max-h-[85vh] flex flex-col gap-0 overflow-hidden sm:max-w-lg"
+        >
+          <DialogHeader className="text-right shrink-0">
+            <DialogTitle>{t('commonIssues.hubClosedTodayDialogTitle')}</DialogTitle>
+            <DialogDescription>{t('commonIssues.hubClosedTodayDialogDesc')}</DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto py-2 space-y-2">
+            {closedTodayIssues.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-right py-6">
+                {t('commonIssues.hubClosedTodayEmpty')}
+              </p>
+            ) : (
+              closedTodayIssues.map(issue => (
+                <div
+                  key={issue._id}
+                  className="rounded-xl border border-border bg-card/60 p-3 text-right space-y-2"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <Badge
+                      variant="outline"
+                      className="shrink-0 border-emerald-500/35 text-emerald-800 dark:text-emerald-200 text-[10px]"
+                    >
+                      {t('commonIssues.badges.resolved')}
+                    </Badge>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-foreground">
+                        {tCategory(t, issue.category)}
+                      </p>
+                      {issue.entityType ? (
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          {entityTypeLabelAr(issue.entityType)}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                  {issue.sampleProblemSummary?.trim() ? (
+                    <div>
+                      <p className="text-[10px] font-bold text-muted-foreground mb-0.5">
+                        {t('liveIndicators.problem')}
+                      </p>
+                      <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                        {issue.sampleProblemSummary}
+                      </p>
+                    </div>
+                  ) : null}
+                  {issue.resolutionNotes?.trim() ? (
+                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/[0.07] px-3 py-2">
+                      <p className="text-[10px] font-bold text-emerald-800 dark:text-emerald-200 mb-1">
+                        {t('commonIssues.hubClosedTodaySolution')}
+                      </p>
+                      <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                        {issue.resolutionNotes}
+                      </p>
+                    </div>
+                  ) : null}
+                  <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[10px] text-muted-foreground border-t border-border/60 pt-2">
+                    <span>
+                      {t('commonIssues.hubClosedTodayResolvedAt')}:{' '}
+                      <span className="text-foreground font-medium">
+                        {formatAppDateTime(issue.resolvedAt!)}
+                      </span>
+                    </span>
+                    <span>
+                      {t('commonIssues.hubClosedTodayOccurrences', {
+                        count: issue.occurrenceCount,
+                      })}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <DialogFooter className="shrink-0 sm:justify-start">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setClosedTodayDialogOpen(false)}
+            >
+              {t('actions.close')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent className={cn('max-w-2xl', COMMON_ISSUES_DIALOG_PANEL)} dir="rtl">

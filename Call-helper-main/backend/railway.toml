@@ -1,0 +1,8 @@
+# Railway — اضبط Root Directory في لوحة Railway إلى: Call-helper-main/backend
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "npm start"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
