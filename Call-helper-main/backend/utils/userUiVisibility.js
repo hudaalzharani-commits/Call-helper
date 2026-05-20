@@ -5,6 +5,7 @@ export const ALLOWED_UI_VISIBILITY_KEYS = [
   'page_knowledge_base',
   'page_operational_updates',
   'page_what_did_rafeeq_learn',
+  'page_before_escalation',
   'page_teach_rafeeq_experience',
   'view_dashboard',
   'view_callhelper',

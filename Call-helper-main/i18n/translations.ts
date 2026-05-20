@@ -28,6 +28,7 @@ const shellAr = {
     'knowledge-base': 'سجل المعرفة',
     'operational-updates': 'التحديثات التشغيلية',
     'what-did-rafeeq-learn': 'وش تعلم رفيق؟',
+    'before-escalation': 'قبل التصعيد',
   },
   askRafeeq: {
     title: 'اسأل رفيق',
@@ -157,6 +158,7 @@ const shellEn = {
     'knowledge-base': 'Knowledge base',
     'operational-updates': 'Operational updates',
     'what-did-rafeeq-learn': 'What did Rafiq learn?',
+    'before-escalation': 'Before escalation',
   },
   askRafeeq: {
     title: 'Ask Rafiq',

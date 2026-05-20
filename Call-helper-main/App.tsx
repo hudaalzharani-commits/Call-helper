@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef, type ElementType, type ReactNode } from 'react';
 import {
-  User, Activity, AlertCircle, BookOpen, RefreshCw, Lightbulb,
+  User, Activity, AlertCircle, BookOpen, RefreshCw, Lightbulb, ArrowUpCircle,
   Headphones, Bot, Sparkles, Menu, X, Shield, Settings, LogOut, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import {
@@ -15,6 +15,7 @@ import { KnowledgeBase } from './components/KnowledgeBase';
 import { OperationalUpdates } from './components/OperationalUpdates';
 import { RafeeqTraining } from './components/RafeeqTraining';
 import { TeachRafeeqExperience } from './components/TeachRafeeqExperience';
+import { BeforeEscalation } from './components/BeforeEscalation';
 import { Logo, IconLogo } from './components/Logo';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AdvancedSettingsProvider } from './contexts/AdvancedSettingsContext';
@@ -38,6 +39,7 @@ const DASHBOARD_SERVICE_DEFS = [
   { id: 'knowledge-base', icon: BookOpen },
   { id: 'operational-updates', icon: RefreshCw },
   { id: 'what-did-rafeeq-learn', icon: Lightbulb },
+  { id: 'before-escalation', icon: ArrowUpCircle },
 ] as const;
 
 type DashboardServiceDef = (typeof DASHBOARD_SERVICE_DEFS)[number];
@@ -523,6 +525,7 @@ function AppContent() {
                 )}
                 {selectedService === 'operational-updates' && <OperationalUpdates />}
                 {selectedService === 'what-did-rafeeq-learn' && <RafeeqTraining />}
+                {selectedService === 'before-escalation' && <BeforeEscalation />}
                 {selectedService === 'teach-rafeeq-experience' &&
                   isUiFlagEnabled(user, pageKeyForServiceId('teach-rafeeq-experience')) && (
                     <TeachRafeeqExperience />
