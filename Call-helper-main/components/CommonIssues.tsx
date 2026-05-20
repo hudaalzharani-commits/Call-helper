@@ -110,8 +110,7 @@ function normCat(s: string) {
   return s.trim().toLowerCase();
 }
 
-/** صفحة «المشاكل العامة» — فقط أنماط فوق 10 حالات ومستمرة أكثر من 24 ساعة (متتبعة تشغيلياً). */
-const PUBLIC_ISSUES_MIN_CASES = 10;
+/** صفحة «المشاكل العامة» — بعد مرحلة «متكرر» ثم مرور 24 ساعة على التتبع التشغيلي. */
 const PUBLIC_ISSUES_PERSISTENCE_MS = 24 * 60 * 60 * 1000;
 
 function hubCaseCount(stat: CategoryStat, op?: OperationalIssue): number {
@@ -143,11 +142,19 @@ function qualifiesForPublicIssuesHub(
   stat: CategoryStat,
   operationalActive: OperationalIssue[],
   operationalArchived: OperationalIssue[],
+  dailyRepeatThreshold: number,
 ): boolean {
   const opA = findActiveOp(stat.category, operationalActive);
+  if (!categoryPersistedOver24h(stat.category, operationalActive, operationalArchived)) {
+    return false;
+  }
+  // ما زالت في مرحلة «متكرر اليوم» فقط — لم تُرفَع بعد إلى عامة
+  if (opA?.status === 'general_repeated') return false;
   const count = hubCaseCount(stat, opA);
-  if (count <= PUBLIC_ISSUES_MIN_CASES) return false;
-  return categoryPersistedOver24h(stat.category, operationalActive, operationalArchived);
+  if (opA?.status !== 'persistent_operational' && count < dailyRepeatThreshold) {
+    return false;
+  }
+  return true;
 }
 
 function buildPublicIssuesFromStats(
@@ -155,6 +162,7 @@ function buildPublicIssuesFromStats(
   weekMap: Map<string, WeekOverWeekCategoryRow>,
   operationalActive: OperationalIssue[],
   operationalArchived: OperationalIssue[],
+  dailyRepeatThreshold: number,
 ): Issue[] {
   // Ensure one row per normalized category to avoid duplicate card ids/states.
   const dedupedTop = new Map<string, CategoryStat>();
@@ -167,7 +175,7 @@ function buildPublicIssuesFromStats(
   }
 
   const qualified = Array.from(dedupedTop.values()).filter(s =>
-    qualifiesForPublicIssuesHub(s, operationalActive, operationalArchived),
+    qualifiesForPublicIssuesHub(s, operationalActive, operationalArchived, dailyRepeatThreshold),
   );
   const seen = new Set(qualified.map(s => normCat(s.category)));
 
@@ -179,7 +187,14 @@ function buildPublicIssuesFromStats(
       count: op.occurrenceCount ?? 0,
       percentage: 0,
     };
-    if (qualifiesForPublicIssuesHub(synthetic, operationalActive, operationalArchived)) {
+    if (
+      qualifiesForPublicIssuesHub(
+        synthetic,
+        operationalActive,
+        operationalArchived,
+        dailyRepeatThreshold,
+      )
+    ) {
       qualified.push(synthetic);
       seen.add(n);
     }
@@ -884,8 +899,15 @@ export function CommonIssues() {
       setOperationalActive(activeOps);
       setOperationalArchived(archivedOps);
 
+      const dailyRepeatThreshold = dist.frequentTodayThreshold ?? 10;
       setIssues(
-        buildPublicIssuesFromStats(top, weekMap, activeOps, archivedOps),
+        buildPublicIssuesFromStats(
+          top,
+          weekMap,
+          activeOps,
+          archivedOps,
+          dailyRepeatThreshold,
+        ),
       );
     } catch (error) {
       console.error('Error loading common issues hub:', error);

@@ -521,7 +521,7 @@ export function OperationalIssueTracker({
             <div className="flex items-center gap-2 justify-end">
               <Flame className="size-4 text-orange-600 dark:text-orange-400" />
               <span className="text-[11px] text-muted-foreground">
-                متكرر اليوم (≥ {thresholds.ROLLING_24H_THRESHOLD} / 24س)
+                متكرر اليوم (≥ {thresholds.ROLLING_24H_THRESHOLD} في اليوم)
               </span>
             </div>
             <p className="text-2xl font-bold text-foreground mt-1">

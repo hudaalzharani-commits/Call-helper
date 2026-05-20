@@ -31,7 +31,7 @@ import {
   getActiveIssues,
   getArchivedIssues,
   resolveIssue,
-  OPERATIONAL_ISSUE_CONSTANTS,
+  getOperationalIssueThresholdsForApi,
 } from '../services/operationalIssueService.js';
 import { mergeUiVisibility } from '../utils/userUiVisibility.js';
 
@@ -536,6 +536,7 @@ router.post('/calls', authenticate, async (req, res) => {
     // payload, but wrapped in the service's own try/catch so a failure here
     // never breaks the call log submission.
     let operationalIssue = null;
+    const issueThresholds = await getOperationalIssueThresholdsForApi();
     if (callLog.category) {
       const detection = await detectAndUpdateIssue({
         category: callLog.category,
@@ -549,7 +550,7 @@ router.post('/calls', authenticate, async (req, res) => {
           occurrenceCount: detection.issue.occurrenceCount,
           count24h: detection.count24h,
           count7d: detection.count7d,
-          thresholds: OPERATIONAL_ISSUE_CONSTANTS,
+          thresholds: issueThresholds,
         };
       } else if (detection) {
         operationalIssue = {
@@ -557,7 +558,7 @@ router.post('/calls', authenticate, async (req, res) => {
           status: null,
           count24h: detection.count24h,
           count7d: detection.count7d,
-          thresholds: OPERATIONAL_ISSUE_CONSTANTS,
+          thresholds: issueThresholds,
         };
       }
     }
@@ -754,10 +755,11 @@ router.get('/operational-issues', authenticate, async (req, res) => {
   try {
     await expireStaleIssues();
     const issues = await getActiveIssues();
+    const thresholds = await getOperationalIssueThresholdsForApi();
     res.json({
       success: true,
       data: issues,
-      thresholds: OPERATIONAL_ISSUE_CONSTANTS,
+      thresholds,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -769,10 +771,11 @@ router.get('/operational-issues/archive', authenticate, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit || '100', 10);
     const issues = await getArchivedIssues({ limit });
+    const thresholds = await getOperationalIssueThresholdsForApi();
     res.json({
       success: true,
       data: issues,
-      thresholds: OPERATIONAL_ISSUE_CONSTANTS,
+      thresholds,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

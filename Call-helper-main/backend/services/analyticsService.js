@@ -6,6 +6,7 @@
  */
 
 import CallLog from '../models/CallLog.js';
+import OperationalIssue from '../models/OperationalIssue.js';
 import User from '../models/User.js';
 import Case from '../models/Case.js';
 import KnowledgeBase from '../models/KnowledgeBase.js';
@@ -427,6 +428,33 @@ export async function getDistributionStats(query = {}) {
       threshold: frequentTodayThreshold,
     }));
 
+    // لوحة «المشاكل المتكررة»: فقط ما زال في مرحلة متكرر اليوم (يوم كامل حتى الترقية بعد 24س)
+    const activeDailyRepeated = await OperationalIssue.find({
+      status: 'general_repeated',
+    })
+      .select({ category: 1, entityType: 1, occurrenceCount: 1 })
+      .lean();
+    const countByKey = new Map(
+      frequentTodayGroups.map((g) => [
+        OperationalIssue.makeKey(g.category, g.entityType || null),
+        g.count,
+      ]),
+    );
+    const recurringTodayDashboard = activeDailyRepeated
+      .map((issue) => {
+        const key = OperationalIssue.makeKey(issue.category, issue.entityType);
+        const countToday = countByKey.get(key) ?? issue.occurrenceCount ?? 0;
+        if (countToday < frequentTodayThreshold) return null;
+        return {
+          category: issue.category,
+          entityType: issue.entityType || '*',
+          count: countToday,
+          threshold: frequentTodayThreshold,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.count - a.count);
+
     // —— مقارنة الفترة الحالية بفترة سابقة بنفس الطول (عند فلترة التاريخ) أو آخر 7 أيام متحركة ——
     let weekOverWeekByCategory;
     if (
@@ -596,6 +624,7 @@ export async function getDistributionStats(query = {}) {
         issuesByPriority,
         issuesByEntity,
         frequentTodayGroups,
+        recurringTodayDashboard,
         frequentTodayThreshold,
         frequentTodayBucketDate: bucketDate,
         weekOverWeekByCategory,

@@ -159,40 +159,39 @@ export function AdminPanel() {
         </div>
       </div>
 
-      {showDatabaseView ? (
-        <DatabasePage />
-      ) : (
-        <div className="flex gap-6">
-          <aside className="w-80 space-y-3 shrink-0">
-            <div className="glass-panel border-2 border-border rounded-2xl p-5">
-              <div className="mb-4">
-                <h3 className={`text-foreground font-bold px-3 mb-3 flex items-center gap-2 ${textAlign}`}>
-                  <Sparkles className="size-5 text-primary" />
-                  {t('admin.panel.menuTitle')}
-                </h3>
-              </div>
+      <div className="flex flex-col lg:flex-row gap-6">
+        <aside className="w-full lg:w-80 space-y-3 shrink-0">
+          <div className="glass-panel border-2 border-border rounded-2xl p-5">
+            <div className="mb-4">
+              <h3 className={`text-foreground font-bold px-3 mb-3 flex items-center gap-2 ${textAlign}`}>
+                <Sparkles className="size-5 text-primary" />
+                {t('admin.panel.menuTitle')}
+              </h3>
+            </div>
 
-              <div className="space-y-2">
-                {adminMenuItems.map((item) => {
-                  const Icon = item.icon;
-                  const isActive =
-                    selectedMenuItem === item.id ||
-                    item.subItems?.some((sub) => sub.id === selectedMenuItem);
-                  const isExpanded = expandedItems.includes(item.id);
-                  const hasSubItems = item.subItems && item.subItems.length > 0;
-                  const ExpandIcon = isExpanded ? ChevronDown : ChevronRight;
+            <div className="space-y-2">
+              {adminMenuItems.map((item) => {
+                const Icon = item.icon;
+                const isActive =
+                  !showDatabaseView &&
+                  (selectedMenuItem === item.id ||
+                    item.subItems?.some((sub) => sub.id === selectedMenuItem));
+                const isExpanded = expandedItems.includes(item.id);
+                const hasSubItems = item.subItems && item.subItems.length > 0;
+                const ExpandIcon = isExpanded ? ChevronDown : ChevronRight;
 
-                  return (
-                    <div key={item.id} className="space-y-1">
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedMenuItem(item.id);
-                            if (hasSubItems) {
-                              toggleExpand(item.id);
-                            }
-                          }}
+                return (
+                  <div key={item.id} className="space-y-1">
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowDatabaseView(false);
+                          setSelectedMenuItem(item.id);
+                          if (hasSubItems) {
+                            toggleExpand(item.id);
+                          }
+                        }}
                           className={`flex-1 group relative overflow-hidden rounded-xl transition-all duration-300 ${
                             isActive ? 'scale-[1.02] shadow-lg' : 'hover:scale-[1.01]'
                           }`}
@@ -222,13 +221,17 @@ export function AdminPanel() {
                         <div className={`space-y-1 ${subMenuIndent}`}>
                           {item.subItems!.map((subItem) => {
                             const SubIcon = subItem.icon;
-                            const isSubActive = selectedMenuItem === subItem.id;
+                            const isSubActive =
+                              !showDatabaseView && selectedMenuItem === subItem.id;
 
                             return (
                               <button
                                 key={subItem.id}
                                 type="button"
-                                onClick={() => setSelectedMenuItem(subItem.id)}
+                                onClick={() => {
+                                  setShowDatabaseView(false);
+                                  setSelectedMenuItem(subItem.id);
+                                }}
                                 className={`w-full ${textAlign} px-3 py-2 rounded-lg transition-all ${
                                   isSubActive
                                     ? 'bg-primary/20 text-primary border-2 border-primary'
@@ -247,13 +250,14 @@ export function AdminPanel() {
                     </div>
                   );
                 })}
-              </div>
             </div>
-          </aside>
+          </div>
+        </aside>
 
-          <div className="flex-1 min-w-0">{renderContent()}</div>
+        <div className="flex-1 min-w-0">
+          {showDatabaseView ? <DatabasePage /> : renderContent()}
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -64,8 +64,8 @@ export interface OperationalIssue {
 export interface OperationalIssueThresholds {
   ROLLING_24H_THRESHOLD: number;
   ROLLING_7D_THRESHOLD: number;
-  // Backend may also expose the new persistence signals; keep them optional
-  // so older API versions still type-check.
+  /** Same value as admin +/- daily repeat threshold (Settings). */
+  frequentIssueDailyThreshold?: number;
   DISTINCT_DAYS_THRESHOLD?: number;
   PERSISTENT_INACTIVITY_DAYS?: number;
 }

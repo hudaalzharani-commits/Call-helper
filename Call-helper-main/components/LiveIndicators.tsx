@@ -420,12 +420,24 @@ export function LiveIndicators() {
     }
   }, [selectedPeriod, t]);
 
+  /** متكرر اليوم فقط — نشط في التتبع طوال اليوم حتى مرور 24س (ثم يُرفَع لعامة) */
+  const frequentTodayGroupsFiltered = useMemo(() => {
+    const threshold = distributionStats?.frequentTodayThreshold ?? 10;
+    const dashboard = distributionStats?.recurringTodayDashboard;
+    if (dashboard && dashboard.length > 0) {
+      return dashboard.filter((g) => Number(g.count) >= threshold);
+    }
+    return (distributionStats?.frequentTodayGroups ?? []).filter(
+      (g) => Number(g.count) >= threshold,
+    );
+  }, [distributionStats]);
+
   const statsCards = useMemo(() => {
     const callsInPeriod =
       selectedPeriod === "today"
         ? (summaryStats?.callsToday ?? periodCasesTotal)
         : periodCasesTotal;
-    const topIssueCount = distributionStats?.topCategories?.[0]?.count ?? 0;
+    const topIssueCount = frequentTodayGroupsFiltered[0]?.count ?? 0;
     /** ÙŠØ·Ø§Ø¨Ù‚ Ø¹Ø¯Ø¯ Ø§Ù„Ø£Ø¹Ù…Ø¯Ø©/Ø§Ù„ÙØ¦Ø§Øª Ø§Ù„Ù…Ø¹Ø±ÙˆØ¶Ø© ÙÙŠ Ù…Ø®Ø·Ø· Â«Ø§Ù„Ù…Ø´Ø§ÙƒÙ„ Ø§Ù„Ø¹Ø§Ù…Ø©Â» (Ø¨Ø¹Ø¯ Ø§Ù„Ø¯Ù…Ø¬)ØŒ ÙˆÙ„ÙŠØ³ ÙƒÙ„ Ø§Ù„ØªØµÙ†ÙŠÙØ§Øª ÙÙŠ Ø§Ù„ÙØªØ±Ø© */
     const uniqueGeneralTypes = uniqueCommonIssuesChartData.length;
 
@@ -487,6 +499,7 @@ export function LiveIndicators() {
     ];
   }, [
     summaryStats,
+    frequentTodayGroupsFiltered,
     distributionStats,
     selectedPeriod,
     periodCasesTotal,
@@ -530,9 +543,14 @@ export function LiveIndicators() {
   }, [summaryStats, t]);
 
   const topIssuesData = useMemo(() => {
-    const top = distributionStats?.topCategories ?? [];
-    return top.slice(0, 5).map((c) => ({ name: c.category, value: Number(c.count) }));
-  }, [distributionStats]);
+    return frequentTodayGroupsFiltered
+      .slice(0, 5)
+      .map((g) => ({
+        name: g.category,
+        value: Number(g.count),
+        entityType: g.entityType,
+      }));
+  }, [frequentTodayGroupsFiltered]);
 
   const platformsData = useMemo(() => {
     const entities = distributionStats?.issuesByEntity ?? [];
@@ -1294,9 +1312,12 @@ export function LiveIndicators() {
             </CardHeader>
             <CardContent className="space-y-4 pt-6">
               {(() => {
-                const totalTypes = distributionStats?.topCategories?.length ?? 0;
-                const top = distributionStats?.topCategories?.[0];
-                const totalRepeats = (distributionStats?.topCategories ?? []).reduce((sum, c) => sum + Number(c.count), 0);
+                const totalTypes = frequentTodayGroupsFiltered.length;
+                const top = frequentTodayGroupsFiltered[0];
+                const totalRepeats = frequentTodayGroupsFiltered.reduce(
+                  (sum, g) => sum + Number(g.count),
+                  0,
+                );
 
                 return (
                   <>

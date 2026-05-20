@@ -89,6 +89,8 @@ export interface DistributionStats {
   issuesByPriority: PriorityStat[];
   issuesByEntity: EntityStat[];
   frequentTodayGroups?: FrequentTodayGroup[];
+  /** للداشبورد: فقط general_repeated النشطة اليوم (لا تشمل ما أصبحت عامة) */
+  recurringTodayDashboard?: FrequentTodayGroup[];
   frequentTodayThreshold?: number;
   frequentTodayBucketDate?: string;
   /** آخر 7 أيام مقابل الـ 7 أيام التي قبلها (حسب نفس تصنيفات topCategories) */

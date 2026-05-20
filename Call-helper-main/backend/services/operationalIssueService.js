@@ -8,7 +8,8 @@
  * UI copy in OperationalIssueTracker.tsx):
  *
  *   "general_repeated" (متكرر اليوم)
- *     - 5+ occurrences within the rolling 24h window
+ *     - Admin-configurable daily threshold on (category + entityType)
+ *       for the calendar day (bucketDate), same as Advanced Settings +/−
  *     - Lives for at most 24h after the last hit (auto-archives quickly)
  *     - Intended as a *spike detector* for today
  *
@@ -33,9 +34,10 @@
 
 import CallLog from '../models/CallLog.js';
 import OperationalIssue from '../models/OperationalIssue.js';
+import { getFrequentIssueThreshold } from '../utils/frequentIssueThreshold.js';
+import { calendarDayBounds, ANALYTICS_TZ } from '../utils/analyticsDateRange.js';
 
-// Spec thresholds. Kept as constants on purpose — separate from the
-// admin-configurable "frequent issue daily threshold" (Settings collection).
+// Weekly / persistence thresholds (7d lane). Daily recurring uses Settings.
 export const ROLLING_24H_THRESHOLD = 5;
 export const ROLLING_7D_THRESHOLD = 10;
 export const DISTINCT_DAYS_THRESHOLD = 3;
@@ -50,6 +52,7 @@ const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
  * updates the matching OperationalIssue. Never throws.
  *
  * Counting rules (per spec):
+ *   - countToday   : CallLogs on today's calendar bucketDate for the bucket
  *   - count24h     : CallLogs in the rolling 24h window for the bucket
  *   - count7d      : CallLogs in the rolling 7d  window for the bucket
  *   - distinctDays7d: number of distinct bucketDate values (YYYY-MM-DD) in
@@ -81,14 +84,16 @@ export async function detectAndUpdateIssue(call) {
     const now = new Date();
     const since24h = new Date(now.getTime() - TWENTY_FOUR_HOURS_MS);
     const since7d = new Date(now.getTime() - SEVEN_DAYS_MS);
+    const bucketDate = CallLog.computeBucketDate(now);
+    const dailyThreshold = await getFrequentIssueThreshold();
 
     const baseFilter = { category };
     if (entityType) baseFilter.entityType = entityType;
 
-    // Run the three signals in parallel. The distinctDays aggregation is
-    // cheap because the (category, entityType, bucketDate) compound index
-    // (added in CallLog.js) lets Mongo serve the $group from the index.
-    const [count24h, count7d, distinctDaysAgg] = await Promise.all([
+    // Run the signals in parallel. countToday uses the same calendar-day
+    // bucket as the admin +/- threshold and analytics frequentTodayGroups.
+    const [countToday, count24h, count7d, distinctDaysAgg] = await Promise.all([
+      CallLog.countDocuments({ ...baseFilter, bucketDate }),
       CallLog.countDocuments({ ...baseFilter, createdAt: { $gte: since24h } }),
       CallLog.countDocuments({ ...baseFilter, createdAt: { $gte: since7d } }),
       CallLog.aggregate([
@@ -99,7 +104,7 @@ export async function detectAndUpdateIssue(call) {
     ]);
     const distinctDays7d = distinctDaysAgg?.[0]?.days || 0;
 
-    const reachedDaily = count24h >= ROLLING_24H_THRESHOLD;
+    const reachedDaily = countToday >= dailyThreshold;
     const reachedWeekly = count7d >= ROLLING_7D_THRESHOLD;
     const reachedDistinctDays = distinctDays7d >= DISTINCT_DAYS_THRESHOLD;
 
@@ -154,7 +159,7 @@ export async function detectAndUpdateIssue(call) {
       // occurrenceCount is window-dependent: daily issues care about the
       // last 24h spike, persistent issues care about the 7d total.
       activeExisting.occurrenceCount =
-        newStatus === 'persistent_operational' ? count7d : count24h;
+        newStatus === 'persistent_operational' ? count7d : countToday;
 
       // Refresh the criteria snapshot so the UI can explain *why* a row is
       // classified the way it is right now.
@@ -219,7 +224,7 @@ export async function detectAndUpdateIssue(call) {
       issueKey: finalKey,
       status,
       occurrenceCount:
-        status === 'persistent_operational' ? count7d : count24h,
+        status === 'persistent_operational' ? count7d : countToday,
       distinctDays7d,
       detectionCriteria: criteria,
       firstDetectedAt: firstHit?.createdAt || now,
@@ -260,10 +265,39 @@ export async function expireStaleIssues() {
     const now = new Date();
     const dailyCutoff = new Date(now.getTime() - TWENTY_FOUR_HOURS_MS);
     const persistentCutoff = new Date(now.getTime() - SEVEN_DAYS_MS);
+    const todayYmd = CallLog.computeBucketDate(now);
+    const { start: todayStart } = calendarDayBounds(todayYmd, ANALYTICS_TZ);
+
+    // مرّت 24 ساعة من أول رصد وما زالت «متكرر اليوم» → عامة (تشغيلية مستمرة)
+    const promoteCutoff = new Date(now.getTime() - TWENTY_FOUR_HOURS_MS);
+    const toPromote = await OperationalIssue.find({
+      status: 'general_repeated',
+      firstDetectedAt: { $lte: promoteCutoff },
+    });
+
+    await Promise.all(
+      toPromote.map(async (issue) => {
+        const criteria = new Set(issue.detectionCriteria || []);
+        criteria.add('spans-beyond-24h');
+        issue.status = 'persistent_operational';
+        issue.detectionCriteria = [...criteria];
+        await issue.save();
+      }),
+    );
 
     // Two separate updates so each lane carries its own resolution note.
-    // Running them in parallel keeps the on-read overhead negligible.
-    const [dailyResult, persistentResult] = await Promise.all([
+    const [priorDayResult, dailyResult, persistentResult] = await Promise.all([
+      OperationalIssue.updateMany(
+        {
+          status: 'general_repeated',
+          firstDetectedAt: { $lt: todayStart },
+        },
+        {
+          status: 'resolved',
+          resolvedAt: now,
+          resolutionNotes: 'انتهى يوم التكرار — أُرشفت تلقائياً',
+        },
+      ),
       OperationalIssue.updateMany(
         {
           status: 'general_repeated',
@@ -273,7 +307,7 @@ export async function expireStaleIssues() {
           status: 'resolved',
           resolvedAt: now,
           resolutionNotes: 'انتهت دورة 24 ساعة بدون تكرار — أُرشفت تلقائياً',
-        }
+        },
       ),
       OperationalIssue.updateMany(
         {
@@ -285,17 +319,18 @@ export async function expireStaleIssues() {
           resolvedAt: now,
           resolutionNotes:
             'مرت 7 أيام بدون نشاط على المشكلة المستمرة — أُرشفت تلقائياً',
-        }
+        },
       ),
     ]);
 
     return {
-      daily: dailyResult.modifiedCount || 0,
+      daily: (dailyResult.modifiedCount || 0) + (priorDayResult.modifiedCount || 0),
       persistent: persistentResult.modifiedCount || 0,
+      promoted: toPromote.length,
     };
   } catch (err) {
     console.warn('⚠️ expireStaleIssues failed:', err.message);
-    return { daily: 0, persistent: 0 };
+    return { daily: 0, persistent: 0, promoted: 0 };
   }
 }
 
@@ -349,3 +384,13 @@ export const OPERATIONAL_ISSUE_CONSTANTS = Object.freeze({
   DISTINCT_DAYS_THRESHOLD,
   PERSISTENT_INACTIVITY_DAYS,
 });
+
+/** Thresholds for API consumers — daily recurring uses admin Settings. */
+export async function getOperationalIssueThresholdsForApi() {
+  const frequentIssueDailyThreshold = await getFrequentIssueThreshold();
+  return {
+    ...OPERATIONAL_ISSUE_CONSTANTS,
+    frequentIssueDailyThreshold,
+    ROLLING_24H_THRESHOLD: frequentIssueDailyThreshold,
+  };
+}
